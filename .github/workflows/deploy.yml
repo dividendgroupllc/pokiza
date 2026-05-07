@@ -194,9 +194,11 @@ jobs:
           FRAPPE_EOF
           
           # Restart services (as root)
+          # Run in background so SSH does not fail with "Broken pipe" if services restart the connection.
           echo "🔄 Restarting services..."
-          supervisorctl restart all
-          systemctl reload nginx || true
+          nohup bash -lc 'sleep 2; supervisorctl restart all; systemctl reload nginx || true' \
+            > /tmp/pokiza-deploy-restart.log 2>&1 &
+          echo "🔄 Service restart queued (log: /tmp/pokiza-deploy-restart.log)"
           
           echo "✅ Deployment updated successfully!"
           ENDSSH
