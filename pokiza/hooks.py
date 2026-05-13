@@ -89,7 +89,7 @@ doctype_js = {
 
 # before_install = "pokiza.install.before_install"
 after_install = "pokiza.setup.after_install"
-after_migrate = ["pokiza.setup.create_nakladnaya_print_format"]
+after_migrate = ["pokiza.setup.after_migrate"]
 
 # Uninstallation
 # ------------

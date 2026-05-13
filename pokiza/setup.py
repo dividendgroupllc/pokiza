@@ -5,6 +5,8 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
 NAKLADNAYA_PRINT_FORMAT = "Накладная Pokiza"
+BOM_DOCTYPE = "BOM"
+BOM_UNIQUE_CODE_FIELDNAME = "custom_unique_code"
 
 
 def get_custom_fields():
@@ -70,8 +72,125 @@ def get_custom_fields():
     }
 
 
-def after_install():
+def get_bom_unique_code_field():
+    return {
+        "fieldname": BOM_UNIQUE_CODE_FIELDNAME,
+        "label": "Custom Unique Code",
+        "fieldtype": "Data",
+        "insert_after": "item",
+        "in_list_view": 1,
+        "in_standard_filter": 1,
+        "reqd": 1,
+    }
+
+
+def sync_custom_fields():
     create_custom_fields(get_custom_fields(), ignore_validate=True, update=True)
+    sync_bom_unique_code_field()
+
+
+def sync_bom_unique_code_field():
+    field = get_bom_unique_code_field()
+    custom_field_name = frappe.db.get_value(
+        "Custom Field",
+        {"dt": BOM_DOCTYPE, "fieldname": BOM_UNIQUE_CODE_FIELDNAME},
+        "name",
+    )
+
+    if custom_field_name or not frappe.get_meta(BOM_DOCTYPE, cached=False).get_field(
+        BOM_UNIQUE_CODE_FIELDNAME
+    ):
+        create_custom_fields(
+            {BOM_DOCTYPE: [field]},
+            ignore_validate=True,
+            update=True,
+        )
+
+    normalize_blank_bom_unique_codes()
+    validate_existing_bom_unique_codes()
+    set_bom_unique_code_property()
+
+    frappe.clear_cache(doctype=BOM_DOCTYPE)
+    frappe.db.updatedb(BOM_DOCTYPE)
+
+
+def normalize_blank_bom_unique_codes():
+    if frappe.db.has_column(BOM_DOCTYPE, BOM_UNIQUE_CODE_FIELDNAME):
+        frappe.db.sql(
+            f"""
+            UPDATE `tab{BOM_DOCTYPE}`
+            SET `{BOM_UNIQUE_CODE_FIELDNAME}` = NULL
+            WHERE `{BOM_UNIQUE_CODE_FIELDNAME}` = ''
+            """
+        )
+
+
+def validate_existing_bom_unique_codes():
+    if not frappe.db.has_column(BOM_DOCTYPE, BOM_UNIQUE_CODE_FIELDNAME):
+        return
+
+    duplicates = frappe.db.sql(
+        f"""
+        SELECT `{BOM_UNIQUE_CODE_FIELDNAME}` AS code
+        FROM `tab{BOM_DOCTYPE}`
+        WHERE `{BOM_UNIQUE_CODE_FIELDNAME}` IS NOT NULL
+            AND `{BOM_UNIQUE_CODE_FIELDNAME}` != ''
+        GROUP BY `{BOM_UNIQUE_CODE_FIELDNAME}`
+        HAVING COUNT(*) > 1
+        LIMIT 5
+        """,
+        as_dict=True,
+    )
+    if duplicates:
+        duplicate_codes = ", ".join(d.code for d in duplicates)
+        frappe.throw(
+            "BOM custom_unique_code maydonini unique qilib bo'lmadi. "
+            f"Takrorlangan qiymatlar bor: {duplicate_codes}"
+        )
+
+
+def set_bom_unique_code_property():
+    custom_field_name = frappe.db.get_value(
+        "Custom Field",
+        {"dt": BOM_DOCTYPE, "fieldname": BOM_UNIQUE_CODE_FIELDNAME},
+        "name",
+    )
+    if custom_field_name:
+        frappe.db.set_value("Custom Field", custom_field_name, "unique", 1)
+        frappe.db.set_value("Custom Field", custom_field_name, "reqd", 1)
+
+    for property_name in ("unique", "reqd"):
+        property_setter_name = frappe.db.exists(
+            "Property Setter",
+            {
+                "doc_type": BOM_DOCTYPE,
+                "field_name": BOM_UNIQUE_CODE_FIELDNAME,
+                "property": property_name,
+            },
+        )
+        if property_setter_name:
+            frappe.db.set_value("Property Setter", property_setter_name, "value", "1")
+        else:
+            frappe.make_property_setter(
+                {
+                    "doctype": BOM_DOCTYPE,
+                    "fieldname": BOM_UNIQUE_CODE_FIELDNAME,
+                    "property": property_name,
+                    "property_type": "Check",
+                    "value": "1",
+                },
+                ignore_validate=True,
+                validate_fields_for_doctype=False,
+            )
+
+
+def after_install():
+    sync_custom_fields()
+    create_nakladnaya_print_format()
+
+
+def after_migrate():
+    sync_custom_fields()
     create_nakladnaya_print_format()
 
 
