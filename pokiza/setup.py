@@ -80,7 +80,7 @@ def get_bom_unique_code_field():
         "insert_after": "item",
         "in_list_view": 1,
         "in_standard_filter": 1,
-        "reqd": 1,
+        "reqd": 0,
     }
 
 
@@ -157,31 +157,45 @@ def set_bom_unique_code_property():
     )
     if custom_field_name:
         frappe.db.set_value("Custom Field", custom_field_name, "unique", 1)
-        frappe.db.set_value("Custom Field", custom_field_name, "reqd", 1)
+        frappe.db.set_value("Custom Field", custom_field_name, "reqd", 0)
 
-    for property_name in ("unique", "reqd"):
-        property_setter_name = frappe.db.exists(
-            "Property Setter",
-            {
-                "doc_type": BOM_DOCTYPE,
-                "field_name": BOM_UNIQUE_CODE_FIELDNAME,
-                "property": property_name,
-            },
+    unique_property_setter_name = frappe.db.exists(
+        "Property Setter",
+        {
+            "doc_type": BOM_DOCTYPE,
+            "field_name": BOM_UNIQUE_CODE_FIELDNAME,
+            "property": "unique",
+        },
+    )
+    if unique_property_setter_name:
+        frappe.db.set_value(
+            "Property Setter", unique_property_setter_name, "value", "1"
         )
-        if property_setter_name:
-            frappe.db.set_value("Property Setter", property_setter_name, "value", "1")
-        else:
-            frappe.make_property_setter(
-                {
-                    "doctype": BOM_DOCTYPE,
-                    "fieldname": BOM_UNIQUE_CODE_FIELDNAME,
-                    "property": property_name,
-                    "property_type": "Check",
-                    "value": "1",
-                },
-                ignore_validate=True,
-                validate_fields_for_doctype=False,
-            )
+    else:
+        frappe.make_property_setter(
+            {
+                "doctype": BOM_DOCTYPE,
+                "fieldname": BOM_UNIQUE_CODE_FIELDNAME,
+                "property": "unique",
+                "property_type": "Check",
+                "value": "1",
+            },
+            ignore_validate=True,
+            validate_fields_for_doctype=False,
+        )
+
+    reqd_property_setter_name = frappe.db.exists(
+        "Property Setter",
+        {
+            "doc_type": BOM_DOCTYPE,
+            "field_name": BOM_UNIQUE_CODE_FIELDNAME,
+            "property": "reqd",
+        },
+    )
+    if reqd_property_setter_name:
+        frappe.db.set_value(
+            "Property Setter", reqd_property_setter_name, "value", "0"
+        )
 
 
 def after_install():
