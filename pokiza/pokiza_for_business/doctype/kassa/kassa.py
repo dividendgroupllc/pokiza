@@ -7,9 +7,9 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt
 from erpnext.accounts.party import get_party_account as erpnext_get_party_account
 
-MODE_OF_PAYMENT_CASH_UZS_NAMES = ("Наличый UZS", "Наличный UZS")
-MODE_OF_PAYMENT_CASH_USD_NAMES = ("Наличый USD", "Наличный USD")
-MODE_OF_PAYMENT_BANK = "Р/С"
+# Konvertatsiya faqat shu valyutalar juftligida (UZS ↔ USD) amalga oshiriladi.
+# Mode of Payment turi nomidan EMAS, ulangan cash account valyutasidan aniqlanadi.
+CONVERSION_CURRENCIES = ("UZS", "USD")
 DIVIDEND_ACCOUNT_NUMBERS = {
     "Дивиденд": "3200",
     "Дивиденд 1": "3200",
@@ -17,22 +17,6 @@ DIVIDEND_ACCOUNT_NUMBERS = {
     "Дивиденд 3": "3202",
 }
 EXPENSE_PARENT_ACCOUNT_NUMBER = "5200"
-
-
-def is_cash_uzs_mode_of_payment(mode_of_payment):
-    return mode_of_payment in MODE_OF_PAYMENT_CASH_UZS_NAMES
-
-
-def is_cash_usd_mode_of_payment(mode_of_payment):
-    return mode_of_payment in MODE_OF_PAYMENT_CASH_USD_NAMES
-
-
-def is_uzs_conversion_mode_of_payment(mode_of_payment):
-    return is_cash_uzs_mode_of_payment(mode_of_payment) or mode_of_payment == MODE_OF_PAYMENT_BANK
-
-
-def is_usd_conversion_mode_of_payment(mode_of_payment):
-    return is_cash_usd_mode_of_payment(mode_of_payment)
 
 
 def is_dividend_party_type(party_type):
@@ -566,38 +550,40 @@ class Kassa(Document):
                 frappe.throw(_("Для перемещения способы оплаты должны иметь одинаковую валюту"))
 
     def validate_conversion(self):
-        """Conversion validatsiyasi"""
-        if self.transaction_type == "Конвертация":
-            if not self.mode_of_payment_to:
-                frappe.throw(_("Пожалуйста, выберите способ оплаты (куда)"))
+        """Conversion validatsiyasi.
 
-            source_is_uzs = is_uzs_conversion_mode_of_payment(self.mode_of_payment)
-            source_is_usd = is_usd_conversion_mode_of_payment(self.mode_of_payment)
-            target_is_uzs = is_uzs_conversion_mode_of_payment(self.mode_of_payment_to)
-            target_is_usd = is_usd_conversion_mode_of_payment(self.mode_of_payment_to)
+        Valyuta hisob-kitobi mode of payment NOMI bilan emas, balki ulangan
+        cash account'ning haqiqiy valyutasi (account_currency) bilan aniqlanadi.
+        Shu sabab Р/С USD bo'lsa ham, UZS bo'lsa ham to'g'ri tomonga tushadi.
+        """
+        if self.transaction_type != "Конвертация":
+            return
 
-            if not ((source_is_uzs and target_is_usd) or (source_is_usd and target_is_uzs)):
-                frappe.throw(_("Для конвертации выберите пару UZS ↔ USD"))
+        if not self.mode_of_payment_to:
+            frappe.throw(_("Пожалуйста, выберите способ оплаты (куда)"))
 
-            if not self.exchange_rate or flt(self.exchange_rate) <= 0:
-                frappe.throw(_("Пожалуйста, укажите курс обмена"))
+        if not self.exchange_rate or flt(self.exchange_rate) <= 0:
+            frappe.throw(_("Пожалуйста, укажите курс обмена"))
 
-            if flt(self.debit_amount) <= 0:
-                frappe.throw(_("Пожалуйста, укажите сумму расхода"))
+        if flt(self.debit_amount) <= 0:
+            frappe.throw(_("Пожалуйста, укажите сумму расхода"))
 
-            if flt(self.credit_amount) <= 0:
-                frappe.throw(_("Пожалуйста, укажите сумму прихода"))
+        if flt(self.credit_amount) <= 0:
+            frappe.throw(_("Пожалуйста, укажите сумму прихода"))
 
-            from_currency = frappe.get_cached_value("Account", self.cash_account, "account_currency") if self.cash_account else None
-            to_currency = frappe.get_cached_value("Account", self.cash_account_to, "account_currency") if self.cash_account_to else None
+        from_currency = frappe.get_cached_value("Account", self.cash_account, "account_currency") if self.cash_account else None
+        to_currency = frappe.get_cached_value("Account", self.cash_account_to, "account_currency") if self.cash_account_to else None
 
-            if not from_currency or not to_currency:
-                frappe.throw(_("Не удалось определить валюту счетов для конвертации"))
+        if not from_currency or not to_currency:
+            frappe.throw(_("Не удалось определить валюту счетов для конвертации"))
 
-            if from_currency == to_currency:
-                frappe.throw(
-                    _("Для конвертации способы оплаты должны иметь разные валюты")
-                )
+        if from_currency not in CONVERSION_CURRENCIES or to_currency not in CONVERSION_CURRENCIES:
+            frappe.throw(_("Для конвертации выберите счета в UZS или USD"))
+
+        if from_currency == to_currency:
+            frappe.throw(
+                _("Для конвертации способы оплаты должны иметь разные валюты")
+            )
 
     def validate_amount(self):
         """Summa validatsiyasi"""
@@ -666,6 +652,124 @@ def get_cash_account_with_currency(mode_of_payment, company):
         return {"account": account, "currency": currency}
 
     return {"account": None, "currency": None}
+
+
+def get_cash_mode_of_payment_currencies(company, currencies=None):
+    """Kompaniyaning enabled mode of payment'lari va ulangan cash account valyutasi.
+
+    Faqat shu kompaniya uchun cash account'i sozlangan usullar qaytariladi.
+    ``currencies`` berilsa — faqat o'sha valyutadagilar bilan cheklanadi.
+    """
+    params = {"company": company}
+    currency_condition = ""
+    if currencies:
+        currency_condition = "AND acc.account_currency IN %(currencies)s"
+        params["currencies"] = tuple(currencies)
+
+    return frappe.db.sql(
+        """
+        SELECT mpa.parent AS mode_of_payment, acc.account_currency AS currency
+        FROM `tabMode of Payment Account` mpa
+        INNER JOIN `tabAccount` acc ON acc.name = mpa.default_account
+        INNER JOIN `tabMode of Payment` mop ON mop.name = mpa.parent
+        WHERE mpa.company = %(company)s
+            AND mop.enabled = 1
+            {currency_condition}
+        """.format(currency_condition=currency_condition),
+        params,
+        as_dict=True,
+    )
+
+
+def get_source_mode_currency(company, source_mode_of_payment):
+    """Manba mode of payment'ning cash account valyutasi."""
+    if not source_mode_of_payment:
+        return None
+    source_account = get_cash_account(source_mode_of_payment, company)
+    if not source_account:
+        return None
+    return frappe.get_cached_value("Account", source_account, "account_currency")
+
+
+def get_conversion_mode_of_payments(company, source_mode_of_payment=None):
+    """Konvertatsiya uchun mos mode of payment'lar (UZS/USD, account valyutasi bo'yicha).
+
+    ``source_mode_of_payment`` berilganda faqat undan FARQLI valyutadagi
+    (qarama-qarshi tomon) usullar qaytariladi — manba USD bo'lsa UZS, aksincha.
+    """
+    rows = get_cash_mode_of_payment_currencies(company, CONVERSION_CURRENCIES)
+    source_currency = get_source_mode_currency(company, source_mode_of_payment)
+
+    result = []
+    for row in rows:
+        if source_mode_of_payment:
+            if row.mode_of_payment == source_mode_of_payment:
+                continue
+            if not source_currency or row.currency == source_currency:
+                continue
+        result.append(row)
+    return result
+
+
+def get_transfer_mode_of_payments(company, source_mode_of_payment=None):
+    """Перемещения uchun mos mode of payment'lar (account valyutasi bo'yicha).
+
+    ``source_mode_of_payment`` berilganda faqat u bilan BIR XIL valyutadagi
+    usullar qaytariladi — peremeshenie faqat bir xil valyuta o'rtasida bo'ladi.
+    """
+    rows = get_cash_mode_of_payment_currencies(company)
+    source_currency = get_source_mode_currency(company, source_mode_of_payment)
+
+    result = []
+    for row in rows:
+        if source_mode_of_payment:
+            if row.mode_of_payment == source_mode_of_payment:
+                continue
+            if not source_currency or row.currency != source_currency:
+                continue
+        result.append(row)
+    return result
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def conversion_mode_of_payment_query(doctype, txt, searchfield, start, page_len, filters):
+    """Kassa konvertatsiyasidagi "Способ оплаты" Link maydonlari uchun query.
+
+    ``filters.source_mode_of_payment`` berilsa — qarama-qarshi valyutadagi
+    usullarni qaytaradi (manba tomon uchun esa berilmaydi).
+    """
+    filters = filters or {}
+    company = filters.get("company")
+    if not company:
+        return []
+
+    modes = get_conversion_mode_of_payments(company, filters.get("source_mode_of_payment"))
+    return _format_mode_of_payment_query_result(modes, txt)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def transfer_mode_of_payment_query(doctype, txt, searchfield, start, page_len, filters):
+    """Перемещения dagi "Способ оплаты (куда)" Link maydoni uchun query.
+
+    Manba bilan BIR XIL valyutadagi usullarni qaytaradi.
+    """
+    filters = filters or {}
+    company = filters.get("company")
+    if not company:
+        return []
+
+    modes = get_transfer_mode_of_payments(company, filters.get("source_mode_of_payment"))
+    return _format_mode_of_payment_query_result(modes, txt)
+
+
+def _format_mode_of_payment_query_result(modes, txt):
+    if txt:
+        txt_lower = txt.lower()
+        modes = [m for m in modes if txt_lower in (m.mode_of_payment or "").lower()]
+
+    return [[m.mode_of_payment, m.currency] for m in modes]
 
 
 @frappe.whitelist()

@@ -1,58 +1,9 @@
 // Copyright (c) 2025, abdulloh and contributors
 // For license information, please see license.txt
 
-const MODE_OF_PAYMENT_CASH_UZS_NAMES = ["Наличый UZS", "Наличный UZS"];
-const MODE_OF_PAYMENT_CASH_USD_NAMES = ["Наличый USD", "Наличный USD"];
-const MODE_OF_PAYMENT_BANK = "Р/С";
+// Konvertatsiya/peremeshenie uchun mode of payment turi NOMI bilan emas,
+// ulangan cash account valyutasi bilan aniqlanadi (server query orqali).
 const DIVIDEND_PARTY_TYPES = ["Дивиденд", "Дивиденд 1", "Дивиденд 2", "Дивиденд 3"];
-
-function isCashUzsModeOfPayment(modeOfPayment) {
-    return MODE_OF_PAYMENT_CASH_UZS_NAMES.includes(modeOfPayment);
-}
-
-function isCashUsdModeOfPayment(modeOfPayment) {
-    return MODE_OF_PAYMENT_CASH_USD_NAMES.includes(modeOfPayment);
-}
-
-function isUzsModeOfPayment(modeOfPayment) {
-    return isCashUzsModeOfPayment(modeOfPayment) || modeOfPayment === MODE_OF_PAYMENT_BANK;
-}
-
-function isUsdModeOfPayment(modeOfPayment) {
-    return isCashUsdModeOfPayment(modeOfPayment);
-}
-
-function getUzsModeOfPaymentNames() {
-    return MODE_OF_PAYMENT_CASH_UZS_NAMES.concat([MODE_OF_PAYMENT_BANK]);
-}
-
-function getConversionModeOfPaymentNames() {
-    return getUzsModeOfPaymentNames().concat(MODE_OF_PAYMENT_CASH_USD_NAMES);
-}
-
-function getConversionTargetModeOfPaymentNames(modeOfPayment) {
-    if (isUzsModeOfPayment(modeOfPayment)) {
-        return MODE_OF_PAYMENT_CASH_USD_NAMES;
-    }
-
-    if (isUsdModeOfPayment(modeOfPayment)) {
-        return getUzsModeOfPaymentNames();
-    }
-
-    return getConversionModeOfPaymentNames();
-}
-
-function getTransferTargetModeOfPaymentNames(modeOfPayment) {
-    if (isUzsModeOfPayment(modeOfPayment)) {
-        return getUzsModeOfPaymentNames();
-    }
-
-    if (isUsdModeOfPayment(modeOfPayment)) {
-        return MODE_OF_PAYMENT_CASH_USD_NAMES;
-    }
-
-    return getConversionModeOfPaymentNames();
-}
 
 frappe.ui.form.on("Kassa", {
     onload: function(frm) {
@@ -144,6 +95,14 @@ frappe.ui.form.on("Kassa", {
                     if (r.message && r.message.account) {
                         frm.set_value("cash_account", r.message.account);
                         frm.set_value("cash_account_currency", r.message.currency);
+
+                        // Konvertatsiya faqat UZS/USD account valyutasida ishlaydi.
+                        if (frm.doc.transaction_type === "Конвертация"
+                            && r.message.currency
+                            && !["UZS", "USD"].includes(r.message.currency)) {
+                            frappe.msgprint(__("Для конвертации выберите способ оплаты в UZS или USD."));
+                        }
+
                         frm.trigger("update_balance");
                         frm.trigger("sync_currency_fields");
                         frm.trigger("update_exchange_fields");
@@ -169,19 +128,12 @@ frappe.ui.form.on("Kassa", {
         }
 
         // Clear mode_of_payment_to when mode_of_payment changes (for transfer/conversion)
+        // Manba o'zgarsa, "куда" tomonni tozalab, query'ni yangi valyutaga qarab qayta quramiz.
         if (in_list(["Перемещения", "Конвертация"], frm.doc.transaction_type)) {
             frm.set_value("mode_of_payment_to", "");
             frm.set_value("cash_account_to", "");
             frm.set_value("balance_to", 0);
             frm.trigger("set_mode_of_payment_to_query");
-
-            if (frm.doc.transaction_type === "Конвертация") {
-                if (!isUzsModeOfPayment(frm.doc.mode_of_payment) && !isUsdModeOfPayment(frm.doc.mode_of_payment)) {
-                    frappe.msgprint(__("Для конвертации выберите UZS или USD способ оплаты."));
-                    frm.set_value("mode_of_payment", "");
-                    return;
-                }
-            }
         }
     },
 
@@ -315,33 +267,56 @@ frappe.ui.form.on("Kassa", {
 
     set_mode_of_payment_query: function(frm) {
         frm.set_query("mode_of_payment", function() {
-            let filters = {
-                enabled: 1
-            };
-
+            // Konvertatsiya manbasi (откуда) — UZS/USD account valyutasidagi
+            // barcha usullar, haqiqiy account_currency bo'yicha (server query).
             if (frm.doc.transaction_type === "Конвертация") {
-                filters.name = ["in", getConversionModeOfPaymentNames()];
+                return {
+                    query: "pokiza.pokiza_for_business.doctype.kassa.kassa.conversion_mode_of_payment_query",
+                    filters: {
+                        company: frm.doc.company
+                    }
+                };
             }
 
             return {
-                filters: filters
+                filters: {
+                    enabled: 1
+                }
             };
         });
     },
 
     set_mode_of_payment_to_query: function(frm) {
         frm.set_query("mode_of_payment_to", function() {
+            // Konvertatsiyada "куда" tomon manba account valyutasiga qarab,
+            // server tomonda haqiqiy account_currency bo'yicha filterlanadi.
+            if (frm.doc.transaction_type === "Конвертация") {
+                return {
+                    query: "pokiza.pokiza_for_business.doctype.kassa.kassa.conversion_mode_of_payment_query",
+                    filters: {
+                        company: frm.doc.company,
+                        source_mode_of_payment: frm.doc.mode_of_payment
+                    }
+                };
+            }
+
+            // Peremeshenie ham "куда" tomonni manba account valyutasiga qarab
+            // (bir xil valyuta) server tomonda filterlaydi.
+            if (frm.doc.transaction_type === "Перемещения") {
+                return {
+                    query: "pokiza.pokiza_for_business.doctype.kassa.kassa.transfer_mode_of_payment_query",
+                    filters: {
+                        company: frm.doc.company,
+                        source_mode_of_payment: frm.doc.mode_of_payment
+                    }
+                };
+            }
+
             let filters = {
                 enabled: 1
             };
 
-            if (frm.doc.transaction_type === "Конвертация") {
-                filters.name = ["in", getConversionTargetModeOfPaymentNames(frm.doc.mode_of_payment)];
-            } else if (frm.doc.transaction_type === "Перемещения" && frm.doc.mode_of_payment) {
-                filters.name = ["in", getTransferTargetModeOfPaymentNames(frm.doc.mode_of_payment).filter(
-                    modeOfPayment => modeOfPayment !== frm.doc.mode_of_payment
-                )];
-            } else if (frm.doc.mode_of_payment) {
+            if (frm.doc.mode_of_payment) {
                 filters.name = ["!=", frm.doc.mode_of_payment];
             }
 

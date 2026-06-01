@@ -253,6 +253,28 @@ class UnitTestKassa(FrappeTestCase):
         with self.assertRaises(frappe.ValidationError):
             invalid_doc.validate_conversion()
 
+    @patch("pokiza.pokiza_for_business.doctype.kassa.kassa.frappe.get_cached_value")
+    def test_validate_conversion_uses_real_account_currency_for_bank(self, mocked_get_cached_value):
+        # Р/С account valyutasi USD bo'lsa ham, nomi emas, haqiqiy valyuta hisobga olinadi:
+        # USD (Р/С) -> UZS (Наличный UZS) konvertatsiyasi to'g'ri o'tishi kerak.
+        mocked_get_cached_value.side_effect = lambda doctype, name, fieldname: {
+            ("Account", "1111 - Р/С USD - P", "account_currency"): "USD",
+            ("Account", "1110 - Наличные UZB - P", "account_currency"): "UZS",
+        }.get((doctype, name, fieldname))
+
+        bank_usd_doc = make_kassa_doc(
+            transaction_type="Конвертация",
+            mode_of_payment="Р/С",
+            cash_account="1111 - Р/С USD - P",
+            mode_of_payment_to="Наличый UZS",
+            cash_account_to="1110 - Наличные UZB - P",
+            debit_amount=100,
+            credit_amount=1219000,
+            party_type="",
+            party=None,
+        )
+        bank_usd_doc.validate_conversion()
+
     @patch("pokiza.pokiza_for_business.doctype.kassa.kassa.get_exchange_rate", return_value=12200)
     def test_set_payment_exchange_details_auto_calculates_credit_amount(self, _mocked_rate):
         doc = make_kassa_doc(credit_amount=0, manual_credit_amount=0, amount=183)
