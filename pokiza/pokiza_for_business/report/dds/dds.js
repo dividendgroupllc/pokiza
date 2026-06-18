@@ -42,7 +42,7 @@ frappe.query_reports["DDS"] = {
             "fieldname": "category",
             "label": __("Категория"),
             "fieldtype": "Select",
-            "options": "\nПокупатели\nПоставщики\nРасходы\nДивиденды\nСотрудники\nПеремещения"
+            "options": "\nПокупатели\nПоставщики\nРасходы\nДивиденд 1\nДивиденд 2\nДивиденд 3\nСотрудники\nПеремещения"
         }
     ],
 
@@ -53,8 +53,14 @@ frappe.query_reports["DDS"] = {
             value = value.replace(/\$/g, '');
         }
 
-        if (data && (data.is_opening || data.is_total)) {
-            value = `<span style="font-weight: bold;">${value}</span>`;
+        if (column.fieldname == "kirim" && data) {
+            if (!data.kirim) return "";
+            value = `<span style="color: #1b5e20; font-weight: 600;">${value}</span>`;
+        }
+
+        if (column.fieldname == "chiqim" && data) {
+            if (!data.chiqim) return "";
+            value = `<span style="color: #b71c1c; font-weight: 600;">${value}</span>`;
         }
 
         return value;
