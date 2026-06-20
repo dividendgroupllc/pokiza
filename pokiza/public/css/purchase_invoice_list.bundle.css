@@ -1,0 +1,56 @@
+/* Purchase Invoice ro'yxatidagi status pill'lariga yorqin, farqli ranglar.
+ *
+ * Har bir status pill'ida Frappe `data-filter` atributini qo'yadi
+ * (masalan Overdue -> "status,=,Overdue", Cancelled -> "docstatus,=,2").
+ * Shu atribut orqali har statusni aniq tanlaymiz — JS kerak emas.
+ *
+ * Scope: faqat Purchase Invoice list/report view (data-page-route),
+ * shu sabab boshqa doctype'larga ta'sir qilmaydi.
+ */
+
+[data-page-route^="List/Purchase Invoice"] .indicator-pill.filterable {
+	font-weight: 600;
+}
+
+/* Overdue — ko'k */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Overdue"] {
+	background: #2490ef;
+	color: #ffffff;
+}
+
+/* Cancelled — sariq (data-filter docstatus,=,2 bo'ladi) */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="docstatus,=,2"] {
+	background: #f5b301;
+	color: #4a3500;
+}
+
+/* Unpaid — to'q sariq */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Unpaid"] {
+	background: #fb8c00;
+	color: #ffffff;
+}
+
+/* Paid — och havorang */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Paid"] {
+	background: #7cc4f0;
+	color: #08334f;
+}
+
+/* Partly Paid — binafsha */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Partly Paid"] {
+	background: #8b5cf6;
+	color: #ffffff;
+}
+
+/* Return / Debit Note Issued — kulrang */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Return"],
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Debit Note Issued"] {
+	background: #9aa4b2;
+	color: #ffffff;
+}
+
+/* Internal Transfer — to'q kulrang */
+[data-page-route^="List/Purchase Invoice"] .indicator-pill[data-filter="status,=,Internal Transfer"] {
+	background: #5c6573;
+	color: #ffffff;
+}

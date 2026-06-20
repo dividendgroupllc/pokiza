@@ -25,7 +25,7 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/pokiza/css/pokiza.css"
+app_include_css = "purchase_invoice_list.bundle.css"
 # app_include_js = "/assets/pokiza/js/pokiza.js"
 
 # include js, css files in header of web template
