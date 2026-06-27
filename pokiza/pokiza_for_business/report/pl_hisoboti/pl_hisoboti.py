@@ -289,14 +289,31 @@ def build_rows(period_list, pdata, prod_accounts=None):
     if prod_accounts is None:
         prod_accounts = PRODUCTION_ROWS
 
-    def row(label, value_map, bold=False, indent=0):
-        INDENT = {0: "", 1: "    ", 2: "        "}
-        prefix = INDENT.get(indent, "            ")
-        r = {"label": prefix + label, "bold": 1 if bold else 0}
+    def root(label, value_map):
+        """Asosiy bo'lim — katta harf, bold."""
+        r = {"label": label.upper(), "bold": 1}
         r.update(value_map)
         return r
 
-    def spacer():
+    def result(label, value_map):
+        """Natija qatori — '= ' prefiksi, bold."""
+        r = {"label": "= " + label.upper(), "bold": 1}
+        r.update(value_map)
+        return r
+
+    def sub(label, value_map):
+        """1-darajali ichki qator."""
+        r = {"label": "    " + label, "bold": 0}
+        r.update(value_map)
+        return r
+
+    def detail(label, value_map):
+        """2-darajali ichki qator."""
+        r = {"label": "        " + label, "bold": 0}
+        r.update(value_map)
+        return r
+
+    def divider():
         r = {"label": "", "bold": 0}
         for p in period_list:
             r[_fk(p["key"])] = None
@@ -307,19 +324,19 @@ def build_rows(period_list, pdata, prod_accounts=None):
 
     rows = []
 
-    # ── Volume ──
-    rows.append(row("Объём продажи (кг)", vmap(lambda d: d["volume"]), bold=True))
-    rows.append(spacer())
+    # ── Volume ──────────────────────────────────────────────────────────────
+    rows.append(root("Объём продажи (кг)", vmap(lambda d: d["volume"])))
+    rows.append(divider())
 
-    # ── Revenue ──
-    rows.append(row("Выручка от реализации", vmap(lambda d: d["revenue"]), bold=True))
+    # ── Revenue ─────────────────────────────────────────────────────────────
+    rows.append(root("Выручка от реализации", vmap(lambda d: d["revenue"])))
     avg = {_fk(p["key"]): (pdata[p["key"]]["revenue"] / pdata[p["key"]]["volume"])
            if pdata[p["key"]]["volume"] else 0
            for p in period_list}
-    rows.append(row("средний цена за кг", avg, indent=1))
-    rows.append(spacer())
+    rows.append(sub("средний цена за кг", avg))
+    rows.append(divider())
 
-    # ── Себестоимость ──
+    # ── Себестоимость ────────────────────────────────────────────────────────
     cogs_total = {}
     prod_total = {}
     for p in period_list:
@@ -328,28 +345,28 @@ def build_rows(period_list, pdata, prod_accounts=None):
         prod_total[_fk(p["key"])] = pt
         cogs_total[_fk(p["key"])] = d["cogs"] + pt
 
-    rows.append(row("Себестоимость реализации", cogs_total, bold=True))
-    rows.append(row("Производственные расходы", prod_total, indent=1))
+    rows.append(root("Себестоимость реализации", cogs_total))
+    rows.append(sub("Производственные расходы", prod_total))
     for acc_name, prod_key in prod_accounts:
         prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
-        rows.append(row(acc_name, prow, indent=2))
-    rows.append(spacer())
+        rows.append(detail(acc_name, prow))
+    rows.append(divider())
 
-    # ── Gross Profit ──
+    # ── Прибыль валовая ──────────────────────────────────────────────────────
     gp = {}
     for p in period_list:
         d  = pdata[p["key"]]
         pt = sum(d["prod"].values())
         gp[_fk(p["key"])] = d["revenue"] - d["cogs"] - pt
 
-    rows.append(row("Прибыль валовая", gp, bold=True))
+    rows.append(result("Прибыль валовая", gp))
     margin = {_fk(p["key"]): (gp[_fk(p["key"])] / pdata[p["key"]]["revenue"] * 100)
               if pdata[p["key"]]["revenue"] else 0
               for p in period_list}
-    rows.append(row("маржа %", margin, indent=1))
-    rows.append(spacer())
+    rows.append(sub("маржа %", margin))
+    rows.append(divider())
 
-    # ── OpEx ──
+    # ── Расходы с прибыли ────────────────────────────────────────────────────
     opex_total = {}
     for p in period_list:
         d = pdata[p["key"]]
@@ -357,7 +374,7 @@ def build_rows(period_list, pdata, prod_accounts=None):
             d["opex_sales"] + d["opex_admin"] + d["opex_other"] +
             d["opex_fin"]   + d["opex_tax"]
         )
-    rows.append(row("Расходы с прибыли", opex_total, bold=True))
+    rows.append(root("Расходы с прибыли", opex_total))
 
     for section_label, key in [
         ("52002 - Расходы по реализации",       "opex_sales"),
@@ -367,10 +384,10 @@ def build_rows(period_list, pdata, prod_accounts=None):
         ("52006 - налог с прибыли",             "opex_tax"),
     ]:
         svals = {_fk(p["key"]): pdata[p["key"]][key] for p in period_list}
-        rows.append(row(section_label, svals, indent=1))
-    rows.append(spacer())
+        rows.append(sub(section_label, svals))
+    rows.append(divider())
 
-    # ── Net Profit ──
+    # ── Чистая прибыль ───────────────────────────────────────────────────────
     np_map = {}
     for p in period_list:
         d     = pdata[p["key"]]
@@ -379,11 +396,11 @@ def build_rows(period_list, pdata, prod_accounts=None):
         opex  = d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"]
         np_map[_fk(p["key"])] = gross - opex
 
-    rows.append(row("Чистая прибыль", np_map, bold=True))
+    rows.append(result("Чистая прибыль", np_map))
     net_margin = {_fk(p["key"]): (np_map[_fk(p["key"])] / pdata[p["key"]]["revenue"] * 100)
                   if pdata[p["key"]]["revenue"] else 0
                   for p in period_list}
-    rows.append(row("рентабельность %", net_margin, indent=1))
+    rows.append(sub("рентабельность %", net_margin))
 
     return rows
 
