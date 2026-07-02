@@ -289,118 +289,96 @@ def build_rows(period_list, pdata, prod_accounts=None):
     if prod_accounts is None:
         prod_accounts = PRODUCTION_ROWS
 
-    def root(label, value_map):
-        """Asosiy bo'lim — katta harf, bold."""
-        r = {"label": label.upper(), "bold": 1}
-        r.update(value_map)
-        return r
+    fkeys = [_fk(p["key"]) for p in period_list]
 
-    def result(label, value_map):
-        """Natija qatori — '= ' prefiksi, bold."""
-        r = {"label": "= " + label.upper(), "bold": 1}
-        r.update(value_map)
-        return r
-
-    def sub(label, value_map):
-        """1-darajali ichki qator."""
-        r = {"label": "    " + label, "bold": 0}
-        r.update(value_map)
-        return r
-
-    def detail(label, value_map):
-        """2-darajali ichki qator."""
-        r = {"label": "        " + label, "bold": 0}
-        r.update(value_map)
+    def mk(label, getter=None, value_map=None, row_type="detail", level=0,
+           is_percent=False, is_ratio=False, is_cost=False, is_qty=False):
+        """Universal qator yaratuvchi — dizayn uchun row_type/level/flaglar bilan."""
+        r = {
+            "label":        label,
+            "row_type":     row_type,
+            "indent_level": level,
+            "is_percent":   1 if is_percent else 0,
+            "is_ratio":     1 if is_ratio else 0,
+            "is_cost":      1 if is_cost else 0,
+            "is_qty":       1 if is_qty else 0,
+        }
+        if value_map is None and getter is not None:
+            value_map = {_fk(p["key"]): getter(pdata[p["key"]]) for p in period_list}
+        r.update(value_map or {})
         return r
 
     def divider():
-        r = {"label": "", "bold": 0}
-        for p in period_list:
-            r[_fk(p["key"])] = None
+        r = {"label": "", "row_type": "divider", "indent_level": 0}
+        for fk in fkeys:
+            r[fk] = None
         return r
 
-    def vmap(getter):
-        return {_fk(p["key"]): getter(pdata[p["key"]]) for p in period_list}
+    def per_period(fn):
+        return {_fk(p["key"]): fn(pdata[p["key"]]) for p in period_list}
 
     rows = []
 
-    # ── Volume ──────────────────────────────────────────────────────────────
-    rows.append(root("Объём продажи (кг)", vmap(lambda d: d["volume"])))
+    # ── Объём продажи (кг) ────────────────────────────────────────────────────
+    rows.append(mk("Объём продажи (кг)", getter=lambda d: d["volume"],
+                   row_type="root", is_qty=True))
     rows.append(divider())
 
-    # ── Revenue ─────────────────────────────────────────────────────────────
-    rows.append(root("Выручка от реализации", vmap(lambda d: d["revenue"])))
-    avg = {_fk(p["key"]): (pdata[p["key"]]["revenue"] / pdata[p["key"]]["volume"])
-           if pdata[p["key"]]["volume"] else 0
-           for p in period_list}
-    rows.append(sub("средний цена за кг", avg))
+    # ── Выручка от реализации ─────────────────────────────────────────────────
+    rows.append(mk("Выручка от реализации", getter=lambda d: d["revenue"], row_type="root"))
+    rows.append(mk("средний цена за кг",
+                   value_map=per_period(lambda d: d["revenue"] / d["volume"] if d["volume"] else 0),
+                   row_type="ratio", level=1, is_ratio=True))
     rows.append(divider())
 
-    # ── Себестоимость ────────────────────────────────────────────────────────
-    cogs_total = {}
-    prod_total = {}
-    for p in period_list:
-        d  = pdata[p["key"]]
-        pt = sum(d["prod"].values())
-        prod_total[_fk(p["key"])] = pt
-        cogs_total[_fk(p["key"])] = d["cogs"] + pt
+    # ── Себестоимость реализации (= Сырьё + Производственные расходы) ──────────
+    # Andoza uslubi: Себестоимость JAMI = xomashyo (COGS) + ishlab chiqarish.
+    # Сырьё alohida qator sifatida ko'rsatilmaydi (jami ичida turadi),
+    # faqat Производственные расходы detali chiqadi.
+    prod_total = per_period(lambda d: sum(d["prod"].values()))
+    cogs_total = per_period(lambda d: d["cogs"] + sum(d["prod"].values()))
 
-    rows.append(root("Себестоимость реализации", cogs_total))
-    rows.append(sub("Производственные расходы", prod_total))
+    rows.append(mk("Себестоимость реализации", value_map=cogs_total,
+                   row_type="root", is_cost=True))
+    rows.append(mk("Производственные расходы", value_map=prod_total,
+                   row_type="sub", level=1, is_cost=True))
     for acc_name, prod_key in prod_accounts:
         prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
-        rows.append(detail(acc_name, prow))
+        rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True))
     rows.append(divider())
 
-    # ── Прибыль валовая ──────────────────────────────────────────────────────
-    gp = {}
-    for p in period_list:
-        d  = pdata[p["key"]]
-        pt = sum(d["prod"].values())
-        gp[_fk(p["key"])] = d["revenue"] - d["cogs"] - pt
-
-    rows.append(result("Прибыль валовая", gp))
-    margin = {_fk(p["key"]): (gp[_fk(p["key"])] / pdata[p["key"]]["revenue"] * 100)
-              if pdata[p["key"]]["revenue"] else 0
-              for p in period_list}
-    rows.append(sub("маржа %", margin))
+    # ── = Прибыль валовая = Выручка − Себестоимость ───────────────────────────
+    gp = per_period(lambda d: d["revenue"] - d["cogs"] - sum(d["prod"].values()))
+    rows.append(mk("Прибыль валовая", value_map=gp, row_type="result"))
+    rows.append(mk("маржа",
+                   value_map=per_period(lambda d: (d["revenue"] - d["cogs"] - sum(d["prod"].values())) / d["revenue"] * 100 if d["revenue"] else 0),
+                   row_type="percent", level=1, is_percent=True))
     rows.append(divider())
 
-    # ── Расходы с прибыли ────────────────────────────────────────────────────
-    opex_total = {}
-    for p in period_list:
-        d = pdata[p["key"]]
-        opex_total[_fk(p["key"])] = (
-            d["opex_sales"] + d["opex_admin"] + d["opex_other"] +
-            d["opex_fin"]   + d["opex_tax"]
-        )
-    rows.append(root("Расходы с прибыли", opex_total))
-
+    # ── Расходы с прибыли ─────────────────────────────────────────────────────
+    opex_total = per_period(lambda d: d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"])
+    rows.append(mk("Расходы с прибыли", value_map=opex_total, row_type="root", is_cost=True))
     for section_label, key in [
-        ("52002 - Расходы по реализации",       "opex_sales"),
-        ("52003 - Административные расходы",    "opex_admin"),
-        ("52004 - Прочие операционные расходы", "opex_other"),
-        ("52005 - Финансовые расходы",          "opex_fin"),
-        ("52006 - налог с прибыли",             "opex_tax"),
+        ("Расходы по реализации",       "opex_sales"),
+        ("Административные расходы",     "opex_admin"),
+        ("Прочие операционные расходы", "opex_other"),
+        ("Финансовые расходы",          "opex_fin"),
+        ("налог с прибыли",             "opex_tax"),
     ]:
         svals = {_fk(p["key"]): pdata[p["key"]][key] for p in period_list}
-        rows.append(sub(section_label, svals))
+        rows.append(mk(section_label, value_map=svals, row_type="sub", level=1, is_cost=True))
     rows.append(divider())
 
-    # ── Чистая прибыль ───────────────────────────────────────────────────────
-    np_map = {}
-    for p in period_list:
-        d     = pdata[p["key"]]
-        pt    = sum(d["prod"].values())
-        gross = d["revenue"] - d["cogs"] - pt
+    # ── = Чистая прибыль = Прибыль валовая − Расходы с прибыли ─────────────────
+    def _net(d):
+        gross = d["revenue"] - d["cogs"] - sum(d["prod"].values())
         opex  = d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"]
-        np_map[_fk(p["key"])] = gross - opex
+        return gross - opex
 
-    rows.append(result("Чистая прибыль", np_map))
-    net_margin = {_fk(p["key"]): (np_map[_fk(p["key"])] / pdata[p["key"]]["revenue"] * 100)
-                  if pdata[p["key"]]["revenue"] else 0
-                  for p in period_list}
-    rows.append(sub("рентабельность %", net_margin))
+    rows.append(mk("Чистая прибыль", value_map=per_period(_net), row_type="result"))
+    rows.append(mk("рентабельность",
+                   value_map=per_period(lambda d: _net(d) / d["revenue"] * 100 if d["revenue"] else 0),
+                   row_type="percent", level=1, is_percent=True))
 
     return rows
 
