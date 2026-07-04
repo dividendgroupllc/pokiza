@@ -69,6 +69,15 @@ def get_custom_fields():
                 "in_list_view": 0,
             },
         ],
+        "Sales Order": [
+            {
+                "fieldname": "custom_izoh",
+                "label": "Izoh (sex ekrani uchun)",
+                "fieldtype": "Small Text",
+                "insert_after": "order_type",
+                "in_list_view": 0,
+            },
+        ],
     }
 
 

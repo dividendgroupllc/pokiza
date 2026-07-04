@@ -340,12 +340,6 @@ def build_rows(period_list, pdata, prod_accounts=None):
 
     rows.append(mk("Себестоимость реализации", value_map=cogs_total,
                    row_type="root", is_cost=True))
-    rows.append(mk("Производственные расходы", value_map=prod_total,
-                   row_type="sub", level=1, is_cost=True))
-    for acc_name, prod_key in prod_accounts:
-        prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
-        rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True))
-    rows.append(divider())
 
     # ── = Прибыль валовая = Выручка − Себестоимость ───────────────────────────
     gp = per_period(lambda d: d["revenue"] - d["cogs"] - sum(d["prod"].values()))
@@ -353,6 +347,12 @@ def build_rows(period_list, pdata, prod_accounts=None):
     rows.append(mk("маржа",
                    value_map=per_period(lambda d: (d["revenue"] - d["cogs"] - sum(d["prod"].values())) / d["revenue"] * 100 if d["revenue"] else 0),
                    row_type="percent", level=1, is_percent=True))
+
+    rows.append(mk("Производственные расходы", value_map=prod_total,
+                   row_type="sub", level=1, is_cost=True))
+    for acc_name, prod_key in prod_accounts:
+        prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
+        rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True))
     rows.append(divider())
 
     # ── Расходы с прибыли ─────────────────────────────────────────────────────
