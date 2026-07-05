@@ -35,6 +35,12 @@ frappe.query_reports["PL Hisoboti"] = {
         }
     ],
 
+    // Sodda oq-qora dizayn: fon rangi yo'q, faqat asosiy (root/result/sub)
+    // qatorlar bold, tafsilot qatorlari oddiy vazn bilan ajratiladi.
+    tree: true,
+    name_field: "label",
+    initial_depth: 0,
+
     "formatter": function (value, row, column, data, default_formatter) {
         const rt = data ? data.row_type : null;
 
@@ -43,17 +49,17 @@ frappe.query_reports["PL Hisoboti"] = {
             if (!data || rt === "divider") return "";
             const level = data.indent_level || 0;
             const pad = 6 + level * 22;
-            let s = `padding-left:${pad}px;white-space:nowrap;`;
+            let s = `padding-left:${pad}px;white-space:nowrap;color:#000;`;
             if (rt === "root") {
-                s += "font-weight:700;text-transform:uppercase;color:#0f2942;letter-spacing:.3px;";
+                s += "font-weight:700;text-transform:uppercase;letter-spacing:.3px;";
             } else if (rt === "result") {
-                s += "font-weight:800;color:#0b6b3a;";
+                s += "font-weight:800;";
             } else if (rt === "sub") {
-                s += "font-weight:600;color:#334155;";
+                s += "font-weight:600;";
             } else if (rt === "detail") {
-                s += "color:#64748b;font-size:12px;";
+                s += "font-size:12.5px;";
             } else if (rt === "percent" || rt === "ratio") {
-                s += "font-style:italic;color:#94a3b8;font-size:11.5px;";
+                s += "font-style:italic;font-size:11.5px;";
             }
             const label = frappe.utils.escape_html(data.label || "");
             return `<div style="${s}">${label}</div>`;
@@ -64,34 +70,29 @@ frappe.query_reports["PL Hisoboti"] = {
         if (value === null || value === undefined || value === "") return "";
         const num = flt(value);
 
-        // Foiz qatorlari — alohida ajralib turadi (pill)
+        // Foiz qatorlari
         if (rt === "percent") {
             const v = Math.round(num);
-            const bg  = v >= 0 ? "#eef4ff" : "#fef2f2";
-            const clr = v >= 0 ? "#2563eb" : "#dc2626";
-            return `<span style="display:inline-block;padding:1px 9px;border-radius:11px;`
-                 + `background:${bg};color:${clr};font-weight:700;font-size:11px;">${v}%</span>`;
+            return `<span style="font-style:italic;font-weight:600;">${v}%</span>`;
         }
 
         // Nisbat (средний цена за кг) — 2 xonali
         if (rt === "ratio") {
             const v = num.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return `<span style="font-style:italic;color:#64748b;">${v}</span>`;
+            return `<span style="font-style:italic;">${v}</span>`;
         }
 
         // Oddiy summalar — kasrsiz (.00 yo'q), mingliklar probel bilan
         let txt = Math.round(num).toLocaleString("ru-RU");
         if (data.is_qty) txt += " кг";
 
-        let s = "";
-        if (rt === "root" || rt === "result") s += "font-weight:700;";
-        if (data.is_cost) {
-            s += "color:#dc2626;";                          // xarajat/tannarx — qizil
-        } else if (rt === "result") {
-            s += (num >= 0 ? "color:#0b6b3a;" : "color:#dc2626;"); // foyda — yashil
-        } else if (rt === "root") {
-            s += "color:#0f2942;";                          // выручка/объём — to'q ko'k
+        const w = (rt === "root" || rt === "result") ? 800 : (rt === "sub" ? 700 : 400);
+
+        // Manfiy qiymatlar — qavs ichida (buxgalteriya konvensiyasi), rang ishlatilmaydi
+        if (num < 0) {
+            const absTxt = Math.round(Math.abs(num)).toLocaleString("ru-RU");
+            return `<span style="font-weight:${w};">(${absTxt})</span>`;
         }
-        return `<span style="${s}">${txt}</span>`;
+        return `<span style="font-weight:${w};">${txt}</span>`;
     }
 };

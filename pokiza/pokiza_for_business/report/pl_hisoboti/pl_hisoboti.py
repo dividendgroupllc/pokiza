@@ -48,10 +48,17 @@ def execute(filters=None):
     gl_rows       = fetch_gl(company, from_date, to_date)
     vol_rows      = fetch_volume(company, from_date, to_date)
     prod_accounts = fetch_production_accounts(company)
+    opex_accounts = {
+        "opex_sales": fetch_group_accounts(company, "52002", OPEX_SALES_NUM),
+        "opex_admin": fetch_group_accounts(company, "52003", OPEX_ADMIN_NUM),
+        "opex_other": fetch_group_accounts(company, "52004", OPEX_OTHER_NUM, OPEX_OTHER_NAMES),
+        "opex_fin":   fetch_group_accounts(company, "52005", OPEX_FIN_NUM,  OPEX_FIN_NAMES),
+        "opex_tax":   fetch_group_accounts(company, "52006", OPEX_TAX_NUM),
+    }
     pdata         = aggregate(period_list, gl_rows, vol_rows)
 
     columns      = get_columns(period_list)
-    data         = build_rows(period_list, pdata, prod_accounts)
+    data         = build_rows(period_list, pdata, prod_accounts, opex_accounts)
     summary_html = get_summary_html(company, filters, period_list, pdata)
 
     return columns, data, summary_html
@@ -151,11 +158,11 @@ def fetch_volume(company, from_date, to_date):
     """, (company, from_date, to_date), as_dict=True)
 
 
-def fetch_production_accounts(company):
+def fetch_group_accounts(company, parent_num, fallback_numbers, fallback_names=None):
     """
-    Returns list of (account_name, prod_key) for production breakdown rows.
-    Priority: children of 52001 parent (production env).
-    Fallback: hardcoded PRODUCTION_ROWS (local env).
+    Returns list of (account_name, key) breakdown rows for a cost group.
+    Priority: children of `parent_num` parent account (production env).
+    Fallback: accounts matching fallback_numbers/fallback_names (local env).
     """
     accounts = frappe.db.sql("""
         SELECT
@@ -163,30 +170,36 @@ def fetch_production_accounts(company):
             account_name
         FROM `tabAccount`
         WHERE company = %s
-          AND parent_account LIKE '52001%%'
+          AND parent_account LIKE %s
           AND is_group = 0
         ORDER BY account_number, account_name
-    """, (company,), as_dict=True)
+    """, (company, f"{parent_num}%"), as_dict=True)
 
     if accounts:
         return [(a.account_name, a.acc_num or a.account_name) for a in accounts]
 
-    # Fallback: local structure — use actual DB names for accounts in PRODUCTION_NUMBERS
+    # Fallback: local structure — use actual DB names for accounts in fallback_numbers/names
+    nums  = tuple(fallback_numbers) if fallback_numbers else ("",)
+    names = tuple(fallback_names)   if fallback_names   else ("",)
     db_accounts = frappe.db.sql("""
         SELECT
             TRIM(IFNULL(account_number, '')) AS acc_num,
             account_name
         FROM `tabAccount`
         WHERE company = %s
-          AND TRIM(IFNULL(account_number, '')) IN %s
+          AND (TRIM(IFNULL(account_number, '')) IN %s OR account_name IN %s)
           AND is_group = 0
-        ORDER BY account_number
-    """, (company, tuple(PRODUCTION_NUMBERS)), as_dict=True)
+        ORDER BY account_number, account_name
+    """, (company, nums, names), as_dict=True)
 
     if db_accounts:
-        return [(a.account_name, a.acc_num) for a in db_accounts]
+        return [(a.account_name, a.acc_num or a.account_name) for a in db_accounts]
 
-    return PRODUCTION_ROWS
+    return []
+
+
+def fetch_production_accounts(company):
+    return fetch_group_accounts(company, "52001", PRODUCTION_NUMBERS) or PRODUCTION_ROWS
 
 
 # ─── Aggregation ─────────────────────────────────────────────────────────────
@@ -205,8 +218,8 @@ def _fk(period_key):
 def aggregate(period_list, gl_rows, vol_rows):
     def empty():
         return dict(revenue=0, cogs=0, prod={},
-                    opex_sales=0, opex_admin=0, opex_other=0,
-                    opex_fin=0, opex_tax=0, volume=0)
+                    opex_sales={}, opex_admin={}, opex_other={},
+                    opex_fin={}, opex_tax={}, volume=0)
 
     pdata = {p["key"]: empty() for p in period_list}
 
@@ -232,33 +245,40 @@ def aggregate(period_list, gl_rows, vol_rows):
             d["prod"][key] = d["prod"].get(key, 0) + net
 
         elif parent_num == "52002":
-            d["opex_sales"] += net
+            key = num or name
+            d["opex_sales"][key] = d["opex_sales"].get(key, 0) + net
 
         elif parent_num == "52003":
-            d["opex_admin"] += net
+            key = num or name
+            d["opex_admin"][key] = d["opex_admin"].get(key, 0) + net
 
         elif parent_num == "52004":
-            d["opex_other"] += net
+            key = num or name
+            d["opex_other"][key] = d["opex_other"].get(key, 0) + net
 
         elif parent_num == "52005":
-            d["opex_fin"] += net
+            key = num or name
+            d["opex_fin"][key] = d["opex_fin"].get(key, 0) + net
 
         elif parent_num == "52006":
-            d["opex_tax"] += net
+            key = num or name
+            d["opex_tax"][key] = d["opex_tax"].get(key, 0) + net
 
         # ── Fallback: by individual account number (local/old structure) ──
         elif num in PRODUCTION_NUMBERS:
             d["prod"][num] = d["prod"].get(num, 0) + net
         elif num in OPEX_SALES_NUM:
-            d["opex_sales"] += net
+            d["opex_sales"][num] = d["opex_sales"].get(num, 0) + net
         elif num in OPEX_ADMIN_NUM:
-            d["opex_admin"] += net
+            d["opex_admin"][num] = d["opex_admin"].get(num, 0) + net
         elif num in OPEX_OTHER_NUM or name in OPEX_OTHER_NAMES:
-            d["opex_other"] += net
+            key = num or name
+            d["opex_other"][key] = d["opex_other"].get(key, 0) + net
         elif num in OPEX_FIN_NUM or name in OPEX_FIN_NAMES:
-            d["opex_fin"] += net
+            key = num or name
+            d["opex_fin"][key] = d["opex_fin"].get(key, 0) + net
         elif num in OPEX_TAX_NUM:
-            d["opex_tax"] += net
+            d["opex_tax"][num] = d["opex_tax"].get(num, 0) + net
 
     for r in vol_rows:
         pk = _period_key(r.posting_date, period_list)
@@ -285,14 +305,15 @@ def get_columns(period_list):
 
 # ─── Row builder ─────────────────────────────────────────────────────────────
 
-def build_rows(period_list, pdata, prod_accounts=None):
+def build_rows(period_list, pdata, prod_accounts=None, opex_accounts=None):
     if prod_accounts is None:
         prod_accounts = PRODUCTION_ROWS
+    opex_accounts = opex_accounts or {}
 
     fkeys = [_fk(p["key"]) for p in period_list]
 
     def mk(label, getter=None, value_map=None, row_type="detail", level=0,
-           is_percent=False, is_ratio=False, is_cost=False, is_qty=False):
+           is_percent=False, is_ratio=False, is_cost=False, is_qty=False, indent=None):
         """Universal qator yaratuvchi — dizayn uchun row_type/level/flaglar bilan."""
         r = {
             "label":        label,
@@ -303,6 +324,10 @@ def build_rows(period_list, pdata, prod_accounts=None):
             "is_cost":      1 if is_cost else 0,
             "is_qty":       1 if is_qty else 0,
         }
+        # "indent" — frappe-datatable'ning o'zining tree (ochib-yopish) mexanizmi uchun.
+        # Faqat schyot (hisob) qatorlarini yashiradigan header/detail juftlarida beriladi.
+        if indent is not None:
+            r["indent"] = indent
         if value_map is None and getter is not None:
             value_map = {_fk(p["key"]): getter(pdata[p["key"]]) for p in period_list}
         r.update(value_map or {})
@@ -349,14 +374,19 @@ def build_rows(period_list, pdata, prod_accounts=None):
                    row_type="percent", level=1, is_percent=True))
 
     rows.append(mk("Производственные расходы", value_map=prod_total,
-                   row_type="sub", level=1, is_cost=True))
+                   row_type="sub", level=1, is_cost=True, indent=0))
     for acc_name, prod_key in prod_accounts:
         prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
-        rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True))
+        rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True, indent=1))
     rows.append(divider())
 
     # ── Расходы с прибыли ─────────────────────────────────────────────────────
-    opex_total = per_period(lambda d: d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"])
+    def _opex(d):
+        return (sum(d["opex_sales"].values()) + sum(d["opex_admin"].values())
+                + sum(d["opex_other"].values()) + sum(d["opex_fin"].values())
+                + sum(d["opex_tax"].values()))
+
+    opex_total = per_period(_opex)
     rows.append(mk("Расходы с прибыли", value_map=opex_total, row_type="root", is_cost=True))
     for section_label, key in [
         ("Расходы по реализации",       "opex_sales"),
@@ -365,15 +395,17 @@ def build_rows(period_list, pdata, prod_accounts=None):
         ("Финансовые расходы",          "opex_fin"),
         ("налог с прибыли",             "opex_tax"),
     ]:
-        svals = {_fk(p["key"]): pdata[p["key"]][key] for p in period_list}
-        rows.append(mk(section_label, value_map=svals, row_type="sub", level=1, is_cost=True))
+        svals = {_fk(p["key"]): sum(pdata[p["key"]][key].values()) for p in period_list}
+        rows.append(mk(section_label, value_map=svals, row_type="sub", level=1, is_cost=True, indent=0))
+        for acc_name, acc_key in opex_accounts.get(key, []):
+            arow = {_fk(p["key"]): pdata[p["key"]][key].get(acc_key, 0) for p in period_list}
+            rows.append(mk(acc_name, value_map=arow, row_type="detail", level=2, is_cost=True, indent=1))
     rows.append(divider())
 
     # ── = Чистая прибыль = Прибыль валовая − Расходы с прибыли ─────────────────
     def _net(d):
         gross = d["revenue"] - d["cogs"] - sum(d["prod"].values())
-        opex  = d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"]
-        return gross - opex
+        return gross - _opex(d)
 
     rows.append(mk("Чистая прибыль", value_map=per_period(_net), row_type="result"))
     rows.append(mk("рентабельность",
@@ -431,7 +463,9 @@ def get_summary_html(company, filters, period_list, pdata):
         d    = pdata[p["key"]]
         pt   = sum(d["prod"].values())
         gp   = d["revenue"] - d["cogs"] - pt
-        opex = d["opex_sales"] + d["opex_admin"] + d["opex_other"] + d["opex_fin"] + d["opex_tax"]
+        opex = (sum(d["opex_sales"].values()) + sum(d["opex_admin"].values())
+                + sum(d["opex_other"].values()) + sum(d["opex_fin"].values())
+                + sum(d["opex_tax"].values()))
         np   = gp - opex
 
         gm_pct  = (gp / d["revenue"] * 100) if d["revenue"] else 0
@@ -509,9 +543,10 @@ def get_summary_html(company, filters, period_list, pdata):
         pt    = sum(d["prod"].values())
         cogs_pct  = d["cogs"] / rev * 100
         prod_pct  = pt        / rev * 100
-        sales_pct = d["opex_sales"] / rev * 100
-        adm_pct   = d["opex_admin"] / rev * 100
-        oth_pct   = (d["opex_other"] + d["opex_fin"] + d["opex_tax"]) / rev * 100
+        sales_pct = sum(d["opex_sales"].values()) / rev * 100
+        adm_pct   = sum(d["opex_admin"].values()) / rev * 100
+        oth_pct   = (sum(d["opex_other"].values()) + sum(d["opex_fin"].values())
+                     + sum(d["opex_tax"].values())) / rev * 100
         profit_pct = 100 - cogs_pct - prod_pct - sales_pct - adm_pct - oth_pct
         profit_pct = max(profit_pct, 0)
         color = CARD_COLORS[i % len(CARD_COLORS)]
