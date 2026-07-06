@@ -41,6 +41,32 @@ frappe.query_reports["PL Hisoboti"] = {
     name_field: "label",
     initial_depth: 0,
 
+    onload: function (report) {
+        if (report.page.inner_toolbar.find(".btn-pl-hisoboti-pdf").length) return;
+        report.page
+            .add_inner_button(__("PDF"), function () {
+                const filters = frappe.query_report.get_filter_values();
+                if (!filters.from_date || !filters.to_date) {
+                    frappe.show_alert({ message: __("Аввал 'Дан' ва 'Гача' сanasini tanlang"), indicator: "orange" });
+                    return;
+                }
+                frappe.call({
+                    method: "pokiza.pokiza_for_business.report.pl_hisoboti.pl_hisoboti_pdf.generate_pl_pdf",
+                    args: { filters: JSON.stringify(filters) },
+                    freeze: true,
+                    freeze_message: __("PDF яратилмоқда..."),
+                    callback: function (r) {
+                        if (r.message && r.message.file_url) {
+                            window.open(r.message.file_url);
+                        } else {
+                            frappe.show_alert({ message: __("Файл яратилмади"), indicator: "red" });
+                        }
+                    },
+                });
+            })
+            .addClass("btn-pl-hisoboti-pdf");
+    },
+
     "formatter": function (value, row, column, data, default_formatter) {
         const rt = data ? data.row_type : null;
 

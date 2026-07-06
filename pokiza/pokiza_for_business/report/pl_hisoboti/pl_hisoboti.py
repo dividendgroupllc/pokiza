@@ -55,7 +55,9 @@ def execute(filters=None):
         "opex_fin":   fetch_group_accounts(company, "52005", OPEX_FIN_NUM,  OPEX_FIN_NAMES),
         "opex_tax":   fetch_group_accounts(company, "52006", OPEX_TAX_NUM),
     }
-    pdata         = aggregate(period_list, gl_rows, vol_rows)
+    group_exists  = {gn: _group_has_accounts(company, gn)
+                      for gn in ("52001", "52002", "52003", "52004", "52005", "52006")}
+    pdata         = aggregate(period_list, gl_rows, vol_rows, group_exists)
 
     columns      = get_columns(period_list)
     data         = build_rows(period_list, pdata, prod_accounts, opex_accounts)
@@ -161,8 +163,12 @@ def fetch_volume(company, from_date, to_date):
 def fetch_group_accounts(company, parent_num, fallback_numbers, fallback_names=None):
     """
     Returns list of (account_name, key) breakdown rows for a cost group.
-    Priority: children of `parent_num` parent account (production env).
-    Fallback: accounts matching fallback_numbers/fallback_names (local env).
+    QAT'IY qoida: agar `parent_num` guruhida haqiqiy (real) hisoblar bo'lsa,
+    FAQAT o'shalar qaytariladi — boshqa guruhga tegishli hisob (masalan
+    "Exchange Gain/Loss" "Indirect Expenses" ostida) bu yerga hech qachon
+    qo'shilmaydi, guruh nomi qanday bo'lsa shu guruh xarajati shundan iborat.
+    fallback_numbers/fallback_names FAQAT guruh umuman bo'sh/mavjud bo'lmagan
+    hollarda (eski, guruhlarsiz tuzilma) ishlatiladi.
     """
     accounts = frappe.db.sql("""
         SELECT
@@ -178,7 +184,7 @@ def fetch_group_accounts(company, parent_num, fallback_numbers, fallback_names=N
     if accounts:
         return [(a.account_name, a.acc_num or a.account_name) for a in accounts]
 
-    # Fallback: local structure — use actual DB names for accounts in fallback_numbers/names
+    # Guruh bo'sh/mavjud emas — eski (guruhlarsiz) tuzilma uchun zaxira
     nums  = tuple(fallback_numbers) if fallback_numbers else ("",)
     names = tuple(fallback_names)   if fallback_names   else ("",)
     db_accounts = frappe.db.sql("""
@@ -192,10 +198,7 @@ def fetch_group_accounts(company, parent_num, fallback_numbers, fallback_names=N
         ORDER BY account_number, account_name
     """, (company, nums, names), as_dict=True)
 
-    if db_accounts:
-        return [(a.account_name, a.acc_num or a.account_name) for a in db_accounts]
-
-    return []
+    return [(a.account_name, a.acc_num or a.account_name) for a in db_accounts]
 
 
 def fetch_production_accounts(company):
@@ -215,7 +218,15 @@ def _fk(period_key):
     return "v_" + period_key.replace(" ", "_").replace("-", "_")
 
 
-def aggregate(period_list, gl_rows, vol_rows):
+def _group_has_accounts(company, parent_num):
+    return bool(frappe.db.exists("Account", {
+        "company": company,
+        "parent_account": ["like", f"{parent_num}%"],
+        "is_group": 0,
+    }))
+
+
+def aggregate(period_list, gl_rows, vol_rows, group_exists):
     def empty():
         return dict(revenue=0, cogs=0, prod={},
                     opex_sales={}, opex_admin={}, opex_other={},
@@ -264,20 +275,24 @@ def aggregate(period_list, gl_rows, vol_rows):
             key = num or name
             d["opex_tax"][key] = d["opex_tax"].get(key, 0) + net
 
-        # ── Fallback: by individual account number (local/old structure) ──
-        elif num in PRODUCTION_NUMBERS:
+        # ── Fallback: faqat guruh UMUMAN mavjud bo'lmagan hollarda (eski,
+        # guruhlarsiz tuzilma). Guruh haqiqatda mavjud bo'lsa (masalan "52005"
+        # da real hisoblar bo'lsa), guruhga tegishli bo'lmagan hisob (masalan
+        # "Exchange Gain/Loss") bu yerga majburan qo'shilmaydi — u guruhga
+        # tegishli bo'lmagani uchun hech qaysi bo'limga tushmaydi.
+        elif not group_exists["52001"] and num in PRODUCTION_NUMBERS:
             d["prod"][num] = d["prod"].get(num, 0) + net
-        elif num in OPEX_SALES_NUM:
+        elif not group_exists["52002"] and num in OPEX_SALES_NUM:
             d["opex_sales"][num] = d["opex_sales"].get(num, 0) + net
-        elif num in OPEX_ADMIN_NUM:
+        elif not group_exists["52003"] and num in OPEX_ADMIN_NUM:
             d["opex_admin"][num] = d["opex_admin"].get(num, 0) + net
-        elif num in OPEX_OTHER_NUM or name in OPEX_OTHER_NAMES:
+        elif not group_exists["52004"] and (num in OPEX_OTHER_NUM or name in OPEX_OTHER_NAMES):
             key = num or name
             d["opex_other"][key] = d["opex_other"].get(key, 0) + net
-        elif num in OPEX_FIN_NUM or name in OPEX_FIN_NAMES:
+        elif not group_exists["52005"] and (num in OPEX_FIN_NUM or name in OPEX_FIN_NAMES):
             key = num or name
             d["opex_fin"][key] = d["opex_fin"].get(key, 0) + net
-        elif num in OPEX_TAX_NUM:
+        elif not group_exists["52006"] and num in OPEX_TAX_NUM:
             d["opex_tax"][num] = d["opex_tax"].get(num, 0) + net
 
     for r in vol_rows:
@@ -356,28 +371,37 @@ def build_rows(period_list, pdata, prod_accounts=None, opex_accounts=None):
                    row_type="ratio", level=1, is_ratio=True))
     rows.append(divider())
 
-    # ── Себестоимость реализации (= Сырьё + Производственные расходы) ──────────
-    # Andoza uslubi: Себестоимость JAMI = xomashyo (COGS) + ishlab chiqarish.
-    # Сырьё alohida qator sifatida ko'rsatilmaydi (jami ичida turadi),
-    # faqat Производственные расходы detali chiqadi.
+    # ── Себестоимость реализации (= faqat сырьё, ишлаб чиqариш харажатларисиз) ──
+    # Armada'dagi PL tuzilishiga mos: Себестоимость = faqat xomashyo (COGS).
+    # Производственные расходы bu yerdan chiqarib olindi — u Маржинальная
+    # прибыль'dan KEYIN, alohida bosqichda ayiriladi (natija — Прибыль валовая).
     prod_total = per_period(lambda d: sum(d["prod"].values()))
-    cogs_total = per_period(lambda d: d["cogs"] + sum(d["prod"].values()))
+    cogs_total = per_period(lambda d: d["cogs"])
 
     rows.append(mk("Себестоимость реализации", value_map=cogs_total,
                    row_type="root", is_cost=True))
 
-    # ── = Прибыль валовая = Выручка − Себестоимость ───────────────────────────
-    gp = per_period(lambda d: d["revenue"] - d["cogs"] - sum(d["prod"].values()))
-    rows.append(mk("Прибыль валовая", value_map=gp, row_type="result"))
+    # ── = Маржинальная прибыль = Выручка − Себестоимость (faqat сырьё) ────────
+    marginal = per_period(lambda d: d["revenue"] - d["cogs"])
+    rows.append(mk("Маржинальная прибыль", value_map=marginal, row_type="result"))
     rows.append(mk("маржа",
-                   value_map=per_period(lambda d: (d["revenue"] - d["cogs"] - sum(d["prod"].values())) / d["revenue"] * 100 if d["revenue"] else 0),
+                   value_map=per_period(lambda d: (d["revenue"] - d["cogs"]) / d["revenue"] * 100 if d["revenue"] else 0),
                    row_type="percent", level=1, is_percent=True))
+    rows.append(divider())
 
     rows.append(mk("Производственные расходы", value_map=prod_total,
                    row_type="sub", level=1, is_cost=True, indent=0))
     for acc_name, prod_key in prod_accounts:
         prow = {_fk(p["key"]): pdata[p["key"]]["prod"].get(prod_key, 0) for p in period_list}
         rows.append(mk(acc_name, value_map=prow, row_type="detail", level=2, is_cost=True, indent=1))
+    rows.append(divider())
+
+    # ── = Прибыль валовая = Маржинальная прибыль − Производственные расходы ───
+    gp = per_period(lambda d: d["revenue"] - d["cogs"] - sum(d["prod"].values()))
+    rows.append(mk("Прибыль валовая", value_map=gp, row_type="result"))
+    rows.append(mk("маржа",
+                   value_map=per_period(lambda d: (d["revenue"] - d["cogs"] - sum(d["prod"].values())) / d["revenue"] * 100 if d["revenue"] else 0),
+                   row_type="percent", level=1, is_percent=True))
     rows.append(divider())
 
     # ── Расходы с прибыли ─────────────────────────────────────────────────────
