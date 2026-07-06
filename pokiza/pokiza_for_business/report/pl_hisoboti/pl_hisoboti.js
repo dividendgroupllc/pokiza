@@ -50,19 +50,12 @@ frappe.query_reports["PL Hisoboti"] = {
                     frappe.show_alert({ message: __("Аввал 'Дан' ва 'Гача' сanasini tanlang"), indicator: "orange" });
                     return;
                 }
-                frappe.call({
-                    method: "pokiza.pokiza_for_business.report.pl_hisoboti.pl_hisoboti_pdf.generate_pl_pdf",
-                    args: { filters: JSON.stringify(filters) },
-                    freeze: true,
-                    freeze_message: __("PDF яратилмоқда..."),
-                    callback: function (r) {
-                        if (r.message && r.message.file_url) {
-                            window.open(r.message.file_url);
-                        } else {
-                            frappe.show_alert({ message: __("Файл яратилмади"), indicator: "red" });
-                        }
-                    },
-                });
+                // Serverga fayl sifatida saqlanmaydi — to'g'ridan-to'g'ri
+                // brauzerga "download" qilib yuboriladi (Frappe'ning standart
+                // PDF-yuklash mexanizmi orqali).
+                const url = "/api/method/pokiza.pokiza_for_business.report.pl_hisoboti.pl_hisoboti_pdf.generate_pl_pdf"
+                    + "?filters=" + encodeURIComponent(JSON.stringify(filters));
+                window.open(url);
             })
             .addClass("btn-pl-hisoboti-pdf");
     },

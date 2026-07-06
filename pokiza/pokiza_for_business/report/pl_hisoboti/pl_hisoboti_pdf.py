@@ -192,6 +192,12 @@ def build_html(filters):
 
 @frappe.whitelist()
 def generate_pl_pdf(filters):
+    """
+    PDF serverga saqlanmaydi — javob to'g'ridan-to'g'ri brauzerga
+    "download" sifatida yuboriladi (Frappe'ning standart PDF-yuklash
+    mexanizmi, xuddi Print/PDF tugmasidagidek). Diskda hech qanday
+    File yozuvi qoldirilmaydi.
+    """
     import json
     if isinstance(filters, str):
         filters = json.loads(filters)
@@ -204,18 +210,6 @@ def generate_pl_pdf(filters):
     to_date = (filters.get("to_date") or "")[:7]
     filename = f"PL_{company}_{from_date}_to_{to_date}.pdf"
 
-    existing = frappe.db.exists("File", {"file_name": filename, "attached_to_name": ["is", "not set"]})
-    if existing:
-        frappe.delete_doc("File", existing, ignore_permissions=True)
-
-    file_doc = frappe.get_doc({
-        "doctype": "File",
-        "file_name": filename,
-        "is_private": 1,
-        "content": pdf_bytes,
-        "folder": "Home/Attachments",
-    })
-    file_doc.flags.ignore_permissions = True
-    file_doc.insert()
-
-    return {"file_url": file_doc.file_url, "file_name": filename}
+    frappe.local.response.filename = filename
+    frappe.local.response.filecontent = pdf_bytes
+    frappe.local.response.type = "download"
