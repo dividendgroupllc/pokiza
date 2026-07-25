@@ -12,3 +12,6 @@ __pycache__
 *.env
 site_config.json
 common_site_config.json
+
+# Build artifacts (bench build orqali qayta yaratiladi, git'da saqlanmasin)
+pokiza/public/dist/
