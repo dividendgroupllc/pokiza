@@ -18,7 +18,6 @@ def get_columns():
         {"label": "Таъминотчи", "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 180},
         {"label": "Махсулот", "fieldname": "item_name", "fieldtype": "Data", "width": 260},
         {"label": "Миқдор", "fieldname": "qty", "fieldtype": "Float", "width": 110},
-        {"label": "Бирлик", "fieldname": "uom", "fieldtype": "Data", "width": 80},
         {"label": "Нарх", "fieldname": "rate", "fieldtype": "Currency", "options": "currency", "width": 120},
         {"label": "Сумма", "fieldname": "amount", "fieldtype": "Currency", "options": "currency", "width": 140},
         {"label": "Валюта", "fieldname": "currency", "fieldtype": "Link", "options": "Currency", "width": 80},
@@ -49,7 +48,6 @@ def get_data(filters):
             pii.item_code,
             pii.item_name,
             pii.qty,
-            pii.uom,
             pii.rate,
             pii.amount
         FROM `tabPurchase Invoice Item` pii
@@ -59,22 +57,26 @@ def get_data(filters):
     """, values, as_dict=True)
 
     data = []
-    # Har bir валюта бўйича жами сумма
+    # Har bir валюта бўйича жами миқдор ва сумма
     currency_totals = {}
 
     for row in rows:
         data.append(row)
         cur = row.get("currency") or ""
-        currency_totals[cur] = currency_totals.get(cur, 0) + flt(row.get("amount"))
+        if cur not in currency_totals:
+            currency_totals[cur] = {"qty": 0, "amount": 0}
+        currency_totals[cur]["qty"] += flt(row.get("qty"))
+        currency_totals[cur]["amount"] += flt(row.get("amount"))
 
     # Жами қаторлар (ҳар бир валюта учун алоҳида)
-    for cur, total_amount in sorted(currency_totals.items()):
+    for cur, totals in sorted(currency_totals.items()):
+        total_qty = totals["qty"]
+        total_amount = totals["amount"]
         data.append({
             "posting_date": None,
             "supplier": "",
             "item_name": "ЖАМИ",
-            "qty": None,
-            "uom": "",
+            "qty": total_qty,
             "rate": None,
             "amount": total_amount,
             "currency": cur,

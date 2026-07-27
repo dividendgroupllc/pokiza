@@ -8,6 +8,13 @@ NAKLADNAYA_PRINT_FORMAT = "Накладная Pokiza"
 BOM_DOCTYPE = "BOM"
 BOM_UNIQUE_CODE_FIELDNAME = "custom_unique_code"
 
+PRODUCTION_ENTRY_DOCTYPE = "Production Entry"
+# Frappe list view kolonkalarni cheklaydi (odatiy ekranada 6 ta). Shu sabab
+# `qty_to_manufacture` (ishlab chiqarilayotgan miqdor) — `bom_no` dan keyingi
+# oxirgi in_list_view maydoni — ro'yxatda ko'rinmay qoladi. Chegarani ko'tarib,
+# uni "ВМ №" (BOM No) ustunidan keyin ko'rsatamiz.
+PRODUCTION_ENTRY_LIST_TOTAL_FIELDS = "8"
+
 
 def get_custom_fields():
     return {
@@ -207,13 +214,38 @@ def set_bom_unique_code_property():
         )
 
 
+def sync_production_entry_list_settings():
+    """Production Entry ro'yxatida ishlab chiqarilayotgan miqdor ustunini ko'rsatish.
+
+    Frappe list view ustunlar sonini cheklaydi, natijada `qty_to_manufacture`
+    (BOM No / "ВМ №" dan keyingi maydon) kesib tashlanadi. `total_fields` ni
+    ko'tarib, uni doimiy ko'rinadigan qilamiz.
+    """
+    if frappe.db.exists("List View Settings", PRODUCTION_ENTRY_DOCTYPE):
+        frappe.db.set_value(
+            "List View Settings",
+            PRODUCTION_ENTRY_DOCTYPE,
+            "total_fields",
+            PRODUCTION_ENTRY_LIST_TOTAL_FIELDS,
+        )
+    else:
+        doc = frappe.new_doc("List View Settings")
+        doc.name = PRODUCTION_ENTRY_DOCTYPE
+        doc.total_fields = PRODUCTION_ENTRY_LIST_TOTAL_FIELDS
+        doc.insert(ignore_permissions=True)
+
+    frappe.clear_cache(doctype=PRODUCTION_ENTRY_DOCTYPE)
+
+
 def after_install():
     sync_custom_fields()
+    sync_production_entry_list_settings()
     create_nakladnaya_print_format()
 
 
 def after_migrate():
     sync_custom_fields()
+    sync_production_entry_list_settings()
     create_nakladnaya_print_format()
 
 
