@@ -386,6 +386,7 @@ frappe.ui.form.on("Kassa", {
     exchange_rate: function(frm) {
         set_derived_value(frm, "manual_credit_amount", 0);
         frm.trigger("calculate_exchange_amounts");
+        frm.trigger("set_exchange_rate_description");
         frm.trigger("render_currency_info");
     },
 
@@ -457,8 +458,9 @@ frappe.ui.form.on("Kassa", {
             frm.set_df_property("exchange_rate", "label", `Курс ${frm.doc.cash_account_currency || ""} к ${frm.doc.party_currency || ""}`.trim());
             frm.set_df_property("credit_amount", "label", `Сумма в валюте контрагента${frm.doc.party_currency ? ` (${frm.doc.party_currency})` : ""}`);
         } else {
+            const quote = getConversionQuotePair(frm);
             frm.set_df_property("section_break_conversion", "label", "Конвертация");
-            frm.set_df_property("exchange_rate", "label", "Курс");
+            frm.set_df_property("exchange_rate", "label", `Курс (1 ${quote.base} = ? ${quote.quote})`);
             frm.set_df_property("credit_amount", "label", "Сумма прихода");
         }
 
@@ -474,7 +476,66 @@ frappe.ui.form.on("Kassa", {
         }
 
         frm.trigger("sync_currency_fields");
+        frm.trigger("set_exchange_rate_description");
         frm.refresh_fields(["section_break_conversion", "exchange_rate", "debit_amount", "credit_amount"]);
+    },
+
+    set_exchange_rate_description: function(frm) {
+        // Курс maydonining pastida teskari kursni ma'lumot uchun ko'rsatadi.
+        const showConversion = frm.doc.transaction_type === "Конвертация";
+        const showPartyExchange = isPartyMulticurrencyPayment(frm);
+
+        if (!showConversion && !showPartyExchange) {
+            set_exchange_rate_description_text(frm, "");
+            return;
+        }
+
+        const rate = flt(frm.doc.exchange_rate);
+
+        if (showConversion) {
+            // Курс "1 USD = R UZS" (USD→UZS) ma'nosida kiritiladi. Pastida uning
+            // teskarisini (1 UZS = 1/R USD) ma'lumot uchun ko'rsatamiz. Kiritilgan
+            // kursning aynan teskarisi bo'lishi uchun 1/rate dan foydalanamiz.
+            const quote = getConversionQuotePair(frm);
+            if (!rate || !quote.base || !quote.quote) {
+                set_exchange_rate_description_text(frm, "");
+                return;
+            }
+            set_exchange_rate_description_text(
+                frm,
+                `1 ${quote.quote} = ${format_reverse_rate(1 / rate)} ${quote.base}`
+            );
+            return;
+        }
+
+        // Party multivalyutali to'lov — avvalgidek: teskari kursni Currency Exchange
+        // doctypedan olamiz, topilmasa 1/rate ga qaytamiz.
+        const sourceCurrency = frm.doc.cash_account_currency;
+        const targetCurrency = frm.doc.party_currency;
+
+        if (!rate || !sourceCurrency || !targetCurrency) {
+            set_exchange_rate_description_text(frm, "");
+            return;
+        }
+
+        frappe.call({
+            method: "pokiza.pokiza_for_business.doctype.kassa.kassa.get_exchange_rate",
+            args: {
+                from_currency: targetCurrency,
+                to_currency: sourceCurrency,
+                date: frm.doc.date || frappe.datetime.get_today()
+            },
+            callback: function(r) {
+                let inverseRate = flt(r.message);
+                if (!inverseRate || inverseRate <= 0) {
+                    inverseRate = 1 / rate;
+                }
+                set_exchange_rate_description_text(
+                    frm,
+                    `1 ${targetCurrency} = ${format_reverse_rate(inverseRate)} ${sourceCurrency}`
+                );
+            }
+        });
     },
 
     calculate_exchange_amounts: function(frm) {
@@ -482,9 +543,21 @@ frappe.ui.form.on("Kassa", {
             if (!frm.doc.debit_amount || !frm.doc.exchange_rate) return;
             if (cint(frm.doc.manual_credit_amount)) return;
 
+            const sourceCurrency = frm.doc.cash_account_currency;
             const targetCurrency = getTargetCurrency(frm);
             const precision = targetCurrency === "UZS" ? 0 : 2;
-            let credit = flt(frm.doc.debit_amount) * flt(frm.doc.exchange_rate);
+            const rate = flt(frm.doc.exchange_rate);
+
+            // Kurs "1 USD = R UZS" (USD→UZS) ma'nosida:
+            //  - manba USD bo'lsa (USD→UZS): credit(UZS) = debit(USD) * R
+            //  - manba UZS bo'lsa (UZS→USD): credit(USD) = debit(UZS) / R
+            let credit = 0;
+            if (sourceCurrency === "USD") {
+                credit = flt(frm.doc.debit_amount) * rate;
+            } else if (rate) {
+                credit = flt(frm.doc.debit_amount) / rate;
+            }
+
             frm._setting_credit_amount_from_script = true;
             set_derived_value(frm, "credit_amount", flt(credit, precision));
             frm._setting_credit_amount_from_script = false;
@@ -608,9 +681,15 @@ frappe.ui.form.on("Kassa", {
             );
         }
 
-        if (frm.doc.exchange_rate && (txType === "Конвертация" || isPartyMulticurrencyPayment(frm))) {
+        if (frm.doc.exchange_rate && txType === "Конвертация") {
+            // Konvertatsiyada kurs USD→UZS ko'rinishida: 1 USD = R UZS.
+            const quote = getConversionQuotePair(frm);
             rows.push(
-                `<div><strong>Курс:</strong> 1 ${frappe.utils.escape_html(sourceCurrency || "-")} = ${frappe.format(frm.doc.exchange_rate, {fieldtype: "Float", precision: 6})} ${frappe.utils.escape_html((txType === "Конвертация" ? targetCurrency : frm.doc.party_currency) || "-")}</div>`
+                `<div><strong>Курс:</strong> 1 ${frappe.utils.escape_html(quote.base)} = ${frappe.format(frm.doc.exchange_rate, {fieldtype: "Float", precision: 6})} ${frappe.utils.escape_html(quote.quote)}</div>`
+            );
+        } else if (frm.doc.exchange_rate && isPartyMulticurrencyPayment(frm)) {
+            rows.push(
+                `<div><strong>Курс:</strong> 1 ${frappe.utils.escape_html(sourceCurrency || "-")} = ${frappe.format(frm.doc.exchange_rate, {fieldtype: "Float", precision: 6})} ${frappe.utils.escape_html(frm.doc.party_currency || "-")}</div>`
             );
         }
 
@@ -658,6 +737,20 @@ function has_field(frm, fieldname) {
     return Boolean(frm && frm.fields_dict && frm.fields_dict[fieldname]);
 }
 
+function set_exchange_rate_description_text(frm, text) {
+    frm.set_df_property("exchange_rate", "description", text || "");
+    frm.refresh_field("exchange_rate");
+}
+
+function format_reverse_rate(rate) {
+    // Ortiqcha nol chiqmasligi uchun (masalan 12100,000000 emas 12100),
+    // qiymatni 6 xonagacha yaxlitlab, faqat kerakli o'nlik xonalarni ko'rsatamiz.
+    const value = flt(rate, 6);
+    const parts = value.toString().split(".");
+    const precision = parts.length > 1 ? parts[1].length : 0;
+    return format_number(value, null, precision);
+}
+
 function set_derived_value(frm, fieldname, value) {
     const normalizedCurrent = frm.doc[fieldname] == null ? "" : frm.doc[fieldname];
     const normalizedNext = value == null ? "" : value;
@@ -674,12 +767,28 @@ function getTargetCurrency(frm) {
     return frm._cash_account_to_currency || getDefaultConversionTargetCurrency(frm) || "";
 }
 
+// Konvertatsiya har doim UZS↔USD orasida bo'ladi va kurs "1 USD = ? UZS"
+// (USD→UZS) ko'rinishida kiritiladi/ko'rsatiladi. Shu sabab base doim USD,
+// quote esa USD bo'lmagan tomon (UZS).
+function getConversionQuotePair(frm) {
+    const source = frm.doc.cash_account_currency;
+    const target = getTargetCurrency(frm);
+    const base = "USD";
+    const quote = [source, target].find((c) => c && c !== "USD") || "UZS";
+    return { base, quote };
+}
+
 function getExchangePair(frm) {
     if (frm.doc.transaction_type === "Конвертация") {
-        const inferredTargetCurrency = getTargetCurrency(frm) || getDefaultConversionTargetCurrency(frm);
+        // Manba account valyutasi tanlanmaguncha kurs olib kelmaymiz.
+        if (!frm.doc.cash_account_currency) {
+            return { from_currency: "", to_currency: "" };
+        }
+        // Kurs USD→UZS ko'rinishida: 1 USD = ? UZS.
+        const quote = getConversionQuotePair(frm);
         return {
-            from_currency: frm.doc.cash_account_currency,
-            to_currency: inferredTargetCurrency
+            from_currency: quote.base,
+            to_currency: quote.quote
         };
     }
 
