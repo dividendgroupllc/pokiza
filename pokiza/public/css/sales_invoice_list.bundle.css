@@ -1,0 +1,36 @@
+/* Sales Invoice ro'yxatidagi status pill'lariga farqli ranglar.
+ *
+ * Standart ERPNext'da Draft, Overdue va Cancelled — uchalasi ham qizil,
+ * shu sabab bir-biridan ajralmaydi. Bu yerda Draft va Overdue ajratiladi,
+ * Cancelled esa qizil bo'lib qoladi.
+ *
+ * Har bir status pill'ida Frappe `data-filter` atributini qo'yadi
+ * (masalan Overdue -> "status,=,Overdue", Draft -> "docstatus,=,0").
+ * Shu atribut orqali har statusni aniq tanlaymiz — JS kerak emas.
+ *
+ * Scope: faqat Sales Invoice list/report view (data-page-route),
+ * shu sabab boshqa doctype'larga ta'sir qilmaydi.
+ */
+
+[data-page-route^="List/Sales Invoice"] .indicator-pill.filterable {
+	font-weight: 600;
+}
+
+/* Draft — sariq (data-filter docstatus,=,0 bo'ladi) */
+[data-page-route^="List/Sales Invoice"] .indicator-pill[data-filter="docstatus,=,0"] {
+	background: #fbd14f;
+	color: #4a3500;
+}
+
+/* Overdue — sabzi rang (sariq bilan qizil orasidagi) */
+[data-page-route^="List/Sales Invoice"] .indicator-pill[data-filter="status,=,Overdue"] {
+	background: #ed7014;
+	color: #ffffff;
+}
+
+/* Overdue and Discounted — sabzi rangning to'qroq varianti */
+[data-page-route^="List/Sales Invoice"]
+	.indicator-pill[data-filter="status,=,Overdue and Discounted"] {
+	background: #c85a08;
+	color: #ffffff;
+}
