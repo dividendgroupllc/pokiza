@@ -12,10 +12,36 @@ FINISHED_GOODS_ITEM_GROUP = "Готовый продукт"
 class ProductionEntry(Document):
     def validate(self):
         self.set_status()
-        self.validate_qty()
         self.validate_item_to_manufacture()
         self.validate_bom()
+        self.recalculate_required_qty()
+        self.validate_qty()
         self.update_available_qty()
+
+    def recalculate_required_qty(self):
+        """Required qty ni server o'zi BOM'dan qayta hisoblaydi.
+
+        Brauzerdan kelgan qiymatga ishonilmaydi: eski/keshlangan forma yoki
+        saqlashdan oldin yetib kelmagan hisob-kitob xato qiymat yuborishi mumkin
+        (2026-iyul/avgustda barcha PE'lar 1 birlik uchun saqlanib qolgan edi).
+        """
+        if not (self.bom_no and flt(self.qty_to_manufacture) > 0):
+            return
+
+        bom = frappe.get_doc("BOM", self.bom_no)
+        if not flt(bom.quantity):
+            return
+
+        bom_qty = {}
+        for bi in bom.items:
+            bom_qty[bi.item_code] = bom_qty.get(bi.item_code, 0) + flt(bi.qty)
+
+        for item in self.items:
+            if item.item_code in bom_qty:
+                item.required_qty = flt(
+                    bom_qty[item.item_code] * flt(self.qty_to_manufacture) / flt(bom.quantity),
+                    item.precision("required_qty"),
+                )
 
     def on_submit(self):
         self.set_status("Submitted")

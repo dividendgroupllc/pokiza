@@ -90,7 +90,10 @@ frappe.ui.form.on('Production Entry', {
     },
 
     bom_no: function(frm) {
-        if (frm.doc.bom_no && frm.doc.qty_to_manufacture) {
+        // Miqdor hali kiritilmagan bo'lsa ham jadval darhol ko'rinsin (1 birlik
+        // uchun retsept sifatida). Yakuniy to'g'ri qiymatni baribir server
+        // saqlash paytida qayta hisoblaydi — bu faqat ko'rish uchun.
+        if (frm.doc.bom_no) {
             fetch_bom_items(frm);
         }
     },
@@ -162,16 +165,20 @@ function update_all_available_qty(frm) {
 }
 
 function fetch_bom_items(frm) {
+    // Har bir so'rovga raqam beriladi: faqat ENG OXIRGI so'rov javobi qabul qilinadi.
+    // Aks holda sekin kelgan eski javob (masalan qty=1 bilan) yangi jadvalni yozib qo'yadi.
+    const req_id = frm._bom_fetch_id = (frm._bom_fetch_id || 0) + 1;
     frappe.call({
         method: "pokiza.pokiza_for_business.doctype.production_entry.production_entry.get_bom_items",
         args: {
             bom_no: frm.doc.bom_no,
-            qty_to_manufacture: frm.doc.qty_to_manufacture,
+            qty_to_manufacture: frm.doc.qty_to_manufacture || 1,
             posting_date: frm.doc.posting_date,
             posting_time: frm.doc.posting_time,
             source_warehouse: frm.doc.target_warehouse || ""
         },
         callback: function(r) {
+            if (req_id !== frm._bom_fetch_id) return;
             if (r.message) {
                 frm.clear_table("items");
                 r.message.forEach(function(item) {
