@@ -90,12 +90,26 @@ def handle():
     except Exception:
         return {"ok": True}
 
+    process_update(update)
+    return {"ok": True}
+
+
+def process_update(update: dict) -> None:
+    """Bitta Telegram update'ni qayta ishlash (webhook ham, polling ham shuni chaqiradi)."""
+    from pokiza.pokiza_for_business.doctype.telegram_user.telegram_user import (
+        upsert_from_telegram,
+    )
+
     if "message" in update:
+        tg_from = update["message"].get("from")
+        if tg_from:
+            upsert_from_telegram(tg_from)
         _on_message(update["message"])
     elif "callback_query" in update:
+        tg_from = update["callback_query"].get("from")
+        if tg_from:
+            upsert_from_telegram(tg_from)
         _on_callback(update["callback_query"])
-
-    return {"ok": True}
 
 
 # ─── Xabar dispatcher ────────────────────────────────────────────────────────
@@ -190,6 +204,10 @@ def _handle_phone_input(chat_id: int, text: str) -> None:
 
     frappe.db.set_value(party_type, party_name, "telegram_chat_id", str(chat_id))
     frappe.db.commit()
+
+    from pokiza.pokiza_for_business.doctype.telegram_user.telegram_user import set_party
+    set_party(chat_id, party_type, party_name, phone=phone)
+
     _clear_state(chat_id)
 
     if party_type == "Customer":
