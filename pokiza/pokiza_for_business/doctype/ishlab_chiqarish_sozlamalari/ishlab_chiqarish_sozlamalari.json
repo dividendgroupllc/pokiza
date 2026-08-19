@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "creation": "2026-08-18 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "issingle": 1,
+ "field_order": [
+  "kunlik_quvvat_kg",
+  "kesim_vaqti",
+  "column_break_1",
+  "zames_kg",
+  "yakshanba_ishlaydi",
+  "gorizont_kun"
+ ],
+ "fields": [
+  {
+   "fieldname": "kunlik_quvvat_kg",
+   "fieldtype": "Float",
+   "label": "Kunlik ishlab chiqarish quvvati (kg)",
+   "default": "6900",
+   "reqd": 1,
+   "description": "Bir kunda ishlab chiqarish mumkin bo'lgan jami mahsulot (kg). Masalan: 180 tonna/oy ÷ 26 ish kuni ≈ 6900 kg"
+  },
+  {
+   "fieldname": "kesim_vaqti",
+   "fieldtype": "Time",
+   "label": "Kesim vaqti (abed chegarasi)",
+   "default": "13:00:00",
+   "reqd": 1,
+   "description": "Shu vaqtgacha kelgan zakaz bugungi rejaga tushadi (joy bo'lsa), keyin kelgani — ertangi kunga"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "zames_kg",
+   "fieldtype": "Float",
+   "label": "Bitta zames og'irligi (kg)",
+   "default": "95",
+   "reqd": 1,
+   "description": "Kutterga bir marta sig'adigan miqdor. Har mahsulot uchun kerakli zames soni shu songa bo'lib (yuqoriga yaxlitlab) hisoblanadi"
+  },
+  {
+   "default": "0",
+   "fieldname": "yakshanba_ishlaydi",
+   "fieldtype": "Check",
+   "label": "Yakshanba ham ishlaydi",
+   "description": "Belgilanmagan bo'lsa reja yakshanbani sakrab o'tadi (6 kunlik ish haftasi)"
+  },
+  {
+   "fieldname": "gorizont_kun",
+   "fieldtype": "Int",
+   "label": "Navbat sahifasida ko'rinadigan kunlar soni",
+   "default": "7"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-08-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Ishlab Chiqarish Sozlamalari",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "role": "Manufacturing Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

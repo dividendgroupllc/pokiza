@@ -7,3 +7,6 @@
 pokiza.patches.v0_0.add_stock_entry_production_entry_link
 pokiza.patches.v0_0.add_telegram_custom_fields
 pokiza.patches.v0_0.add_sales_invoice_nakladnaya_print_format
+pokiza.patches.v0_0.add_navbat_custom_fields
+pokiza.patches.v0_0.add_navbat_item_fields
+pokiza.patches.v0_0.add_navbat_taqsimot_field

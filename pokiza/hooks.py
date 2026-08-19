@@ -153,7 +153,17 @@ doc_events = {
 		"on_submit": "pokiza.events.kassa.on_submit",
 	},
 	"Sales Order": {
-		"on_submit": "pokiza.events.sales_order.on_submit",
+		"validate": "pokiza.api.navbat.so_validate",
+		"before_submit": "pokiza.api.navbat.so_before_submit",
+		"on_submit": [
+			"pokiza.events.sales_order.on_submit",
+			"pokiza.api.navbat.so_on_submit_notify",
+		],
+		"before_cancel": "pokiza.api.navbat.so_before_cancel",
+		"on_cancel": "pokiza.api.navbat.so_on_cancel",
+	},
+	"Sales Invoice": {
+		"on_submit": "pokiza.api.navbat.si_on_submit",
 	},
 }
 

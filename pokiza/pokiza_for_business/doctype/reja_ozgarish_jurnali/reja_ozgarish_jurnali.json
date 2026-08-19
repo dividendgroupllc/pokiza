@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "autoname": "format:RJL-{#####}",
+ "creation": "2026-08-18 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sales_order",
+  "mijoz",
+  "miqdor_kg",
+  "column_break_1",
+  "eski_kun",
+  "yangi_kun",
+  "sabab",
+  "kim"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Zakaz (Sales Order)",
+   "options": "Sales Order",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mijoz",
+   "fieldtype": "Data",
+   "label": "Mijoz",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "miqdor_kg",
+   "fieldtype": "Float",
+   "label": "Miqdor (kg)"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "eski_kun",
+   "fieldtype": "Date",
+   "label": "Eski kun",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "yangi_kun",
+   "fieldtype": "Date",
+   "label": "Yangi kun",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sabab",
+   "fieldtype": "Small Text",
+   "label": "Sabab / izoh"
+  },
+  {
+   "fieldname": "kim",
+   "fieldtype": "Data",
+   "label": "Kim o'zgartirdi",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-08-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Reja Ozgarish Jurnali",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "export": 1,
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Manufacturing Manager",
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
