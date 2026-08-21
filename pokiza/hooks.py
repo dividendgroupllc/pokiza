@@ -163,6 +163,7 @@ doc_events = {
 		"on_cancel": "pokiza.api.navbat.so_on_cancel",
 	},
 	"Sales Invoice": {
+		"before_submit": "pokiza.events.sales_invoice.before_submit",
 		"on_submit": "pokiza.api.navbat.si_on_submit",
 	},
 }
