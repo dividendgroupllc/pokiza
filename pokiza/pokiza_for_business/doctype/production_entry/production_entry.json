@@ -24,6 +24,8 @@
   "items",
   "section_break_remarks",
   "remarks",
+  "sales_order",
+  "so_item",
   "amended_from",
   "stock_entry"
  ],
@@ -146,6 +148,22 @@
    "label": "Remarks"
   },
   {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order (navbat)",
+   "no_copy": 1,
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "so_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "SO Item (navbat)",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -170,7 +188,7 @@
    "link_fieldname": "custom_production_entry"
   }
  ],
- "modified": "2026-08-11 23:30:00.000000",
+ "modified": "2026-08-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pokiza for business",
  "name": "Production Entry",
