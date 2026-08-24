@@ -1315,6 +1315,60 @@ def zakaz_yarat(mijoz, items, mashina_vaqti=None, mashina_izoh=None,
 
 
 # ---------------------------------------------------------------------------
+#  ZAKAZLAR RO'YXATI (tab — faqat ko'rish uchun jadval)
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def zakaz_royxat(limit=200):
+    """Sales Orderdan kelgan zakazlar ro'yxati: kimdan, qancha mahsulot,
+    qachonga. Faqat o'qish — omborga ham, boshqa hech narsaga bog'lanmagan."""
+    so_list = frappe.get_all(
+        "Sales Order",
+        filters={"docstatus": 1},
+        fields=[
+            "name", "customer", "customer_name", "custom_jami_kg",
+            "custom_kg_nomalum", "custom_kelgan_vaqt",
+            "custom_ishlab_chiqarish_kuni",
+        ],
+        order_by="custom_kelgan_vaqt desc, creation desc",
+        limit_page_length=cint(limit) or 200,
+    )
+    items_by_so = {}
+    if so_list:
+        rows = frappe.db.sql(
+            """
+            SELECT parent, item_code, item_name, qty, uom, stock_qty, stock_uom
+            FROM `tabSales Order Item`
+            WHERE parent IN %(names)s
+            ORDER BY idx
+            """,
+            {"names": tuple(d.name for d in so_list)},
+            as_dict=True,
+        )
+        gp_map = _bundle_gp_map(list({r.item_code for r in rows}))
+        for r in rows:
+            kg, _gps, yoq = hisobla_qator_kg(r, gp_map)
+            items_by_so.setdefault(r.parent, []).append({
+                "nom": r.item_name or r.item_code,
+                "qty": flt(r.qty),
+                "uom": r.uom,
+                "kg": None if yoq else flt(kg, 1),
+            })
+    return {
+        "rows": [
+            {
+                "mijoz": so.customer_name or so.customer or _("Noma'lum"),
+                "kelgan": str(so.custom_kelgan_vaqt or ""),
+                "jami_kg": flt(so.custom_jami_kg, 1),
+                "kg_nomalum": cint(so.custom_kg_nomalum),
+                "qachonga": str(so.custom_ishlab_chiqarish_kuni or ""),
+                "items": items_by_so.get(so.name, []),
+            }
+            for so in so_list
+        ]
+    }
+
+
+# ---------------------------------------------------------------------------
 #  SOZLAMALAR (sahifadan)
 # ---------------------------------------------------------------------------
 SOZLAMA_ROLLARI = ("System Manager", "Manufacturing Manager")

@@ -2,9 +2,8 @@
 //  ISHLAB CHIQARISH NAVBATI — zavod ish markazi (artifact spec asosida)
 //  4 bo'lim (tepada o'ngda): 🛒 Zakaz urish · 🏭 Ishlab chiqarish ·
 //  📦 Ombor · ⚙️ Sozlamalar
-//  - Zakaz urish: faqat "Сотув махсулотлари" itemlari, kiritish -> tekshiruv
-//    (limit + ombor) -> Sales Order SUBMIT -> navbatga avto tushadi.
-//  - Limitga sig'masa ombordagi tayyor mahsulot taklif qilinadi (band qilish).
+//  - Zakaz urish: sales orderdan kelgan zakazlar ro'yxati — faqat jadval
+//    (kimdan, qancha mahsulot, qachonga). Omborga bog'lanmagan.
 //  - Ombor: tayyor mahsulot qoldig'i (qoldiq / band / bo'sh).
 //  - Sozlamalar: kunlik sig'im, kesim vaqti, zames kg, yakshanba, gorizont.
 // ============================================================================
@@ -74,7 +73,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 		$tabbar.find(".nv-tab-btn").removeClass("nv-tab-active");
 		$tabbar.find(`[data-tab="${t}"]`).addClass("nv-tab-active");
 		Object.keys($tabs).forEach((k) => $tabs[k].toggle(k === t));
-		if (t === "zakaz" && !zakazQurilgan) zakazForm();
+		if (t === "zakaz") zakazYukla();
 		if (t === "ombor") omborYukla();
 		if (t === "sozlama") sozlamaYukla();
 	}
@@ -574,340 +573,65 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 	}
 
 	// ======================================================== ZAKAZ URISH TAB
-	let zakazQurilgan = false;
-	let mijozCtrl = null;
-	let zakazRows = []; // [{$r, ctrl}]
-
-	function zakazForm() {
-		zakazQurilgan = true;
-		zakazRows = [];
+	// Faqat jadval: sales orderdan kelgan zakazlar ro'yxati (faqat ko'rish).
+	// Kimdan, qancha mahsulot, qachonga — hech narsaga bog'lanmagan (ombor ham).
+	function zakazYukla() {
 		const $f = $tabs.zakaz;
-		$f.empty();
-		const $card = $(`
-			<div class="nv-card nv-zk">
-				<div class="nv-zk-title">🛒 ${__("Yangi zakaz")}
-					<span class="nv-mini text-muted">(${__("faqat sotuv mahsulotlari ko'rinadi")})</span>
-				</div>
-				<div class="nv-zk-top">
-					<div class="nv-zk-mijoz"></div>
-					<div class="nv-zk-kun-wrap">
-						<label class="nv-label">📅 ${__("Qaysi kunga (oldindan zakaz)")}</label>
-						<input type="date" class="form-control nv-zk-kun"
-							value="${frappe.datetime.get_today()}" min="${frappe.datetime.get_today()}">
+		$f.empty().append(`<div class="nv-card nv-empty">${__("Yuklanmoqda...")}</div>`);
+		frappe.call({ method: "pokiza.api.navbat.zakaz_royxat" }).then((r) => {
+			const rows = (r.message || {}).rows || [];
+			$f.empty();
+			const $card = $(`
+				<div class="nv-card nv-zk">
+					<div class="nv-zk-title">🛒 ${__("Zakazlar ro'yxati")}
+						<span class="nv-mini text-muted">(${__("oxirgi")} ${rows.length} ${__("ta")})</span>
 					</div>
-				</div>
-				<div class="nv-zk-items-head">
-					<span>${__("Mahsulot")}</span><span>${__("Miqdor")}</span><span></span>
-					<span>${__("Ombordagi qoldiq")}</span><span>${__("Ombordan olish (kg)")}</span><span></span>
-				</div>
-				<div class="nv-zk-items"></div>
-				<button class="btn btn-xs btn-default nv-zk-add">+ ${__("Mahsulot qo'shish")}</button>
-				<div class="nv-zk-extra">
-					<div>
-						<label class="nv-label">🚚 ${__("Mashina vaqti")}</label>
-						<div class="nv-zk-slot-row">
-							<select class="form-control nv-zk-slot">
-								<option>Ertalab</option>
-								<option>Tushlik / abed atrofi</option>
-								<option>Kechki salqin</option>
-								<option selected>Boshqa vaqt</option>
-							</select>
-							<input type="text" class="form-control nv-zk-slot-izoh"
-								placeholder="${__("aniq vaqt (mas. 15:30)")}">
+					<input type="text" class="form-control nv-zr-search"
+						placeholder="🔍 ${__("Qidirish: mijoz yoki mahsulot...")}">
+					<div class="nv-zr-table">
+						<div class="nv-zr-row nv-zr-head">
+							<span class="nv-zr-sana">${__("Olingan vaqt")}</span>
+							<span>${__("Mijoz")}</span>
+							<span class="nv-zr-mahs">${__("Mahsulot")}</span>
+							<span class="nv-zr-num">${__("Jami kg")}</span>
+							<span class="nv-zr-sana">${__("Qachonga")}</span>
 						</div>
 					</div>
-					<div>
-						<label class="nv-label">💬 ${__("Izoh")}</label>
-						<textarea class="form-control nv-zk-izoh" rows="2"
-							placeholder="${__("masalan: mijoz o'zi olib ketadi")}"></textarea>
-					</div>
-				</div>
-				<button class="btn btn-primary btn-sm nv-zk-submit">➤ ${__("Tekshirish va tasdiqlash")}</button>
-			</div>`).appendTo($f);
-
-		mijozCtrl = frappe.ui.form.make_control({
-			df: {
-				fieldtype: "Link",
-				options: "Customer",
-				label: __("Mijoz"),
-				reqd: 1,
-				get_query: () => ({ filters: { disabled: 0 } }),
-			},
-			parent: $card.find(".nv-zk-mijoz"),
-			render_input: true,
-		});
-
-		qatorQosh();
-		$card.find(".nv-zk-add").on("click", () => qatorQosh());
-		$card.find(".nv-zk-submit").on("click", () => zakazTekshir($card));
-	}
-
-	function qatorQosh() {
-		const $items = $tabs.zakaz.find(".nv-zk-items");
-		const $r = $(`
-			<div class="nv-zk-row">
-				<div class="nv-zk-item"></div>
-				<input type="number" class="form-control nv-zk-qty" min="0" step="any" placeholder="0">
-				<span class="nv-zk-uom text-muted"></span>
-				<span class="nv-zk-ombor text-muted"></span>
-				<input type="number" class="form-control nv-zk-omb" min="0" step="any"
-					placeholder="0" disabled title="${__("Ombordan band qilinadigan kg")}">
-				<button class="btn btn-xs btn-default nv-zk-del">✕</button>
-			</div>`).appendTo($items);
-		const ctrl = frappe.ui.form.make_control({
-			df: {
-				fieldtype: "Link",
-				options: "Item",
-				placeholder: __("Mahsulot tanlang..."),
-				// FAQAT sotuv mahsulotlari (egasi talabi)
-				get_query: () => ({
-					filters: { item_group: "Сотув махсулотлари", disabled: 0 },
-				}),
-			},
-			parent: $r.find(".nv-zk-item"),
-			render_input: true,
-		});
-		ctrl.df.onchange = () => {
-			const v = ctrl.get_value();
-			if (!v) return;
-			frappe.db.get_value("Item", v, "stock_uom").then((r) => {
-				$r.find(".nv-zk-uom").text((r.message || {}).stock_uom || "");
-			});
-			// ombordagi qoldiq darhol ko'rinadi (egasi talabi):
-			// foydalansa bo'ladimi-yo'qmi shu yerning o'zida ma'lum bo'ladi
-			const $om = $r.find(".nv-zk-ombor");
-			$om.attr("class", "nv-zk-ombor text-muted").text("...");
-			const $omb = $r.find(".nv-zk-omb");
-			frappe
-				.call({ method: "pokiza.api.navbat.item_ombor", args: { item_code: v } })
-				.then((res) => {
-					const o = res.message;
-					if (!o) {
-						$om.attr("class", "nv-zk-ombor text-muted")
-							.text(__("ombor: aniqlanmadi"));
-						$omb.prop("disabled", true).val("");
-					} else if (o.bosh > 0.4) {
-						$om.attr("class", "nv-zk-ombor nv-yashil")
-							.html(`📦 <b>${fmt(o.bosh)} kg</b> ${__("bo'sh")}${
-								o.band > 0 ? ` <span class="text-muted">(${fmt(o.band)} ${__("band")})</span>` : ""
-							}`);
-						// ombordan foydalanish HAR DOIM mumkin (egasi talabi) —
-						// limit oshishini kutmasdan shu yerda kg kiritiladi
-						$omb.prop("disabled", false).attr("max", o.bosh)
-							.attr("placeholder", `${__("maks")} ${fmt(o.bosh)}`);
-					} else {
-						$om.attr("class", "nv-zk-ombor nv-qizil")
-							.html(`❌ ${__("omborda yo'q")}`);
-						$omb.prop("disabled", true).val("");
-					}
-				});
-		};
-		const row = { $r, ctrl };
-		zakazRows.push(row);
-		$r.find(".nv-zk-del").on("click", () => {
-			zakazRows = zakazRows.filter((x) => x !== row);
-			$r.remove();
-		});
-	}
-
-	function zakazYigish() {
-		const mijoz = mijozCtrl && mijozCtrl.get_value();
-		if (!mijoz) {
-			frappe.msgprint({ message: __("Mijozni tanlang"), indicator: "orange" });
-			return null;
-		}
-		const items = [];
-		zakazRows.forEach((row) => {
-			const code = row.ctrl.get_value();
-			const qty = parseFloat(row.$r.find(".nv-zk-qty").val());
-			const ombordan = parseFloat(row.$r.find(".nv-zk-omb").val()) || 0;
-			if (code && qty > 0) {
-				const it = { item_code: code, qty: qty };
-				if (ombordan > 0) it.ombordan_kg = ombordan;
-				items.push(it);
+				</div>`).appendTo($f);
+			const $t = $card.find(".nv-zr-table");
+			if (!rows.length) {
+				$t.append(`<div class="nv-zr-empty">${__("Hozircha zakaz yo'q")}</div>`);
+				return;
 			}
-		});
-		if (!items.length) {
-			frappe.msgprint({
-				message: __("Kamida bitta mahsulot va miqdor kiriting"),
-				indicator: "orange",
+			rows.forEach((z) => {
+				const mahs = (z.items || [])
+					.map((it) =>
+						`${frappe.utils.escape_html(it.nom)} — ${fmt(it.qty)} ${it.uom || ""}` +
+						(it.kg !== null && Math.abs(it.kg - it.qty) > 0.05
+							? ` <span class="text-muted">(${fmt(it.kg)} kg)</span>` : ""))
+					.join("<br>");
+				$t.append(`
+					<div class="nv-zr-row">
+						<span class="nv-zr-sana">${vaqtLabel(z.kelgan)}</span>
+						<span class="nv-zr-mijoz">${frappe.utils.escape_html(z.mijoz)}</span>
+						<span class="nv-zr-mahs">${mahs || "—"}</span>
+						<span class="nv-zr-num">${z.kg_nomalum ? "?" : fmt(z.jami_kg)}</span>
+						<span class="nv-zr-sana">${z.qachonga ? qisqaSana(z.qachonga) : "—"}</span>
+					</div>`);
 			});
-			return null;
-		}
-		// oldindan zakaz: tanlangan kundan boshlab rejalashtiriladi
-		const bugun = frappe.datetime.get_today();
-		let kerak_kun = $tabs.zakaz.find(".nv-zk-kun").val() || bugun;
-		if (kerak_kun < bugun) {
-			frappe.msgprint({
-				message: __("O'tgan kunga zakaz olib bo'lmaydi"),
-				indicator: "red",
-			});
-			return null;
-		}
-		return { mijoz, items, kerak_kun };
-	}
-
-	function zakazTekshir($card) {
-		const g = zakazYigish();
-		if (!g) return;
-		frappe
-			.call({
-				method: "pokiza.api.navbat.zakaz_korish",
-				args: { items: g.items, kerak_kun: g.kerak_kun },
-				freeze: true,
-				freeze_message: __("Tekshirilmoqda..."),
-			})
-			.then((r) => korikDialog(g, r.message, $card));
-	}
-
-	// ko'rik oynasi: reja + limitga sig'magan bo'lsa ombor taklifi
-	function korikDialog(g, d, $card) {
-		const rejaHtml = (d.taqsimot || [])
-			.map((t) => `${qisqaSana(t.sana)} — <b>${fmt(t.kg)} kg</b>`)
-			.join(" · ");
-
-		// ombor bo'limi HAR DOIM ko'rinadi (egasi talabi) — limit oshgan
-		// bo'lsa ogohlantirish ham qo'shiladi
-		const itemRows = d.items
-			.filter((it) => !it.kg_nomalum && it.kg > 0)
-			.map((it) => {
-				const o = it.ombor;
-				if (!o) {
-					return `<div class="nv-ko-row">
-						<span>${frappe.utils.escape_html(it.item_name)}</span>
-						<span class="nv-mini text-muted">${__("to'plami yo'q — ombordan tekshirib bo'lmadi")}</span>
-					</div>`;
-				}
-				if (o.bosh < 0.5 && !(it.ombordan_kg > 0)) {
-					return `<div class="nv-ko-row">
-						<span>${frappe.utils.escape_html(it.item_name)}</span>
-						<span class="nv-qizil">❌ ${__("Omborda ham bu mahsulotdan YO'Q")}</span>
-					</div>`;
-				}
-				const max = Math.min(o.bosh, it.kg);
-				return `<div class="nv-ko-row">
-					<span>${frappe.utils.escape_html(it.item_name)}
-						<span class="nv-mini text-muted">(${__("zakazda")} ${fmt(it.kg)} kg)</span></span>
-					<span class="nv-yashil">${__("omborda bo'sh")}: <b>${fmt(o.bosh)} kg</b></span>
-					<span class="nv-ko-inp">
-						<input type="number" class="nv-fakt nv-ko-ombordan" data-item="${frappe.utils.escape_html(it.item_code)}"
-							min="0" max="${max}" step="any" placeholder="0"
-							value="${it.ombordan_kg > 0 ? it.ombordan_kg : ""}"> kg
-					</span>
-				</div>`;
-			})
-			.join("");
-		const warnHtml =
-			d.yetmaydi > 0.4
-				? `<div class="nv-ko-warn">
-						⚠ ${__("Kunlik limitga")} <b>${fmt(d.yetmaydi)} kg</b> ${__("sig'mayapti")}
-						(${qisqaSana(d.kutilgan_kun)}: ${fmt(d.kutilgan_band)} / ${fmt(d.quvvat)} kg ${__("band")}).
-						${__("Xohlasangiz, yetmagan qismini OMBORDAN ishlatishingiz mumkin")}:
-					</div>`
-				: `<div class="nv-mini text-muted" style="margin-bottom:4px">
-						📦 ${__("Xohlasangiz, mahsulotni ombordan ham ishlatishingiz mumkin (band qilinadi)")}:
-					</div>`;
-		const omborHtml = itemRows
-			? `${warnHtml}
-				<div class="nv-ko-rows">${itemRows}</div>
-				<button class="btn btn-xs btn-default nv-ko-recalc">♻ ${__("Ombor bilan qayta hisoblash")}</button>`
-			: "";
-
-		const dlg = new frappe.ui.Dialog({
-			title: __("Zakaz ko'rigi") + " — " + g.mijoz,
-			size: "large",
-			fields: [{ fieldname: "html", fieldtype: "HTML" }],
-			primary_action_label: __("✅ Tasdiqlash (zakaz urish)"),
-			primary_action() {
-				const items = g.items.map((it) => ({ ...it }));
-				dlg.$wrapper.find(".nv-ko-ombordan").each(function () {
-					const code = $(this).data("item");
-					const kg = parseFloat($(this).val()) || 0;
-					const row = items.find((x) => x.item_code === code);
-					if (row) row.ombordan_kg = kg; // 0 = ombordan olinmaydi
+			$card.find(".nv-zr-search").on("input", function () {
+				const q = ($(this).val() || "").toLowerCase();
+				$t.find(".nv-zr-row").not(".nv-zr-head").each(function () {
+					$(this).toggle(!q || $(this).text().toLowerCase().includes(q));
 				});
-				dlg.hide();
-				zakazUr(g, items, $card);
-			},
-		});
-		const oldindan =
-			g.kerak_kun && g.kerak_kun > frappe.datetime.get_today()
-				? `<div class="nv-ko-reja nv-kok">🗓 ${__("Oldindan zakaz — so'ralgan kun")}: <b>${sanaLabel(g.kerak_kun)}</b></div>`
-				: "";
-		dlg.fields_dict.html.$wrapper.html(`
-			<div class="nv-ko">
-				<div class="nv-ko-jami">
-					${__("Jami")}: <b>${fmt(d.jami_kg)} kg</b>
-					${d.ombordan_kg > 0 ? ` · 📦 ${__("ombordan")}: <b>${fmt(d.ombordan_kg)} kg</b> · ${__("ishlab chiqariladi")}: <b>${fmt(d.ishlab_kg)} kg</b>` : ""}
-				</div>
-				${oldindan}
-				<div class="nv-ko-reja">📅 ${__("Reja")}: ${rejaHtml || __("(kg noma'lum — birinchi bo'sh kunga)")}</div>
-				${omborHtml}
-			</div>`);
-		// ombor kiritilgach rejani qayta ko'rish
-		dlg.$wrapper.find(".nv-ko-recalc").on("click", () => {
-			const items = g.items.map((it) => ({ ...it }));
-			dlg.$wrapper.find(".nv-ko-ombordan").each(function () {
-				const code = $(this).data("item");
-				const kg = parseFloat($(this).val()) || 0;
-				const row = items.find((x) => x.item_code === code);
-				if (row) row.ombordan_kg = kg; // 0 = ombordan olinmaydi
 			});
-			dlg.hide();
-			frappe
-				.call({
-					method: "pokiza.api.navbat.zakaz_korish",
-					args: { items: items, kerak_kun: g.kerak_kun },
-					freeze: true,
-				})
-				.then((r) =>
-					korikDialog(
-						{ mijoz: g.mijoz, items: items, kerak_kun: g.kerak_kun },
-						r.message,
-						$card
-					)
-				);
 		});
-		dlg.show();
 	}
 
-	function zakazUr(g, items, $card) {
-		frappe
-			.call({
-				method: "pokiza.api.navbat.zakaz_yarat",
-				args: {
-					mijoz: g.mijoz,
-					items: items,
-					kerak_kun: g.kerak_kun,
-					mashina_vaqti: $card.find(".nv-zk-slot").val(),
-					mashina_izoh: $card.find(".nv-zk-slot-izoh").val(),
-					izoh: $card.find(".nv-zk-izoh").val(),
-				},
-				freeze: true,
-				freeze_message: __("Zakaz urilmoqda..."),
-			})
-			.then((r) => {
-				const m = r.message || {};
-				const reja = (m.taqsimot || [])
-					.map((t) => `${qisqaSana(t.sana)} — ${fmt(t.kg)} kg`)
-					.join(" · ");
-				frappe.msgprint({
-					title: __("Zakaz urildi"),
-					message: `
-						<a href="/app/sales-order/${m.so}"><b>${m.so}</b></a> · ${fmt(m.jami_kg)} kg
-						${m.ombordan_kg > 0 ? `<br>📦 ${__("Ombordan band qilindi")}: <b>${fmt(m.ombordan_kg)} kg</b>` : ""}
-						${reja ? `<br>📅 ${__("Reja")}: ${reja}` : ""}`,
-					indicator: "green",
-				});
-				zakazForm(); // formani tozalash
-				if (m.kun) {
-					state.gBoshi = frappe.datetime.get_today();
-					tanla(m.kun);
-				} else {
-					yukla();
-				}
-				tabOch("ishlab");
-			});
+	function vaqtLabel(dt) {
+		if (!dt) return "—";
+		const [sana, vaqt] = String(dt).split(" ");
+		return qisqaSana(sana) + (vaqt ? " " + vaqt.slice(0, 5) : "");
 	}
 
 	// ============================================================= OMBOR TAB
@@ -1132,44 +856,26 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 			.nv-kesim-jami { border-top: 1px solid var(--border-color); font-weight: 700; margin-top: 4px; padding-top: 6px; }
 			.nv-zames { font-weight: 700; color: #e67e22; }
 			.nv-empty { text-align: center; color: var(--text-muted); padding: 30px; }
-			/* --- zakaz urish formasi --- */
-			.nv-zk { max-width: 860px; }
+			/* --- zakazlar ro'yxati (jadval) --- */
+			.nv-zk { max-width: 1000px; }
 			.nv-zk-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-			.nv-zk-top { display: flex; gap: 14px; align-items: flex-end;
-				flex-wrap: wrap; margin-bottom: 8px; }
-			.nv-zk-mijoz { width: 340px; max-width: 100%; }
-			.nv-zk-mijoz .frappe-control, .nv-zk-mijoz .form-group { margin-bottom: 0 !important; }
-			.nv-zk-kun-wrap { width: 190px; }
-			.nv-zk-items-head { display: grid; grid-template-columns: 1fr 100px 40px 160px 110px 30px;
-				gap: 8px; font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; }
-			.nv-zk-row { display: grid; grid-template-columns: 1fr 100px 40px 160px 110px 30px;
-				gap: 8px; align-items: center; margin-bottom: 4px; }
-			.nv-zk-ombor { font-size: 12px; }
-			.nv-zk-omb { text-align: right; }
-			.nv-zk-omb:disabled { opacity: .45; }
+			.nv-zr-search { max-width: 340px; margin-bottom: 10px; }
+			.nv-zr-table { overflow-x: auto; }
+			.nv-zr-row { display: grid; grid-template-columns: 110px 1.2fr 2fr 80px 90px;
+				gap: 10px; padding: 7px 4px; font-size: 12.5px;
+				border-bottom: 1px solid var(--border-color); align-items: start; }
+			.nv-zr-head { font-size: 10.5px; text-transform: uppercase;
+				color: var(--text-muted); font-weight: 600;
+				border-bottom: 2px solid var(--border-color); }
+			.nv-zr-num { text-align: right; font-weight: 600; }
+			.nv-zr-mijoz { font-weight: 600; }
+			.nv-zr-sana { white-space: nowrap; }
+			.nv-zr-empty { text-align: center; color: var(--text-muted); padding: 20px; }
 			@media (max-width: 700px) {
-				.nv-zk-items-head { display: none; }
-				.nv-zk-row { grid-template-columns: 1fr 90px 40px; }
-				.nv-zk-ombor, .nv-zk-omb { grid-column: 1 / -1; }
+				.nv-zr-row { grid-template-columns: 90px 1fr 70px; }
+				.nv-zr-mahs { grid-column: 1 / -1; padding-left: 8px; }
+				.nv-zr-row > .nv-zr-sana:last-child { display: none; }
 			}
-			.nv-zk-item .frappe-control { margin-bottom: 0 !important; }
-			.nv-zk-item .form-group { margin-bottom: 0 !important; }
-			.nv-zk-qty { text-align: right; }
-			.nv-zk-uom { font-size: 12px; }
-			.nv-zk-add { margin: 6px 0 12px; }
-			.nv-zk-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
-			@media (max-width: 700px) { .nv-zk-extra { grid-template-columns: 1fr; } }
-			.nv-zk-slot-row { display: flex; gap: 8px; }
-			/* --- ko'rik oynasi --- */
-			.nv-ko-jami { font-size: 14px; margin-bottom: 6px; }
-			.nv-ko-reja { font-size: 12.5px; margin-bottom: 10px; }
-			.nv-ko-warn { background: rgba(230,126,34,.1); border: 1px solid #e67e22;
-				border-radius: 8px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 8px; }
-			.nv-ko-row { display: flex; gap: 10px; align-items: center; font-size: 12.5px;
-				padding: 4px 0; border-bottom: 1px dashed var(--border-color); flex-wrap: wrap; }
-			.nv-ko-row > span:first-child { flex: 1; min-width: 200px; }
-			.nv-ko-inp { white-space: nowrap; }
-			.nv-ko-recalc { margin-top: 8px; }
 			/* --- ombor jadvali --- */
 			.nv-om-row { display: grid; grid-template-columns: 1fr 100px 100px 100px; gap: 8px;
 				font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid var(--border-color); }
