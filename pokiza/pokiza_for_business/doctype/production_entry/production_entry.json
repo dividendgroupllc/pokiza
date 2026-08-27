@@ -46,7 +46,7 @@
    "reqd": 1
   },
   {
-   "default": "Now",
+   "default": "12:00:00",
    "fieldname": "posting_time",
    "fieldtype": "Time",
    "label": "Время",
