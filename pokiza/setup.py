@@ -76,6 +76,17 @@ def get_custom_fields():
                 "in_list_view": 0,
             },
         ],
+        # Oylik tabel: har kunlik stavka koeffitsienti (1 = to'liq kun, 0.5, 1.5, 2 ...)
+        "Attendance": [
+            {
+                "fieldname": "custom_koef",
+                "label": "Stavka koeffitsienti (tabel)",
+                "fieldtype": "Float",
+                "precision": "9",
+                "insert_after": "status",
+                "in_list_view": 1,
+            },
+        ],
         "Sales Order": [
             {
                 "fieldname": "custom_izoh",
