@@ -447,11 +447,38 @@ def set_bonus(xodim, yil, oy, summa):
     _ochiq_tekshir(yil, oy)
     oy_boshi, oy_oxiri, _kun = _oy_chegara(yil, oy)
 
-    emp = frappe.db.get_value("Employee", xodim, ["name", "employee_name", "company"], as_dict=True)
+    emp = frappe.db.get_value(
+        "Employee", xodim,
+        ["name", "employee_name", "company", "date_of_joining"], as_dict=True,
+    )
     if not emp:
         frappe.throw(_("Xodim topilmadi"))
 
     _bonus_komponent_ta_minla()
+    _struktura_ta_minla()
+
+    # HRMS Additional Salary xodimda SSA bo'lishini talab qiladi — yo'q bo'lsa,
+    # tabelda ko'rinib turgan qiymat (Kassa taklifi yoki 0) bilan yaratib qo'yamiz
+    if not frappe.db.exists(
+        "Salary Structure Assignment", {"employee": xodim, "docstatus": 1}
+    ):
+        from_date = oy_boshi
+        if emp.date_of_joining and getdate(emp.date_of_joining) > oy_boshi:
+            from_date = getdate(emp.date_of_joining)
+        company = emp.company or _kompaniya()
+        taklif = _kassa_taklif([xodim], oy_boshi).get(xodim, 0.0)
+        ssa = frappe.get_doc({
+            "doctype": "Salary Structure Assignment",
+            "employee": xodim,
+            "salary_structure": STRUKTURA,
+            "from_date": from_date,
+            "company": company,
+            "currency": _valyuta(company),
+            "base": flt(taklif),
+        })
+        ssa.flags.ignore_permissions = True
+        ssa.insert(ignore_permissions=True)
+        ssa.submit()
 
     mavjud = frappe.get_all(
         "Additional Salary",
@@ -483,6 +510,9 @@ def set_bonus(xodim, yil, oy, summa):
             "currency": _valyuta(company),
             "amount": summa,
             "payroll_date": oy_oxiri,
+            # Bonus "Pokiza Oylik" strukturasiga kirmaydi — u ustidan yozish
+            # emas, QO'SHIMCHA to'lov; aks holda HRMS xato beradi
+            "overwrite_salary_structure_amount": 0,
         })
         doc.flags.ignore_permissions = True
         doc.insert(ignore_permissions=True)
