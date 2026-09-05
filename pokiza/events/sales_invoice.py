@@ -33,22 +33,86 @@ def before_submit(doc, method=None) -> None:
         )
 
 
-def validate(doc, method=None) -> None:
-    """Yangi schyotga mijozning doimiy bonus foizini avtomatik qo'llash.
+BONUS_REMARK = "Avto bonus"
 
-    Bonus Customer.custom_bonus_foiz maydonidan olinadi va umumiy summadan
-    (Grand Total) chegirma sifatida ayiriladi — qarzdorlik sof summada yoziladi.
-    Faqat birinchi saqlashda va chegirma qo'lda kiritilmagan bo'lsa ishlaydi —
-    keyin sotuvchi qiymatni shu schyot uchun erkin o'zgartira oladi.
+
+def on_submit(doc, method=None) -> None:
+    """Schyot tasdiqlanganda mijoz bonusini Journal Entry qilib avto yozish.
+
+    Summa = Customer.custom_bonus_foiz × schyot umumiy summasi.
+    Dt «Бонус» (rasxod) / Kt Debtors (mijoz, schyotga bog'langan) —
+    mijoz qarzi bonus summasiga kamayadi. Manfiy foiz = ustama (teskari
+    yozuv, qarz oshadi). JE avto submit bo'ladi.
     """
-    if not doc.is_new() or not doc.customer:
-        return
-    if flt(doc.additional_discount_percentage) or flt(doc.discount_amount):
-        return  # qo'lda kiritilgan chegirma ustuvor
     bonus = flt(frappe.get_cached_value("Customer", doc.customer, "custom_bonus_foiz"))
-    if not bonus:
+    summa = flt(doc.base_grand_total * bonus / 100, 2)
+    if not summa:
         return
-    doc.apply_discount_on = "Grand Total"
-    doc.additional_discount_percentage = bonus
-    # validate hook standart hisob-kitobdan KEYIN chaqiriladi — qayta hisoblaymiz
-    doc.calculate_taxes_and_totals()
+
+    bonus_account = frappe.db.get_value(
+        "Account", {"account_name": "Бонус", "company": doc.company, "is_group": 0}
+    )
+    if not bonus_account:
+        frappe.throw(
+            _("«Бонус» nomli rasxod accounti topilmadi ({0}). "
+              "Avval Chart of Accounts'da yarating.").format(doc.company),
+            title=_("Bonus accounti yo'q"),
+        )
+
+    debtors_qator = {
+        "account": doc.debit_to,
+        "party_type": "Customer",
+        "party": doc.customer,
+    }
+    if summa > 0:
+        # Bonus: mijoz qarzi kamayadi, schyotga to'lov sifatida bog'lanadi
+        debtors_qator.update({
+            "credit_in_account_currency": summa,
+            "reference_type": "Sales Invoice",
+            "reference_name": doc.name,
+        })
+        bonus_qator = {"account": bonus_account, "debit_in_account_currency": summa}
+    else:
+        # Ustama (manfiy foiz): mijoz qarzi oshadi.
+        # ERPNext debit qatorni Sales Invoice'ga bog'lashga ruxsat bermaydi —
+        # bog'liqlik cheque_no (Reference No) orqali saqlanadi.
+        debtors_qator["debit_in_account_currency"] = -summa
+        bonus_qator = {"account": bonus_account, "credit_in_account_currency": -summa}
+
+    je = frappe.get_doc({
+        "doctype": "Journal Entry",
+        "voucher_type": "Journal Entry",
+        "company": doc.company,
+        "posting_date": doc.posting_date,
+        "cheque_no": doc.name,
+        "cheque_date": doc.posting_date,
+        "user_remark": f"{BONUS_REMARK} {bonus}% — {doc.name}, {doc.customer_name or doc.customer}",
+        "accounts": [debtors_qator, bonus_qator],
+    })
+    je.flags.ignore_permissions = True
+    je.insert()
+    je.submit()
+    frappe.msgprint(
+        _("Bonus {0}% — {1} avto yozildi: {2}").format(
+            bonus, frappe.format_value(abs(summa), {"fieldtype": "Currency"}),
+            frappe.utils.get_link_to_form("Journal Entry", je.name),
+        ),
+        alert=True, indicator="green",
+    )
+
+
+def before_cancel(doc, method=None) -> None:
+    """Schyot bekor qilinsa, unga avto yozilgan bonus JE ham bekor bo'ladi."""
+    je_lar = frappe.get_all(
+        "Journal Entry",
+        filters={
+            "cheque_no": doc.name,
+            "docstatus": 1,
+            "user_remark": ["like", f"{BONUS_REMARK}%"],
+        },
+        pluck="name",
+    )
+    for nomi in je_lar:
+        je = frappe.get_doc("Journal Entry", nomi)
+        je.flags.ignore_permissions = True
+        je.cancel()

@@ -163,9 +163,12 @@ doc_events = {
 		"on_cancel": "pokiza.api.navbat.so_on_cancel",
 	},
 	"Sales Invoice": {
-		"validate": "pokiza.events.sales_invoice.validate",
 		"before_submit": "pokiza.events.sales_invoice.before_submit",
-		"on_submit": "pokiza.api.navbat.si_on_submit",
+		"on_submit": [
+			"pokiza.api.navbat.si_on_submit",
+			"pokiza.events.sales_invoice.on_submit",
+		],
+		"before_cancel": "pokiza.events.sales_invoice.before_cancel",
 	},
 }
 

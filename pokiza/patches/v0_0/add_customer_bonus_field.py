@@ -1,6 +1,7 @@
 # Mijoz bonusi (2026-09-05, egasi talabi): har mijozga doimiy bonus foizi.
-# Schyot (Sales Invoice) yaratilganda shu foiz umumiy summadan avtomatik
-# chegirma (Additional Discount %) bo'lib tushadi — qarzdorlik sof yoziladi.
+# Schyot (Sales Invoice) submit bo'lganda shu foiz umumiy summadan hisoblanib,
+# avto Journal Entry yoziladi: Dt «Бонус» (rasxod) / Kt Debtors (mijoz) —
+# mijoz qarzi bonus summasiga kamayadi.
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
@@ -15,8 +16,9 @@ def execute():
                     "fieldtype": "Percent",
                     "insert_after": "customer_group",
                     "description": (
-                        "Schyot yaratilganda umumiy summadan avtomatik "
-                        "ayiriladigan doimiy bonus. Manfiy qiymat = ustama."
+                        "Schyot tasdiqlanganda shu foizda avto Journal Entry "
+                        "yoziladi (Бонус rasxodi, mijoz qarzi kamayadi). "
+                        "Manfiy qiymat = ustama."
                     ),
                 },
             ],

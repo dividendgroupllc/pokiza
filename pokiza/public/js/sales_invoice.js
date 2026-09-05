@@ -17,7 +17,6 @@ frappe.ui.form.on("Sales Invoice", {
 
     customer(frm) {
         if (!frm.doc.customer) return;
-        bonusniQollash(frm);
         odatiyItemlarniYuklash(frm);
     },
 });
@@ -34,22 +33,6 @@ frappe.ui.form.on("Sales Invoice Item", {
         }, 100);
     },
 });
-
-// Mijozning doimiy bonus foizi (Customer.custom_bonus_foiz) umumiy
-// summadan chegirma bo'lib tushadi; sotuvchi ko'rib, kerak bo'lsa
-// shu schyot uchun qo'lda o'zgartira oladi.
-function bonusniQollash(frm) {
-    frappe.db
-        .get_value("Customer", frm.doc.customer, "custom_bonus_foiz")
-        .then((r) => {
-            const bonus = flt(r.message && r.message.custom_bonus_foiz);
-            if (!frm.doc.customer) return;
-            if (bonus !== flt(frm.doc.additional_discount_percentage)) {
-                frm.set_value("apply_discount_on", "Grand Total");
-                frm.set_value("additional_discount_percentage", bonus);
-            }
-        });
-}
 
 // Mijoz tanlanganda uning doim sotib oladigan itemlari (so'nggi 90 kun
 // tarixidan, oxirgi soni/narxi bilan) jadvalga default tushadi. Sotuvchi
