@@ -13,3 +13,4 @@ pokiza.patches.v0_0.add_navbat_taqsimot_field
 pokiza.patches.v0_0.add_ombor_zakaz_fields
 pokiza.patches.v0_0.add_zakaz_kerak_kun
 pokiza.patches.v0_0.add_oylik_tabel_setup
+pokiza.patches.v0_0.add_customer_bonus_field

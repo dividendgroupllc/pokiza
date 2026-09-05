@@ -31,3 +31,24 @@ def before_submit(doc, method=None) -> None:
             + f"<ul>{royxat}</ul>",
             title=_("Narx kiritilmagan"),
         )
+
+
+def validate(doc, method=None) -> None:
+    """Yangi schyotga mijozning doimiy bonus foizini avtomatik qo'llash.
+
+    Bonus Customer.custom_bonus_foiz maydonidan olinadi va umumiy summadan
+    (Grand Total) chegirma sifatida ayiriladi — qarzdorlik sof summada yoziladi.
+    Faqat birinchi saqlashda va chegirma qo'lda kiritilmagan bo'lsa ishlaydi —
+    keyin sotuvchi qiymatni shu schyot uchun erkin o'zgartira oladi.
+    """
+    if not doc.is_new() or not doc.customer:
+        return
+    if flt(doc.additional_discount_percentage) or flt(doc.discount_amount):
+        return  # qo'lda kiritilgan chegirma ustuvor
+    bonus = flt(frappe.get_cached_value("Customer", doc.customer, "custom_bonus_foiz"))
+    if not bonus:
+        return
+    doc.apply_discount_on = "Grand Total"
+    doc.additional_discount_percentage = bonus
+    # validate hook standart hisob-kitobdan KEYIN chaqiriladi — qayta hisoblaymiz
+    doc.calculate_taxes_and_totals()
