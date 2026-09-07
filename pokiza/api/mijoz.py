@@ -1,8 +1,9 @@
 """Mijozning odatiy (doim sotib oladigan) itemlari.
 
 Schyotda mijoz tanlanganda items jadvaliga default tushadigan ro'yxat:
-so'nggi 90 kundagi tasdiqlangan schyotlardan, har item bo'yicha eng
-oxirgi olingan soni va narxi bilan (2026-09-05, egasi talabi).
+so'nggi 90 kundagi tasdiqlangan schyotlardan (2026-09-05, egasi talabi).
+Client tomonda soni 0 bilan tushadi, narxni ERPNext o'zi oladi — bu yerdagi
+qty/rate faqat ma'lumot uchun (2026-09-07).
 """
 
 import frappe

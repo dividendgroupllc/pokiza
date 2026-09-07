@@ -19,24 +19,17 @@ frappe.ui.form.on("Sales Invoice", {
         if (!frm.doc.customer) return;
         odatiyItemlarniYuklash(frm);
     },
-});
 
-frappe.ui.form.on("Sales Invoice Item", {
-    qty(frm, cdt, cdn) {
-        // Soni 0 qilinsa qator jadvaldan o'zi yo'qoladi
-        const row = locals[cdt][cdn];
-        if (!row || !row.item_code || flt(row.qty) !== 0) return;
-        setTimeout(() => {
-            const grid_row = frm.get_field("items").grid.grid_rows_by_docname[cdn];
-            if (grid_row) grid_row.remove();
-            frm.refresh_field("items");
-        }, 100);
+    validate(frm) {
+        nolQatorlarniTozalash(frm);
     },
 });
 
 // Mijoz tanlanganda uning doim sotib oladigan itemlari (so'nggi 90 kun
-// tarixidan, oxirgi soni/narxi bilan) jadvalga default tushadi. Sotuvchi
-// sonini/narxini o'zgartiradi, yangi qator qo'shadi; soni 0 = qator o'chadi.
+// tarixidan) jadvalga SONI 0 bilan default tushadi; narxni ERPNext'ning o'zi
+// olib keladi (Item Price / Pricing Rule — kiritilgan songa mos bo'ladi).
+// Sotuvchi sotiladigan itemlarning sonini kiritadi; Save/Submit oldidan
+// soni 0 qolgan qatorlar jadvaldan avtomatik olib tashlanadi.
 // Faqat YANGI (saqlanmagan) schyotda ishlaydi; mijoz almashtirilsa jadval
 // yangi mijoz ro'yxati bilan qayta to'ldiriladi.
 function odatiyItemlarniYuklash(frm) {
@@ -57,21 +50,43 @@ function odatiyItemlarniYuklash(frm) {
 
             const ishlar = itemlar.map((it) => {
                 const row = frm.add_child("items");
+                // Narx set qilinmaydi — ERPNext joriy narxni o'zi olib keladi
                 return frappe.model
                     .set_value(row.doctype, row.name, "item_code", it.item_code)
-                    .then(() => {
-                        frappe.model.set_value(row.doctype, row.name, "qty", it.qty);
-                        return frappe.model.set_value(row.doctype, row.name, "rate", it.rate);
-                    });
+                    .then(() => frappe.model.set_value(row.doctype, row.name, "qty", 0));
             });
             Promise.all(ishlar).then(() => {
                 frm.refresh_field("items");
                 frappe.show_alert({
-                    message: __("{0} ta odatiy item yuklandi (so'nggi 90 kun)", [itemlar.length]),
+                    message: __(
+                        "{0} ta odatiy item yuklandi — sotiladigan sonini kiriting (0 = qator o'chadi)",
+                        [itemlar.length]
+                    ),
                     indicator: "green",
                 });
             });
         });
+}
+
+// Save/Submit oldidan soni 0 qolgan qatorlar olib tashlanadi — jadvalda
+// faqat operator sonini kiritgan itemlar qoladi.
+function nolQatorlarniTozalash(frm) {
+    const items = frm.doc.items || [];
+    const qoladigan = items.filter((r) => !r.item_code || flt(r.qty) !== 0);
+    if (qoladigan.length === items.length) return;
+    if (!qoladigan.some((r) => r.item_code)) {
+        frappe.throw(
+            __("Hamma itemning soni 0 — hech bo'lmaganda bittasining sonini kiriting.")
+        );
+    }
+    const olib_tashlandi = items.length - qoladigan.length;
+    frm.doc.items = qoladigan;
+    frm.doc.items.forEach((r, i) => (r.idx = i + 1));
+    frm.refresh_field("items");
+    frappe.show_alert({
+        message: __("Soni 0 bo'lgan {0} ta qator olib tashlandi", [olib_tashlandi]),
+        indicator: "orange",
+    });
 }
 
 function setSalesItemQuery(frm) {
