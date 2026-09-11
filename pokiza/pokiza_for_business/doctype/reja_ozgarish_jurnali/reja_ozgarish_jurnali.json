@@ -63,7 +63,7 @@
   }
  ],
  "index_web_pages_for_search": 0,
- "in_create": 1,
+ "in_create": 0,
  "links": [],
  "modified": "2026-08-18 00:00:00.000000",
  "modified_by": "Administrator",
@@ -80,6 +80,19 @@
   {
    "read": 1,
    "role": "Sales Manager",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "kassa",
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
    "report": 1
   },
   {

@@ -313,7 +313,7 @@ def get_tabel(yil=None, oy=None):
     natija["holat"] = tabel.holat
     natija["tahrir_mumkin"] = tabel.holat == "Ochiq"
     natija["yopish_mumkin"] = tabel.holat == "Ochiq" and bugun >= oy_oxiri
-    natija["ochish_mumkin"] = tabel.holat == "Yopiq" and "System Manager" in frappe.get_roles()
+    natija["ochish_mumkin"] = tabel.holat == "Yopiq"
     return natija
 
 
@@ -650,9 +650,8 @@ def _oy_yop_job(yil, oy, foydalanuvchi):
 
 @frappe.whitelist()
 def oy_och(yil, oy):
-    """Yopiq oyni qayta ochish (faqat System Manager)."""
-    if "System Manager" not in frappe.get_roles():
-        frappe.throw(_("Faqat System Manager oyni qayta ocha oladi"), frappe.PermissionError)
+    """Yopiq oyni qayta ochish (sahifaga ruxsati bor rollar)."""
+    _rol_tekshir()
     yil, oy = cint(yil), cint(oy)
     tabel = _tabel_doc(yil, oy)
     if tabel.holat != "Yopiq":

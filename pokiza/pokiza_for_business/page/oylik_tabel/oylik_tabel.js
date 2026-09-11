@@ -324,7 +324,7 @@ frappe.pages["oylik-tabel"].on_page_load = function (wrapper) {
 			`<b>${d.oy_nomi} ${d.yil}</b> tabelini yopmoqchimisiz?<br><br>
 			• Yozilmagan kunlar avtomatik "1" (to'liq stavka) bilan to'ldiriladi<br>
 			• Barcha davomat va bonuslar rasmiy tasdiqlanadi (HRMS)<br>
-			• Yopilgandan keyin tahrirlab bo'lmaydi (faqat System Manager qayta ochadi)`,
+			• Yopilgandan keyin tahrirlab bo'lmaydi ("Oyni qayta ochish" tugmasi bilan qayta ochiladi)`,
 			() => {
 				frappe.call({
 					method: "pokiza.api.oylik.oy_yop",
