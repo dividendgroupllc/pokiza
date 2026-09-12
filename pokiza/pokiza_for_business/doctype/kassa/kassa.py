@@ -35,6 +35,32 @@ def get_account_currency_amount(company_amount, account_currency, company_curren
     return flt(flt(company_amount) / flt(exchange_rate)), flt(exchange_rate)
 
 
+def get_employee_payable_account(company):
+    """Hodimlar uchun payable hisob — faqat kompaniya valyutasidagisi.
+
+    Kompaniyada bir nechta Payable hisob bo'lishi mumkin (UZS va USD),
+    shuning uchun valyutani filtrlamasdan tanlash noto'g'ri valyutaga tushiradi.
+    """
+    company_currency = frappe.get_cached_value("Company", company, "default_currency")
+
+    default_payable = frappe.get_cached_value("Company", company, "default_payable_account")
+    if default_payable and frappe.get_cached_value(
+        "Account", default_payable, "account_currency"
+    ) == company_currency:
+        return default_payable
+
+    return frappe.db.get_value(
+        "Account",
+        {
+            "company": company,
+            "account_type": "Payable",
+            "is_group": 0,
+            "account_currency": company_currency,
+        },
+        "name",
+    )
+
+
 class Kassa(Document):
     def validate(self):
         self.set_default_company()
@@ -143,15 +169,7 @@ class Kassa(Document):
             return erpnext_get_party_account(self.party_type, self.party, self.company)
 
         if self.party_type == "Employee":
-            payable_account = frappe.db.get_value(
-                "Account",
-                {
-                    "company": self.company,
-                    "account_type": "Payable",
-                    "is_group": 0,
-                },
-                "name",
-            )
+            payable_account = get_employee_payable_account(self.company)
             if payable_account:
                 return payable_account
 
@@ -790,11 +808,7 @@ def get_party_currency(party_type, party, company):
         if not currency:
             currency = frappe.get_cached_value("Company", company, "default_currency")
     elif party_type == "Employee":
-        account = frappe.db.get_value(
-            "Account",
-            {"company": company, "account_type": "Payable", "is_group": 0},
-            "name"
-        )
+        account = get_employee_payable_account(company)
         if account:
             currency = frappe.get_cached_value("Account", account, "account_currency")
         if not currency:
