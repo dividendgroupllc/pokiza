@@ -14,7 +14,7 @@ def execute():
                     "fieldname": "custom_sarf_jami_soni",
                     "label": "Sarf mahsulotlar umumiy soni",
                     "fieldtype": "Float",
-                    "insert_after": "items",
+                    "insert_after": "set_rate_of_sub_assembly_item_based_on_bom",
                     "read_only": 1,
                     "no_copy": 1,
                     "description": "Syryo jadvalidagi barcha qatorlar miqdorining yig'indisi",
