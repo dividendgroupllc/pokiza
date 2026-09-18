@@ -15,3 +15,4 @@ pokiza.patches.v0_0.add_zakaz_kerak_kun
 pokiza.patches.v0_0.add_oylik_tabel_setup
 pokiza.patches.v0_0.add_customer_bonus_field
 pokiza.patches.v0_0.add_kassa_financial_report_roles
+pokiza.patches.v0_0.add_kassa_pl_hisoboti
