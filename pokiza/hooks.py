@@ -149,6 +149,9 @@ after_migrate = ["pokiza.setup.after_migrate"]
 # Hook on document methods and events
 
 doc_events = {
+	"BOM": {
+		"validate": "pokiza.events.bom.validate",
+	},
 	"Kassa": {
 		"on_submit": "pokiza.events.kassa.on_submit",
 	},
