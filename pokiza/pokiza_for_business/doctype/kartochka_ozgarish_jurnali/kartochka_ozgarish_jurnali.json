@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "autoname": "format:KJL-{#####}",
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mijoz",
+  "sku",
+  "maydon",
+  "column_break_1",
+  "eski_qiymat",
+  "yangi_qiymat",
+  "kim"
+ ],
+ "fields": [
+  {
+   "fieldname": "mijoz",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "label": "Mijoz",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sku",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "SKU",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "maydon",
+   "fieldtype": "Data",
+   "label": "Maydon",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "eski_qiymat",
+   "fieldtype": "Data",
+   "label": "Eski qiymat",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "yangi_qiymat",
+   "fieldtype": "Data",
+   "label": "Yangi qiymat",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kim",
+   "fieldtype": "Data",
+   "label": "Kim o'zgartirdi",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Kartochka Ozgarish Jurnali",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "export": 1,
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales User",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "kassa",
+   "export": 1,
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Manufacturing Manager",
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

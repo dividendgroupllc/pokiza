@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sku",
+  "sku_nomi",
+  "norma",
+  "tannarx",
+  "sotuv_narxi",
+  "bonus_foiz",
+  "bonus_keyin_narx",
+  "marja_som",
+  "marja_foiz",
+  "amal_sana",
+  "status",
+  "tannarx_tafsilot"
+ ],
+ "fields": [
+  {
+   "fieldname": "sku",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "SKU / mahsulot",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "sku_nomi",
+   "fieldtype": "Data",
+   "label": "SKU nomi",
+   "fetch_from": "sku.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "norma",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Norma",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "tannarx",
+   "fieldtype": "Currency",
+   "label": "Tannarx so'm/kg",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "sotuv_narxi",
+   "fieldtype": "Currency",
+   "label": "Sotuv narxi so'm/kg",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "bonus_foiz",
+   "fieldtype": "Percent",
+   "label": "Bonus %",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "bonus_keyin_narx",
+   "fieldtype": "Currency",
+   "label": "Bonusdan keyingi narx",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "marja_som",
+   "fieldtype": "Currency",
+   "label": "Marja so'm/kg",
+   "read_only": 1
+  },
+  {
+   "fieldname": "marja_foiz",
+   "fieldtype": "Percent",
+   "label": "Marja %",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "amal_sana",
+   "fieldtype": "Date",
+   "label": "Amal qilish sanasi"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Aktiv\nNoaktiv",
+   "default": "Aktiv",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "tannarx_tafsilot",
+   "fieldtype": "Data",
+   "label": "Tannarx tafsiloti",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Mijoz Kartochka Qatori",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

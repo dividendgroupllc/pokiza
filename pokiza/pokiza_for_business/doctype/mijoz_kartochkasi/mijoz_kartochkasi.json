@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "autoname": "field:mijoz",
+ "creation": "2026-09-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mijoz",
+  "holat",
+  "hudud",
+  "column_break_1",
+  "masul",
+  "tolov_sharti",
+  "limit_summa",
+  "kartochka_sana",
+  "section_qatorlar",
+  "qatorlar",
+  "izoh"
+ ],
+ "fields": [
+  {
+   "fieldname": "mijoz",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "label": "Mijoz",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "holat",
+   "fieldtype": "Select",
+   "label": "Holat",
+   "options": "Qoralama\nTasdiqlangan",
+   "default": "Qoralama",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "hudud",
+   "fieldtype": "Data",
+   "label": "Hudud",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "masul",
+   "fieldtype": "Data",
+   "label": "Mas'ul",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tolov_sharti",
+   "fieldtype": "Data",
+   "label": "To'lov sharti"
+  },
+  {
+   "fieldname": "limit_summa",
+   "fieldtype": "Currency",
+   "label": "Limit (so'm)",
+   "description": "Hozircha faqat ma'lumot va ogohlantirish uchun — schyotni bloklamaydi"
+  },
+  {
+   "fieldname": "kartochka_sana",
+   "fieldtype": "Date",
+   "label": "Kartochka sanasi",
+   "default": "Today"
+  },
+  {
+   "fieldname": "section_qatorlar",
+   "fieldtype": "Section Break",
+   "label": "SKU – Norma – Narx qatorlari"
+  },
+  {
+   "fieldname": "qatorlar",
+   "fieldtype": "Table",
+   "options": "Mijoz Kartochka Qatori",
+   "label": "Qatorlar"
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Mijoz Kartochkasi",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "report": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "report": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "print": 1,
+   "report": 1,
+   "role": "Sales User"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "report": 1,
+   "role": "kassa"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager"
+  }
+ ],
+ "search_fields": "mijoz,hudud,masul",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
