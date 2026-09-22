@@ -1234,6 +1234,20 @@ def zakaz_yarat(mijoz, items, mashina_vaqti=None, mashina_izoh=None,
 
     rows = _zakaz_items_tayyorla(items)
 
+    # --- mijoz kartochkasi bo'lsa faqat undagi AKTIV SKU'larga ruxsat
+    #     (Disabled yoki kartochkada yo'q item — server darajasida rad,
+    #     brauzer filtrini aylanib o'tib bo'lmaydi), narx ham kartochkadan
+    from pokiza.api.kartochka import aktiv_map
+    karta = aktiv_map(mijoz)
+    if karta:
+        for r in rows:
+            if r["item_code"] not in karta:
+                frappe.throw(
+                    _("«{0}» — {1} kartochkasida Aktiv emas. "
+                      "Avval kartochkaga qo'shing yoki Aktiv qiling.")
+                    .format(r["item_name"], mijoz)
+                )
+
     # --- ombor talabini ГП kesimida tekshirish (bir xil ГПга ikki qator
     #     qo'shilib qoldiqdan oshib ketmasin)
     ombor = _item_ombor([r["item_code"] for r in rows])
@@ -1277,10 +1291,13 @@ def zakaz_yarat(mijoz, items, mashina_vaqti=None, mashina_izoh=None,
         "custom_izoh": izoh or None,
     })
     for r in rows:
-        rate = flt(frappe.db.get_value(
-            "Item Price", {"item_code": r["item_code"], "selling": 1},
-            "price_list_rate",
-        ))
+        if karta and r["item_code"] in karta:
+            rate = flt(karta[r["item_code"]].sotuv_narxi)
+        else:
+            rate = flt(frappe.db.get_value(
+                "Item Price", {"item_code": r["item_code"], "selling": 1},
+                "price_list_rate",
+            ))
         so.append("items", {
             "item_code": r["item_code"],
             "qty": r["qty"],

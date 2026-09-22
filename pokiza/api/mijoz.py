@@ -14,9 +14,32 @@ NARX_GURUHI = "Сотув махсулотлари"
 
 @frappe.whitelist()
 def odatiy_itemlar(customer):
-    """Mijoz so'nggi KUNLAR ichida olgan itemlar — oxirgi soni/narxi bilan."""
+    """Schyotga default tushadigan itemlar.
+
+    Mijozning kartochkasi bo'lsa (2026-09-22) — undagi AKTIV qatorlar
+    kartochka narxi bilan (Disabled qatorlar tushmaydi); kartochkasiz
+    mijozga eski usul: so'nggi KUNLAR tarixidan oxirgi soni/narxi.
+    """
     if not customer or not frappe.has_permission("Sales Invoice", "read"):
         return []
+
+    from pokiza.api.kartochka import aktiv_map
+
+    karta = aktiv_map(customer)
+    if karta:
+        return sorted(
+            (
+                {
+                    "item_code": r.sku,
+                    "item_name": r.sku_nomi or r.sku,
+                    "qty": 0,
+                    "rate": r.sotuv_narxi,
+                    "kartochkadan": 1,
+                }
+                for r in karta.values()
+            ),
+            key=lambda q: (q["item_name"] or "").lower(),
+        )
 
     qatorlar = frappe.db.sql(
         """

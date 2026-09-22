@@ -9,6 +9,7 @@ frappe.ui.form.on("Sales Invoice", {
             frm.set_value("set_posting_time", 1);
             frm.set_value("posting_time", "15:00:00");
         }
+        kartaFiltrYuklash(frm);
     },
 
     refresh(frm) {
@@ -17,6 +18,7 @@ frappe.ui.form.on("Sales Invoice", {
 
     customer(frm) {
         if (!frm.doc.customer) return;
+        kartaFiltrYuklash(frm);
         odatiyItemlarniYuklash(frm);
     },
 
@@ -25,13 +27,28 @@ frappe.ui.form.on("Sales Invoice", {
     },
 });
 
-// Mijoz tanlanganda uning doim sotib oladigan itemlari (so'nggi 90 kun
-// tarixidan) jadvalga SONI 0 bilan default tushadi; narxni ERPNext'ning o'zi
-// olib keladi (Item Price / Pricing Rule — kiritilgan songa mos bo'ladi).
-// Sotuvchi sotiladigan itemlarning sonini kiritadi; Save/Submit oldidan
-// soni 0 qolgan qatorlar jadvaldan avtomatik olib tashlanadi.
-// Faqat YANGI (saqlanmagan) schyotda ishlaydi; mijoz almashtirilsa jadval
-// yangi mijoz ro'yxati bilan qayta to'ldiriladi.
+// Mijoz kartochkasi bo'lsa item tanlash FAQAT undagi Aktiv SKU'lar bilan
+// cheklanadi (Disabled qatorlar chiqmaydi); kartochkasiz mijozda eski
+// umumiy filtr (butun sotuv guruhi) ishlayveradi.
+function kartaFiltrYuklash(frm) {
+    const mijoz = frm.doc.customer;
+    frm.__karta_skular = null;
+    if (!mijoz) return;
+    frappe
+        .call({ method: "pokiza.api.kartochka.aktiv_itemlar", args: { mijoz } })
+        .then((r) => {
+            if (frm.doc.customer !== mijoz) return;
+            const itemlar = r.message || [];
+            frm.__karta_skular = itemlar.length ? itemlar.map((it) => it.sku) : null;
+        });
+}
+
+// Mijoz tanlanganda jadvalga default itemlar SONI 0 bilan tushadi:
+// kartochkali mijozga — kartochkadagi Aktiv qatorlar KARTOCHKA NARXI bilan,
+// kartochkasizga — so'nggi 90 kun tarixi (narxni ERPNext o'zi oladi).
+// Sotuvchi sonini kiritadi; Save/Submit oldidan soni 0 qolgan qatorlar
+// avtomatik olib tashlanadi. Faqat YANGI (saqlanmagan) schyotda ishlaydi;
+// mijoz almashtirilsa jadval yangi mijoz ro'yxati bilan qayta to'ldiriladi.
 function odatiyItemlarniYuklash(frm) {
     if (!frm.is_new() || frm.doc.amended_from) return;
     const bosh = (frm.doc.items || []).every((r) => !r.item_code);
@@ -47,21 +64,29 @@ function odatiyItemlarniYuklash(frm) {
             if (frm.doc.customer !== mijoz || !itemlar.length) return;
             frm.clear_table("items");
             frm.__odatiy_mijoz = mijoz;
+            const kartochkadan = itemlar.some((it) => it.kartochkadan);
 
             const ishlar = itemlar.map((it) => {
                 const row = frm.add_child("items");
-                // Narx set qilinmaydi — ERPNext joriy narxni o'zi olib keladi
                 return frappe.model
                     .set_value(row.doctype, row.name, "item_code", it.item_code)
-                    .then(() => frappe.model.set_value(row.doctype, row.name, "qty", 0));
+                    .then(() => frappe.model.set_value(row.doctype, row.name, "qty", 0))
+                    .then(() => {
+                        // Kartochkali mijozda narx — kartochkadan (shartnoma
+                        // narxi); kartochkasizda ERPNext o'zi olib keladi.
+                        if (it.kartochkadan && flt(it.rate)) {
+                            return frappe.model.set_value(
+                                row.doctype, row.name, "rate", it.rate
+                            );
+                        }
+                    });
             });
             Promise.all(ishlar).then(() => {
                 frm.refresh_field("items");
                 frappe.show_alert({
-                    message: __(
-                        "{0} ta odatiy item yuklandi — sotiladigan sonini kiriting (0 = qator o'chadi)",
-                        [itemlar.length]
-                    ),
+                    message: kartochkadan
+                        ? __("Mijoz kartochkasidan {0} ta Aktiv SKU yuklandi — sonini kiriting (0 = qator o'chadi)", [itemlar.length])
+                        : __("{0} ta odatiy item yuklandi — sotiladigan sonini kiriting (0 = qator o'chadi)", [itemlar.length]),
                     indicator: "green",
                 });
             });
@@ -91,6 +116,10 @@ function nolQatorlarniTozalash(frm) {
 
 function setSalesItemQuery(frm) {
     frm.set_query("item_code", "items", () => {
+        // Kartochkali mijoz: faqat kartochkadagi Aktiv SKU'lar
+        if (frm.__karta_skular && frm.__karta_skular.length) {
+            return { filters: { name: ["in", frm.__karta_skular] } };
+        }
         return {
             filters: {
                 disabled: 0,

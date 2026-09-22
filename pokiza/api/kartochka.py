@@ -166,6 +166,36 @@ def sku_malumot(sku, mijoz=None):
     }
 
 
+def aktiv_map(mijoz):
+    """Mijoz kartochkasidagi Aktiv qatorlar: {sku: {narx, bonus, norma}}.
+
+    Bo'sh dict = kartochka yo'q yoki Aktiv qatori yo'q — chaqiruvchi eski
+    xatti-harakatga qaytadi (kartochkasiz mijozlar ishlashda davom etadi).
+    """
+    rows = frappe.db.sql(
+        """
+        SELECT q.sku, q.sku_nomi, q.norma, q.sotuv_narxi, q.bonus_foiz
+        FROM `tabMijoz Kartochka Qatori` q
+        JOIN `tabMijoz Kartochkasi` k ON k.name = q.parent
+        WHERE k.mijoz = %s AND q.status = 'Aktiv'
+        """,
+        mijoz,
+        as_dict=True,
+    )
+    return {r.sku: r for r in rows}
+
+
+@frappe.whitelist()
+def aktiv_itemlar(mijoz):
+    """Zakaz/schyot formalari uchun: mijozning Aktiv kartochka SKU'lari."""
+    if not frappe.has_permission("Mijoz Kartochkasi", "read"):
+        frappe.throw(_("Huquq yo'q"))
+    return sorted(
+        aktiv_map(mijoz).values(),
+        key=lambda r: (r.sku_nomi or r.sku or "").lower(),
+    )
+
+
 def _mijoz_qatorlari(mijoz):
     """Mijozning 90 kunlik tarixidan kartochka qatorlari (har SKU oxirgi narxi)."""
     tarix = frappe.db.sql(

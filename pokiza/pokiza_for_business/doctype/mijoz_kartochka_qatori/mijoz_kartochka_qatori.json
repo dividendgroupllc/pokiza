@@ -85,7 +85,8 @@
    "label": "Marja %",
    "read_only": 1,
    "in_list_view": 1,
-   "columns": 1
+   "columns": 1,
+   "precision": "1"
   },
   {
    "fieldname": "amal_sana",
@@ -96,7 +97,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Aktiv\nNoaktiv",
+   "options": "Aktiv\nDisabled",
    "default": "Aktiv",
    "in_list_view": 1,
    "columns": 1

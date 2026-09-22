@@ -51,7 +51,7 @@ class MijozKartochkasi(Document):
                 continue
             if q.sku in aktiv:
                 frappe.throw(_("{0}-qator: «{1}» uchun ikkinchi Aktiv qator. "
-                               "Eskisini Noaktiv qiling.").format(q.idx, q.sku_nomi or q.sku))
+                               "Eskisini Disabled qiling.").format(q.idx, q.sku_nomi or q.sku))
             aktiv.add(q.sku)
 
     def hisobla(self):
