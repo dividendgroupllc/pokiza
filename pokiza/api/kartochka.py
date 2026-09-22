@@ -1,11 +1,17 @@
 """Mijoz Kartochkasi API — tannarx hisoblash va qoralama to'ldirish.
 
 Tannarx modeli (arxitektura 2026-09-21, egasi tasdiqlagan):
-  tannarx so'm/kg = norma farsh narxi (aktiv BOM: total_cost/quantity)
+  tannarx so'm/kg = norma farsh narxi (aktiv BOM retsepti boyicha)
                   + SKU upakovka narxi (Product Bundle'ning ГП bo'lmagan
                     qatorlari: qty * item narxi, 1 kg uchun).
-Upakovka item narxi: ombor valuation_rate → Item.valuation_rate →
-Standard Buying Item Price (qaysi biri birinchi topilsa).
+
+MUHIM (2026-09-22): farsh BOM'ning saqlangan total_cost'idan OLINMAYDI —
+u BOM oxirgi saqlangan kundagi narx bo'lib qolgan bo'ladi (avto-yangilash
+o'chiq, masalan Нитрит BOM'da 103 879 vs skladda 62 936). Buning o'rniga
+BOM'dan faqat retsept miqdorlari olinib, har xom ashyo HOZIRGI sklad
+narxida qayta hisoblanadi. Item narxi manbai (ikkala qism uchun bir xil):
+ombor valuation_rate → Item.valuation_rate → Standard Buying Item Price →
+(farshda) BOM qatoridagi rate.
 """
 
 import frappe
@@ -18,23 +24,31 @@ KUNLAR = 90  # qoralama uchun sotuv tarixi oynasi
 
 
 def _norma_farsh_narxi(norma):
-    """Normaning aktiv BOM'idan 1 kg farsh tannarxi."""
+    """1 kg farsh tannarxi: BOM retsepti × HOZIRGI sklad narxlari."""
     if not norma:
         return 0.0
     bom = frappe.db.get_value(
         "BOM",
         {"item": norma, "is_active": 1, "is_default": 1, "docstatus": 1},
-        ["total_cost", "quantity"],
+        ["name", "quantity", "operating_cost"],
         as_dict=True,
     ) or frappe.db.get_value(
         "BOM",
         {"item": norma, "is_active": 1, "docstatus": 1},
-        ["total_cost", "quantity"],
+        ["name", "quantity", "operating_cost"],
         as_dict=True,
     )
     if not bom or not flt(bom.quantity):
         return 0.0
-    return flt(bom.total_cost) / flt(bom.quantity)
+
+    qatorlar = frappe.get_all(
+        "BOM Item", filters={"parent": bom.name}, fields=["item_code", "qty", "rate"]
+    )
+    jami = 0.0
+    for q in qatorlar:
+        narx = _item_narxi(q.item_code) or flt(q.rate)
+        jami += flt(q.qty) * narx
+    return (jami + flt(bom.operating_cost)) / flt(bom.quantity)
 
 
 def _item_narxi(item_code):
