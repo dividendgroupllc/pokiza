@@ -128,6 +128,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 				</div>
 				<button class="btn btn-default btn-sm nv-next">›</button>
 				<button class="btn btn-default btn-sm nv-bugun">${__("Bugun")}</button>
+				<button class="btn btn-default btn-sm nv-qogoz">🖨 ${__("Qog'ozlar")}</button>
 			</div>`).appendTo($body);
 		$nav.find(".nv-prev").on("click", () => surSana(-1, d.yakshanba_dam));
 		$nav.find(".nv-next").on("click", () => surSana(1, d.yakshanba_dam));
@@ -135,6 +136,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 			state.gBoshi = bugun;
 			tanla(bugun);
 		});
+		$nav.find(".nv-qogoz").on("click", () => qogozChiqar(d.sana));
 
 		// --- umumiy uchyot plitkalari (butun tizim + shu kun)
 		const u = d.umumiy || {};
@@ -573,6 +575,98 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 	}
 
 	// ======================================================== ZAKAZ URISH TAB
+	// ------------------------------------------------- 3 QOG'OZ (print)
+	// 1-Farsh rejasi (texnolog) · 2-Shprits rejasi · 3-Tarozi varaqasi.
+	// Ma'lumot serverdan (kun_qogozlari), yangi oynada chop etiladi.
+	function qogozChiqar(sana) {
+		frappe
+			.call({ method: "pokiza.api.navbat.kun_qogozlari", args: { sana } })
+			.then((r) => {
+				const d = r.message;
+				if (!d || !(d.farsh || []).length) {
+					frappe.show_alert({ message: __("Bu kunga ishlab chiqarish rejasi yo'q"), indicator: "orange" });
+					return;
+				}
+				const w = window.open("", "_blank");
+				if (!w) {
+					frappe.msgprint(__("Brauzer yangi oynani blokladi — ruxsat bering"));
+					return;
+				}
+				w.document.write(qogozHtml(d));
+				w.document.close();
+				w.focus();
+				setTimeout(() => w.print(), 400);
+			});
+	}
+
+	function esc(t) {
+		return String(t == null ? "" : t)
+			.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+
+	function qogozHtml(d) {
+		const sana = sanaLabel(d.sana);
+		const kesimga = (rows) => rows.map((f) => `
+			<tr><td>${esc(f.norma)}</td>
+				<td class="num">${fmt(f.kg)}</td>
+				<td class="num">${f.zames}</td></tr>`).join("");
+		const shpritsga = (rows) => rows.map((n) => `
+			<tr class="norma-row"><td colspan="2"><b>${esc(n.norma)}</b></td>
+				<td class="num"><b>${fmt(n.jami)} kg</b></td></tr>
+			${n.skular.map((s) => `
+			<tr><td class="indent"></td><td>${esc(s.nom)}</td>
+				<td class="num">${fmt(s.kg)}</td></tr>`).join("")}`).join("");
+		const tarozga = (rows) => rows.map((t) => t.normalar.map((n, i) => `
+			<tr>${i === 0 ? `<td rowspan="${t.normalar.length}">${esc(t.nom)}</td>` : ""}
+				<td>${esc(n.norma)}</td>
+				<td class="num">${fmt(n.kg)}</td>
+				<td class="fakt"></td><td class="fakt"></td></tr>`).join("")).join("");
+
+		return `<!doctype html><html><head><meta charset="utf-8">
+		<title>${esc(d.sana)} qog'ozlar</title>
+		<style>
+			body { font-family: Arial, sans-serif; font-size: 13px; margin: 24px; color: #000; }
+			h2 { margin: 0 0 2px; font-size: 17px; }
+			.sub { color: #444; margin-bottom: 10px; font-size: 12px; }
+			table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+			th, td { border: 1px solid #999; padding: 5px 8px; text-align: left; }
+			th { background: #eee; }
+			.num { text-align: right; white-space: nowrap; }
+			.fakt { width: 90px; }
+			.indent { width: 20px; border-right: none; }
+			.norma-row td { background: #f5f5f5; }
+			.imzo { margin: 14px 0 0; font-size: 12px; }
+			.page { page-break-after: always; }
+			.page:last-child { page-break-after: auto; }
+		</style></head><body>
+
+		<div class="page">
+			<h2>1-QOG'OZ · FARSH ISHLAB CHIQARISH REJASI</h2>
+			<div class="sub">${sana} · jami ${fmt(d.jami_kg)} kg · (texnolog uchun)</div>
+			<table><tr><th>Norma / retsept</th><th class="num">Kg</th><th class="num">Zames</th></tr>
+			${kesimga(d.farsh)}</table>
+			<div class="imzo">Texnolog: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
+		</div>
+
+		<div class="page">
+			<h2>2-QOG'OZ · SHPRITS REJASI</h2>
+			<div class="sub">${sana} · qaysi farsh qaysi mahsulotga urilishi</div>
+			<table><tr><th colspan="2">Norma → SKU</th><th class="num">Kg</th></tr>
+			${shpritsga(d.shprits)}</table>
+			<div class="imzo">Shpritschi: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
+		</div>
+
+		<div class="page">
+			<h2>3-QOG'OZ · TAROZI VARAQASI</h2>
+			<div class="sub">${sana} · pishirishdan keyin fakt og'irlik yoziladi</div>
+			<table><tr><th>Mahsulot (SKU)</th><th>Norma</th><th class="num">Reja kg</th><th>Fakt kg</th><th>Izoh</th></tr>
+			${tarozga(d.tarozi)}</table>
+			<div class="imzo">Tarozichi: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
+		</div>
+
+		</body></html>`;
+	}
+
 	// Faqat jadval: sales orderdan kelgan zakazlar ro'yxati (faqat ko'rish).
 	// Kimdan, qancha mahsulot, qachonga — hech narsaga bog'lanmagan (ombor ham).
 	function zakazYukla() {

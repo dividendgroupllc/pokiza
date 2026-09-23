@@ -185,6 +185,12 @@ def aktiv_map(mijoz):
     return {r.sku: r for r in rows}
 
 
+def norma_map(mijoz):
+    """{sku: norma} — mijoz kartochkasining Aktiv, normasi kiritilgan
+    qatorlari. Ishlab chiqarish rejasi shu normaga yoziladi (Faza 2)."""
+    return {s: r.norma for s, r in aktiv_map(mijoz).items() if r.norma}
+
+
 @frappe.whitelist()
 def aktiv_itemlar(mijoz):
     """Zakaz/schyot formalari uchun: mijozning Aktiv kartochka SKU'lari."""
@@ -227,11 +233,10 @@ def qoralama_toldir(mijoz=None):
 
     mijoz berilsa — faqat o'sha mijozga (mavjud kartochkaga yetishmagan
     SKU qatorlarini qo'shadi), berilmasa — 90 kunda xarid qilgan barcha
-    mijozlarga kartochkasi yo'q bo'lsa yaratadi. Faqat System Manager /
-    Sales Manager.
+    mijozlarga kartochkasi yo'q bo'lsa yaratadi.
     """
     rollar = set(frappe.get_roles())
-    if not rollar & {"System Manager", "Sales Manager"}:
+    if not rollar & {"System Manager", "Sales Manager", "kassa", "investor"}:
         frappe.throw(_("Huquq yo'q"))
 
     if mijoz:

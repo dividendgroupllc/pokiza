@@ -90,6 +90,12 @@
   },
   {
    "read": 1,
+   "role": "investor",
+   "export": 1,
+   "report": 1
+  },
+  {
+   "read": 1,
    "role": "Manufacturing Manager",
    "report": 1
   }

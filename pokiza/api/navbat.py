@@ -88,6 +88,23 @@ def _bundle_gp_map(item_codes):
     return out
 
 
+def _karta_gps(mijoz, item_code, gps, kg, cache):
+    """Mijoz kartochkasida bu SKU uchun norma belgilangan bo'lsa — reja
+    BUNDLE emas, KARTOCHKA normasiga yoziladi (Faza 2, 2026-09-22).
+    Alixonning Jorji N420 rejasiga, Xayotniki N340 ga tushadi.
+    cache: {mijoz: {sku: norma}} — bir chaqiruvda qayta so'ralmasin."""
+    if not mijoz:
+        return gps
+    if mijoz not in cache:
+        from pokiza.api.kartochka import norma_map
+        cache[mijoz] = norma_map(mijoz)
+    norma = cache[mijoz].get(item_code)
+    if not norma:
+        return gps
+    jami = sum(flt(g["kg"]) for g in gps) if gps else flt(kg)
+    return [{"gp": norma, "kg": jami}]
+
+
 def _uom_kg_factor(item_code):
     """Item'ning o'z konversiyasidan 1 stock birlik = ? kg.
     UOM Conversion Detail: 1 <uom> = factor x stock_uom."""
@@ -463,6 +480,109 @@ def _jurnal_yoz(doc, eski_kun, yangi_kun, sabab):
 # ---------------------------------------------------------------------------
 #  SAHIFA API
 # ---------------------------------------------------------------------------
+def _kun_kesim(guruhlar):
+    """Kun rejasining norma kesimi — faqat ISHLAB CHIQARILADIGAN qism:
+    ombordan band qilingan kg kirmaydi; bo'lingan zakazda shu kunga
+    to'g'ri kelgan ULUSH proportsional olinadi.
+
+    Qaytaradi:
+      kesim   {norma: kg}                                — 1-qog'oz/zames
+      shprits {norma: {sku: {"nom", "kg"}}}              — 2-qog'oz
+      tarozi  {sku: {"nom", "normalar": {norma: kg}}}    — 3-qog'oz
+    """
+    kesim, shprits, tarozi = {}, {}, {}
+    for g in guruhlar:
+        for z in g["zakazlar"]:
+            ishlab_jami = z["kg"] - z["ombordan"]
+            ulush = (
+                (z["kun_kg"] / ishlab_jami)
+                if (z["bolingan"] and ishlab_jami > EPS)
+                else 1.0
+            )
+            for it in z["items"]:
+                # qatorning ishlab chiqariladigan qismi (ombordan ayirilgan)
+                it_factor = 1.0
+                if flt(it["kg"]) > EPS and flt(it["ombordan_kg"]) > EPS:
+                    it_factor = max(
+                        (flt(it["kg"]) - flt(it["ombordan_kg"])) / flt(it["kg"]), 0.0
+                    )
+                for gp in it["gps"]:
+                    nom = gp["gp"] or _("(retsepti aniqlanmagan)")
+                    kg = flt(gp["kg"]) * it_factor * ulush
+                    if kg <= EPS:
+                        continue
+                    kesim[nom] = kesim.get(nom, 0.0) + kg
+                    sh = shprits.setdefault(nom, {}).setdefault(
+                        it["item_code"], {"nom": it["item_name"], "kg": 0.0}
+                    )
+                    sh["kg"] += kg
+                    t = tarozi.setdefault(
+                        it["item_code"], {"nom": it["item_name"], "normalar": {}}
+                    )
+                    t["normalar"][nom] = t["normalar"].get(nom, 0.0) + kg
+    return kesim, shprits, tarozi
+
+
+@frappe.whitelist()
+def kun_qogozlari(sana=None):
+    """Ishlab chiqarish uchun 3 qog'oz (tanlangan kun rejasidan):
+    1) FARSH REJASI — texnologga: qaysi norma qancha (+ zames soni);
+    2) SHPRITS REJASI — norma → qaysi SKU'ga qancha urilishi;
+    3) TAROZI VARAQASI — SKU (norma bilan): reja kg, fakt uchun bo'sh katak.
+    """
+    d = get_navbat(sana)
+    kesim, shprits, tarozi = _kun_kesim(d["guruhlar"])
+    s = _sozlamalar()
+
+    farsh = sorted(
+        (
+            {"norma": k, "kg": flt(v, 1),
+             "zames": int(math.ceil(v / s.zames)) if v > EPS else 0}
+            for k, v in kesim.items()
+        ),
+        key=lambda r: -r["kg"],
+    )
+    shprits_rows = sorted(
+        (
+            {
+                "norma": n,
+                "jami": flt(sum(x["kg"] for x in skular.values()), 1),
+                "skular": sorted(
+                    (
+                        {"sku": c, "nom": x["nom"], "kg": flt(x["kg"], 1)}
+                        for c, x in skular.items()
+                    ),
+                    key=lambda y: -y["kg"],
+                ),
+            }
+            for n, skular in shprits.items()
+        ),
+        key=lambda r: -r["jami"],
+    )
+    tarozi_rows = sorted(
+        (
+            {
+                "sku": c,
+                "nom": t["nom"],
+                "jami": flt(sum(t["normalar"].values()), 1),
+                "normalar": [
+                    {"norma": n, "kg": flt(kg, 1)}
+                    for n, kg in sorted(t["normalar"].items(), key=lambda y: -y[1])
+                ],
+            }
+            for c, t in tarozi.items()
+        ),
+        key=lambda r: (r["nom"] or "").lower(),
+    )
+    return {
+        "sana": d["sana"],
+        "jami_kg": d["jami_kg"],
+        "farsh": farsh,
+        "shprits": shprits_rows,
+        "tarozi": tarozi_rows,
+    }
+
+
 @frappe.whitelist()
 def get_navbat(sana=None, gorizont_boshi=None):
     """Bitta kunning to'liq ko'rinishi: mijoz kartochkalari (mashina vaqti
@@ -518,6 +638,8 @@ def get_navbat(sana=None, gorizont_boshi=None):
             as_dict=True,
         )
         gp_map = _bundle_gp_map(list({r.item_code for r in rows}))
+        so_customer = {d.name: d.customer for d in so_list}
+        karta_cache = {}
         # qatorga bog'liq ombor kirimlari (PE) — sahifada havola ko'rinadi
         pe_map = {}
         for p in frappe.get_all(
@@ -531,6 +653,7 @@ def get_navbat(sana=None, gorizont_boshi=None):
             )
         for r in rows:
             kg, gps, yoq = hisobla_qator_kg(r, gp_map)
+            gps = _karta_gps(so_customer.get(r.parent), r.item_code, gps, kg, karta_cache)
             items_by_so.setdefault(r.parent, []).append({
                 "row": r.name,
                 "item_code": r.item_code,
@@ -605,28 +728,8 @@ def get_navbat(sana=None, gorizont_boshi=None):
             tavsiyalar.append({"so": z["name"], "kg": z["kun_kg"]})
             qoldi -= z["kun_kg"]
 
-    # mahsulot (ГП) kesimi + zames — faqat ISHLAB CHIQARILADIGAN qism:
-    # ombordan band qilingan kg zamesga kirmaydi; bo'lingan zakazda shu
-    # kunga to'g'ri kelgan ULUSH proportsional olinadi.
-    kesim = {}
-    for g in tartiblangan:
-        for z in g["zakazlar"]:
-            ishlab_jami = z["kg"] - z["ombordan"]
-            ulush = (
-                (z["kun_kg"] / ishlab_jami)
-                if (z["bolingan"] and ishlab_jami > EPS)
-                else 1.0
-            )
-            for it in z["items"]:
-                # qatorning ishlab chiqariladigan qismi (ombordan ayirilgan)
-                it_factor = 1.0
-                if flt(it["kg"]) > EPS and flt(it["ombordan_kg"]) > EPS:
-                    it_factor = max(
-                        (flt(it["kg"]) - flt(it["ombordan_kg"])) / flt(it["kg"]), 0.0
-                    )
-                for gp in it["gps"]:
-                    nom = gp["gp"] or _("(retsepti aniqlanmagan)")
-                    kesim[nom] = kesim.get(nom, 0.0) + flt(gp["kg"]) * it_factor * ulush
+    # mahsulot (norma) kesimi + zames — faqat ISHLAB CHIQARILADIGAN qism
+    kesim, _shprits, _tarozi = _kun_kesim(tartiblangan)
     kesim_rows = sorted(
         (
             {"gp": k, "kg": flt(v, 1), "zames": int(math.ceil(v / s.zames)) if v > EPS else 0}
@@ -833,6 +936,16 @@ def _pe_qoralama_yarat(qator, fakt_kg):
                           ignore_permissions=True, force=True)
 
     gps = _bundle_gp_map([qator.item_code]).get(qator.item_code) or []
+
+    # mijoz kartochkasida norma belgilangan bo'lsa — fakt TO'LIQ o'sha
+    # normadan chiqqan deb yoziladi (bundle chetlab o'tiladi, Faza 2)
+    mijoz = frappe.db.get_value("Sales Order", qator.parent, "customer")
+    if mijoz:
+        from pokiza.api.kartochka import norma_map
+        karta_norma = norma_map(mijoz).get(qator.item_code)
+        if karta_norma:
+            gps = [{"gp": karta_norma, "kg_per_unit": 1.0}]
+
     jami_u = sum(flt(g["kg_per_unit"]) for g in gps)
     if not gps or jami_u <= EPS:
         return [], _("{0} — retsepti (to'plamdagi tayyor mahsulot) topilmadi, "
