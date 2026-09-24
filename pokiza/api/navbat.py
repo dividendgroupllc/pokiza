@@ -940,11 +940,18 @@ def _pe_qoralama_yarat(qator, fakt_kg):
     # mijoz kartochkasida norma belgilangan bo'lsa — fakt TO'LIQ o'sha
     # normadan chiqqan deb yoziladi (bundle chetlab o'tiladi, Faza 2)
     mijoz = frappe.db.get_value("Sales Order", qator.parent, "customer")
+    karta_norma = None
     if mijoz:
         from pokiza.api.kartochka import norma_map
         karta_norma = norma_map(mijoz).get(qator.item_code)
         if karta_norma:
             gps = [{"gp": karta_norma, "kg_per_unit": 1.0}]
+
+    # Faza 3: SKU partiya rejimida bo'lsa PE ombor kirimini SKU'ga
+    # (SKU, norma) partiyasi bilan yozadi, jadvalga pasport upakovkasi
+    # ham qo'shiladi
+    from pokiza.api.partiya import partiya_rejimda, pasport_qatorlari
+    sku_rejim = bool(karta_norma) and partiya_rejimda(qator.item_code)
 
     jami_u = sum(flt(g["kg_per_unit"]) for g in gps)
     if not gps or jami_u <= EPS:
@@ -977,6 +984,14 @@ def _pe_qoralama_yarat(qator, fakt_kg):
                 _("{0} — BOM bo'sh, ombor kirimini qo'lda yozing").format(g["gp"])
             )
             continue
+        if sku_rejim:
+            for p in pasport_qatorlari(qator.item_code):
+                if flt(p.qty) * gp_kg > EPS:
+                    items.append({
+                        "item_code": p.item,
+                        "required_qty": flt(p.qty) * gp_kg,
+                        "source_warehouse": wh,
+                    })
         pe = frappe.get_doc({
             "doctype": "Production Entry",
             "naming_series": "PE-.YYYY.-",
@@ -984,6 +999,7 @@ def _pe_qoralama_yarat(qator, fakt_kg):
             "posting_time": frappe.utils.nowtime(),
             "company": company,
             "item_to_manufacture": g["gp"],
+            "sku_item": qator.item_code if sku_rejim else None,
             "bom_no": bom,
             "qty_to_manufacture": flt(gp_kg, 2),
             "target_warehouse": wh,

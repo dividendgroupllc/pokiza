@@ -11,6 +11,7 @@
   "column_break_1",
   "masul",
   "tolov_sharti",
+  "bonus_foiz",
   "limit_summa",
   "kartochka_sana",
   "section_qatorlar",
@@ -56,6 +57,13 @@
    "fieldname": "tolov_sharti",
    "fieldtype": "Data",
    "label": "To'lov sharti"
+  },
+  {
+   "fieldname": "bonus_foiz",
+   "fieldtype": "Percent",
+   "label": "Bonus % (umumiy)",
+   "precision": "1",
+   "description": "O'zgartirilsa pastdagi BARCHA qatorlarga qo'llanadi; keyin istalgan qatorda alohida o'zgartirish mumkin"
   },
   {
    "fieldname": "limit_summa",

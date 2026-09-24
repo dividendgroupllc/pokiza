@@ -51,6 +51,7 @@ doctype_js = {
 	"Payment Entry": "public/js/payment_entry.js",
 	"Purchase Invoice": "public/js/purchase_invoice.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
+	"Sales Order": "public/js/sales_order.js",
 }
 doctype_list_js = {
 	"Sales Order": "public/js/sales_order_list.js",

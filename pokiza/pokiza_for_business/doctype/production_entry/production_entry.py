@@ -43,6 +43,18 @@ class ProductionEntry(Document):
                     item.precision("required_qty"),
                 )
 
+        # SKU (partiya) rejimida jadvalda BOM syryosidan tashqari SKU
+        # pasportidagi upakovka ham bor — ular ham serverda qayta hisoblanadi
+        if self.sku_item:
+            from pokiza.api.partiya import pasport_qatorlari
+            pasport = {r.item: flt(r.qty) for r in pasport_qatorlari(self.sku_item)}
+            for item in self.items:
+                if item.item_code in pasport:
+                    item.required_qty = flt(
+                        pasport[item.item_code] * flt(self.qty_to_manufacture),
+                        item.precision("required_qty"),
+                    )
+
     def on_submit(self):
         self.set_status("Submitted")
         self.db_set("status", "Submitted")
@@ -102,16 +114,27 @@ class ProductionEntry(Document):
                 )
 
     def create_stock_entry(self):
-        """Submit bo'lganda Stock Entry (Manufacture) yaratish"""
+        """Submit bo'lganda Stock Entry yaratish.
+
+        Oddiy rejim: Manufacture, tayyor mahsulot = item_to_manufacture (ГП).
+        SKU (partiya) rejimi — sku_item to'ldirilgan bo'lsa: Repack, tayyor
+        mahsulot = SKU, unga (SKU, norma) doimiy partiyasi qo'yiladi;
+        norma = item_to_manufacture, jadvalda BOM syryosi + SKU pasportidagi
+        upakovka turadi. Repack tanlangani sabab: ERPNext Manufacture'da
+        tayyor mahsulot BOM itemiga teng bo'lishini talab qiladi.
+        """
+        sku_rejim = bool(self.sku_item)
+
         se = frappe.new_doc("Stock Entry")
-        se.stock_entry_type = "Manufacture"
+        se.stock_entry_type = "Repack" if sku_rejim else "Manufacture"
         se.posting_date = self.posting_date
         se.posting_time = self.posting_time
         se.set_posting_time = 1
         se.company = self.company
-        se.from_bom = 1
-        se.bom_no = self.bom_no
-        se.fg_completed_qty = self.qty_to_manufacture
+        if not sku_rejim:
+            se.from_bom = 1
+            se.bom_no = self.bom_no
+            se.fg_completed_qty = self.qty_to_manufacture
         se.custom_production_entry = self.name
 
         # Add raw materials (source items)
@@ -126,15 +149,23 @@ class ProductionEntry(Document):
             })
 
         # Add finished good (target item)
-        se.append("items", {
-            "item_code": self.item_to_manufacture,
+        fg_item = self.sku_item if sku_rejim else self.item_to_manufacture
+        fg_row = {
+            "item_code": fg_item,
             "qty": self.qty_to_manufacture,
             "t_warehouse": self.target_warehouse,
             "is_finished_item": 1,
-            "uom": frappe.get_cached_value("Item", self.item_to_manufacture, "stock_uom"),
-            "stock_uom": frappe.get_cached_value("Item", self.item_to_manufacture, "stock_uom"),
+            "uom": frappe.get_cached_value("Item", fg_item, "stock_uom"),
+            "stock_uom": frappe.get_cached_value("Item", fg_item, "stock_uom"),
             "conversion_factor": 1
-        })
+        }
+        if sku_rejim:
+            from pokiza.api.partiya import partiya_ol
+            fg_row.update({
+                "use_serial_batch_fields": 1,
+                "batch_no": partiya_ol(self.sku_item, self.item_to_manufacture),
+            })
+        se.append("items", fg_row)
 
         se.flags.ignore_permissions = True
         se.insert()

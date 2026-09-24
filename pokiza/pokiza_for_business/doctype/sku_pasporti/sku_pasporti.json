@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "autoname": "field:sku",
+ "creation": "2026-09-24 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sku",
+  "sku_nomi",
+  "column_break_1",
+  "manba",
+  "section_qatorlar",
+  "qatorlar",
+  "izoh"
+ ],
+ "fields": [
+  {
+   "fieldname": "sku",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "SKU / mahsulot",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sku_nomi",
+   "fieldtype": "Data",
+   "label": "Nomi",
+   "fetch_from": "sku.item_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "manba",
+   "fieldtype": "Data",
+   "label": "Manba",
+   "read_only": 1,
+   "description": "Bundle'dan avto ko'chirilgan bo'lsa shu yerda yoziladi"
+  },
+  {
+   "fieldname": "section_qatorlar",
+   "fieldtype": "Section Break",
+   "label": "Upakovka normasi (1 kg tayyor mahsulot uchun)"
+  },
+  {
+   "fieldname": "qatorlar",
+   "fieldtype": "Table",
+   "options": "SKU Pasport Qatori",
+   "label": "Materiallar"
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "SKU Pasporti",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1, "write": 1, "create": 1, "delete": 1, "export": 1,
+   "import": 1, "print": 1, "email": 1, "share": 1, "report": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1, "write": 1, "create": 1, "delete": 1, "export": 1,
+   "print": 1, "report": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1, "write": 1, "create": 1, "export": 1, "print": 1, "report": 1,
+   "role": "kassa"
+  },
+  {
+   "read": 1, "report": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1, "report": 1,
+   "role": "investor"
+  }
+ ],
+ "search_fields": "sku_nomi",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

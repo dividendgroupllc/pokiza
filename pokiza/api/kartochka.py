@@ -174,7 +174,8 @@ def aktiv_map(mijoz):
     """
     rows = frappe.db.sql(
         """
-        SELECT q.sku, q.sku_nomi, q.norma, q.sotuv_narxi, q.bonus_foiz
+        SELECT q.sku, q.sku_nomi, q.norma, q.tannarx, q.sotuv_narxi,
+               q.bonus_foiz, k.bonus_foiz AS umumiy_bonus
         FROM `tabMijoz Kartochka Qatori` q
         JOIN `tabMijoz Kartochkasi` k ON k.name = q.parent
         WHERE k.mijoz = %s AND q.status = 'Aktiv'
@@ -265,11 +266,14 @@ def qoralama_toldir(mijoz=None):
         if mavjud_nom:
             doc = frappe.get_doc("Mijoz Kartochkasi", mavjud_nom)
             bor_skular = {q.sku for q in doc.qatorlar}
+            if not flt(doc.bonus_foiz) and bonus:
+                doc.bonus_foiz = bonus
         else:
             doc = frappe.get_doc({
                 "doctype": "Mijoz Kartochkasi",
                 "mijoz": m,
                 "holat": "Qoralama",
+                "bonus_foiz": bonus,
                 "kartochka_sana": nowdate(),
                 "izoh": "Avto-qoralama: so'nggi %s kunlik sotuv tarixidan" % KUNLAR,
             })

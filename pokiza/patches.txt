@@ -17,3 +17,4 @@ pokiza.patches.v0_0.add_customer_bonus_field
 pokiza.patches.v0_0.add_kassa_financial_report_roles
 pokiza.patches.v0_0.add_kassa_pl_hisoboti
 pokiza.patches.v0_0.add_bom_sarf_jami_fields
+pokiza.patches.v0_0.add_partiya_fields

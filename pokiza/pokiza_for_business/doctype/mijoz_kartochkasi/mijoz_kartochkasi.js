@@ -15,6 +15,36 @@ frappe.ui.form.on("Mijoz Kartochkasi", {
 		}));
 	},
 
+	onload(frm) {
+		// «+ Yangi» mijoz maydoni oldindan to'ldirilib ochilsa ham default tushsin
+		if (frm.is_new()) mijozBonusDefault(frm);
+	},
+
+	mijoz(frm) {
+		mijozBonusDefault(frm);
+	},
+
+	bonus_foiz(frm) {
+		// Umumiy bonus o'zgarsa — pastdagi BARCHA qatorlarga qo'llanadi
+		// (keyin istalgan qatorni alohida o'zgartirish mumkin)
+		const b = flt(frm.doc.bonus_foiz);
+		const qatorlar = frm.doc.qatorlar || [];
+		if (!qatorlar.length) return;
+		qatorlar.forEach((q) => {
+			q.bonus_foiz = b;
+			const keyin = flt(q.sotuv_narxi) * (1 - b / 100);
+			q.bonus_keyin_narx = keyin;
+			q.marja_som = keyin - flt(q.tannarx);
+			q.marja_foiz = keyin ? ((keyin - flt(q.tannarx)) / keyin) * 100 : 0;
+		});
+		frm.refresh_field("qatorlar");
+		frm.dirty();
+		frappe.show_alert({
+			message: __("Bonus {0}% — {1} ta qatorga qo'llandi", [b, qatorlar.length]),
+			indicator: "blue",
+		});
+	},
+
 	refresh(frm) {
 		if (!frm.is_new() && frm.doc.mijoz) {
 			frm.add_custom_button(__("90 kunlik tarixdan to'ldirish"), () => {
@@ -36,6 +66,18 @@ frappe.ui.form.on("Mijoz Kartochkasi", {
 		}
 	},
 });
+
+// Yangi kartochkada mijozning Customer'dagi bonus foizi tepaga avto-tushadi
+// (server validate'da ham xuddi shu default bor — bu faqat jonli ko'rinish)
+function mijozBonusDefault(frm) {
+	if (!frm.doc.mijoz || flt(frm.doc.bonus_foiz)) return;
+	frappe.db.get_value("Customer", frm.doc.mijoz, "custom_bonus_foiz").then((r) => {
+		const b = r.message && flt(r.message.custom_bonus_foiz);
+		if (b && frm.doc.mijoz && !flt(frm.doc.bonus_foiz)) {
+			frm.set_value("bonus_foiz", b);
+		}
+	});
+}
 
 function hisobla_qator(frm, cdt, cdn) {
 	const q = locals[cdt][cdn];
@@ -76,7 +118,10 @@ frappe.ui.form.on("Mijoz Kartochka Qatori", {
 				const yangilash = {};
 				if (m.norma && !q.norma) yangilash.norma = m.norma;
 				if (m.oxirgi_narx && !flt(q.sotuv_narxi)) yangilash.sotuv_narxi = m.oxirgi_narx;
-				if (m.bonus_foiz && !flt(q.bonus_foiz)) yangilash.bonus_foiz = m.bonus_foiz;
+				// Yangi qatorga default bonus: avval kartochkaning umumiy
+				// foizi, bo'lmasa mijozning Customer'dagi foizi
+				const def_bonus = flt(frm.doc.bonus_foiz) || m.bonus_foiz;
+				if (def_bonus && !flt(q.bonus_foiz)) yangilash.bonus_foiz = def_bonus;
 				if (!q.amal_sana) yangilash.amal_sana = frappe.datetime.get_today();
 				frappe.model.set_value(cdt, cdn, yangilash).then(() =>
 					tannarx_yangila(frm, cdt, cdn)

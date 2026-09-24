@@ -28,10 +28,25 @@ KUZATILADIGAN = ("norma", "sotuv_narxi", "bonus_foiz", "amal_sana", "status")
 
 class MijozKartochkasi(Document):
     def validate(self):
+        self.bonus_defaultla()
         self.validate_guruhlar()
         self.validate_takror()
         self.hisobla()
         self.jurnalga_yoz()
+
+    def bonus_defaultla(self):
+        """YANGI kartochkada bonus Customer'dagi foizdan default tushadi
+        (egasi talabi 2026-09-24). Faqat birinchi saqlashda va faqat bo'sh
+        joylarga — keyin istalgancha o'zgartirsa bo'ladi."""
+        if not self.is_new() or not self.mijoz:
+            return
+        if not flt(self.bonus_foiz):
+            self.bonus_foiz = flt(frappe.get_cached_value(
+                "Customer", self.mijoz, "custom_bonus_foiz"))
+        if flt(self.bonus_foiz):
+            for q in self.qatorlar:
+                if not flt(q.bonus_foiz):
+                    q.bonus_foiz = self.bonus_foiz
 
     def validate_guruhlar(self):
         """SKU faqat sotuv guruhidan, norma faqat ГП guruhidan bo'lsin."""

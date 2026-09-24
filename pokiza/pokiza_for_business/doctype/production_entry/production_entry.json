@@ -16,6 +16,7 @@
   "section_break_product",
   "item_to_manufacture",
   "item_name",
+  "sku_item",
   "column_break_2",
   "bom_no",
   "qty_to_manufacture",
@@ -97,6 +98,14 @@
    "fieldtype": "Data",
    "label": "Item Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "sku_item",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "SKU (partiya rejimi)",
+   "read_only": 1,
+   "description": "To'ldirilgan bo'lsa ombor kirimi SKU'ga norma partiyasi bilan yoziladi (norma = Item To Manufacture)"
   },
   {
    "fieldname": "column_break_2",
