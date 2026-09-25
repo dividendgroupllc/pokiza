@@ -2,6 +2,8 @@
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
 
+pokiza.patches.v0_0.add_tarozi_zapas_setup
+
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 pokiza.patches.v0_0.add_stock_entry_production_entry_link
@@ -18,3 +20,4 @@ pokiza.patches.v0_0.add_kassa_financial_report_roles
 pokiza.patches.v0_0.add_kassa_pl_hisoboti
 pokiza.patches.v0_0.add_bom_sarf_jami_fields
 pokiza.patches.v0_0.add_partiya_fields
+pokiza.patches.v0_0.add_zapas_mr_fields

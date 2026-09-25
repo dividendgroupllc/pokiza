@@ -25,6 +25,15 @@
   },
   {
    "role": "Manufacturing User"
+  },
+  {
+   "role": "tarozi"
+  },
+  {
+   "role": "kassa"
+  },
+  {
+   "role": "investor"
   }
  ],
  "standard": "Yes",

@@ -39,7 +39,8 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 	const ICH_ROL =
 		frappe.user.has_role("Manufacturing Manager") ||
 		frappe.user.has_role("Manufacturing User") ||
-		frappe.user.has_role("System Manager");
+		frappe.user.has_role("System Manager") ||
+		frappe.user.has_role("tarozi");
 	const SOTUV_ROL =
 		frappe.user.has_role("Sales Manager") ||
 		frappe.user.has_role("Sales User") ||
@@ -251,17 +252,17 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 				const $z = $(`
 					<div class="nv-zakaz">
 						<div class="nv-zakaz-head">
-							<a href="/app/sales-order/${z.name}">${z.name}</a>
-							<span class="nv-badge nv-badge-${p.rang}">${p.label}</span>
+							<a href="/app/${z.zapas ? "material-request" : "sales-order"}/${z.name}">${z.name}</a>
+							<span class="nv-badge nv-badge-${p.rang}">${z.zapas && z.progress === "jonatildi" ? __("Omborga kirdi") : p.label}</span>
 							${z.bolingan ? `<span class="nv-badge nv-badge-sariq">🔀 ${__("bo'lingan")}</span>` : ""}
 							${z.ombordan > 0 ? `<span class="nv-badge nv-badge-kok">📦 ${__("ombordan")}</span>` : ""}
 							<span class="nv-zakaz-kg">${kgHtml}</span>
 							${
-								z.progress === "tayyor" && SOTUV_ROL
+								!z.zapas && z.progress === "tayyor" && SOTUV_ROL
 									? `<button class="btn btn-xs btn-primary nv-jonat">📦 ${__("Jo'natildi")}</button>`
 									: ""
 							}
-							<button class="btn btn-xs btn-default nv-sur">→ ${__("surish")}</button>
+							${z.zapas ? "" : `<button class="btn btn-xs btn-default nv-sur">→ ${__("surish")}</button>`}
 						</div>
 						${
 							z.bolingan

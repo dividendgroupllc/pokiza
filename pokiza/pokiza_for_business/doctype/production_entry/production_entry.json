@@ -26,6 +26,7 @@
   "section_break_remarks",
   "remarks",
   "sales_order",
+  "material_request",
   "so_item",
   "amended_from",
   "stock_entry"
@@ -165,6 +166,14 @@
    "read_only": 1
   },
   {
+   "fieldname": "material_request",
+   "fieldtype": "Link",
+   "label": "Zapas (Material Request)",
+   "no_copy": 1,
+   "options": "Material Request",
+   "read_only": 1
+  },
+  {
    "fieldname": "so_item",
    "fieldtype": "Data",
    "hidden": 1,
@@ -216,6 +225,14 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "tarozi",
    "submit": 1,
    "write": 1
   },

@@ -52,6 +52,7 @@ doctype_js = {
 	"Purchase Invoice": "public/js/purchase_invoice.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
 	"Sales Order": "public/js/sales_order.js",
+	"Material Request": "public/js/material_request.js",
 }
 doctype_list_js = {
 	"Sales Order": "public/js/sales_order_list.js",
@@ -173,6 +174,14 @@ doc_events = {
 			"pokiza.events.sales_invoice.on_submit",
 		],
 		"before_cancel": "pokiza.events.sales_invoice.before_cancel",
+	},
+	# Zapas (omborga) ishlab chiqarish — MIJOZSIZ standart hujjat
+	# (Material Request, turi Manufacture); faqat shu turga ishlaydi
+	"Material Request": {
+		"before_submit": "pokiza.api.navbat.zapas_before_submit",
+		"on_submit": "pokiza.api.navbat.zapas_on_submit",
+		"before_cancel": "pokiza.api.navbat.zapas_before_cancel",
+		"on_cancel": "pokiza.api.navbat.zapas_on_cancel",
 	},
 }
 

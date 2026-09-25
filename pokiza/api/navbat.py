@@ -186,17 +186,23 @@ def _yakshanbami(sana):
 
 
 def _kun_band_kg(sana, exclude_so=None):
-    """Kunning band kg'i — submit bo'lgan zakazlarning shu kunga tushgan
-    taqsimot qatorlari yig'indisi."""
-    cond = "AND so.name != %(exclude)s" if exclude_so else ""
+    """Kunning band kg'i — submit bo'lgan zakazlar (Sales Order) VA zapas
+    so'rovlari (Material Request/Manufacture, mijozsiz) ning shu kunga
+    tushgan taqsimot qatorlari yig'indisi."""
+    cond = "AND kt.parent != %(exclude)s" if exclude_so else ""
     r = frappe.db.sql(
         f"""
         SELECT IFNULL(SUM(kt.kg), 0)
         FROM `tabKun Taqsimot Qatori` kt
-        JOIN `tabSales Order` so ON so.name = kt.parent
-        WHERE kt.parenttype = 'Sales Order'
-          AND so.docstatus = 1
-          AND kt.sana = %(sana)s
+        LEFT JOIN `tabSales Order` so
+               ON so.name = kt.parent AND kt.parenttype = 'Sales Order'
+        LEFT JOIN `tabMaterial Request` mr
+               ON mr.name = kt.parent AND kt.parenttype = 'Material Request'
+        WHERE kt.sana = %(sana)s
+          AND (
+                (kt.parenttype = 'Sales Order' AND so.docstatus = 1)
+             OR (kt.parenttype = 'Material Request' AND mr.docstatus = 1)
+          )
           {cond}
         """,
         {"sana": sana, "exclude": exclude_so},
@@ -214,9 +220,12 @@ def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
     Kesim vaqtigacha kelgan -> bugundan, keyin -> ertadan boshlanadi.
     boshlanish_kun berilsa (oldindan zakaz) — reja o'sha kundan boshlanadi
     (lekin kesim qoidasidan ERTAROQ bo'lolmaydi).
-    Har kunning bo'sh joyi TO'LDIRILADI, qolgani keyingi ish kuniga o'tadi
-    (yakshanba sakrab o'tiladi). Kg noma'lum (0) zakaz birinchi to'lmagan
-    ish kuniga bitta qator bilan tushadi."""
+    ATOMAR QOIDA (egasi 2026-09-25): zakaz kunlar orasida BO'LINMAYDI —
+    «1-2 kg keyingi kunga o'tishi kerak emas, o'tsa hammasi o'tsin».
+    Birinchi yetarli bo'sh joyli ish kuniga BUTUNLIGICHA tushadi (yakshanba
+    sakrab o'tiladi). Faqat kunlik quvvatdan KATTA zakaz (bitta kunga
+    jismonan sig'maydi) kunlarni to'ldirib bo'linadi. Kg noma'lum (0)
+    zakaz birinchi to'lmagan ish kuniga bitta qator bilan tushadi."""
     s = _sozlamalar()
     kelgan = get_datetime(kelgan_vaqt or frappe.utils.now_datetime())
 
@@ -232,6 +241,8 @@ def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
 
     qoldi = flt(jami_kg)
     taqsimot = []
+    # kunlik quvvatga sig'adigan zakaz — ATOMAR (bo'linmaydi)
+    atomar = qoldi <= flt(s.quvvat) + EPS
     for _i in range(730):
         if _yakshanbami(kandidat) and not s.yakshanba:
             kandidat = getdate(add_days(kandidat, 1))
@@ -247,7 +258,11 @@ def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
             kandidat = getdate(add_days(kandidat, 1))
             continue
 
-        if bosh >= MIN_BOLAK_KG or (bosh > EPS and qoldi <= bosh + EPS):
+        if atomar:
+            # butunligicha sig'sagina shu kunga, aks holda keyingi kunga
+            if bosh + EPS >= qoldi:
+                return [{"sana": kandidat, "kg": flt(qoldi, 2)}]
+        elif bosh >= MIN_BOLAK_KG or (bosh > EPS and qoldi <= bosh + EPS):
             olish = min(bosh, qoldi)
             taqsimot.append({"sana": kandidat, "kg": flt(olish, 2)})
             qoldi -= olish
@@ -523,21 +538,12 @@ def _kun_kesim(guruhlar):
     return kesim, shprits, tarozi
 
 
-@frappe.whitelist()
-def kun_qogozlari(sana=None):
-    """Ishlab chiqarish uchun 3 qog'oz (tanlangan kun rejasidan):
-    1) FARSH REJASI — texnologga: qaysi norma qancha (+ zames soni);
-    2) SHPRITS REJASI — norma → qaysi SKU'ga qancha urilishi;
-    3) TAROZI VARAQASI — SKU (norma bilan): reja kg, fakt uchun bo'sh katak.
-    """
-    d = get_navbat(sana)
-    kesim, shprits, tarozi = _kun_kesim(d["guruhlar"])
-    s = _sozlamalar()
-
+def _qogoz_format(kesim, shprits, tarozi, zames_kg):
+    """_kun_kesim natijasini 3 qog'oz ko'rinishiga keltiradi."""
     farsh = sorted(
         (
             {"norma": k, "kg": flt(v, 1),
-             "zames": int(math.ceil(v / s.zames)) if v > EPS else 0}
+             "zames": int(math.ceil(v / zames_kg)) if v > EPS else 0}
             for k, v in kesim.items()
         ),
         key=lambda r: -r["kg"],
@@ -574,9 +580,73 @@ def kun_qogozlari(sana=None):
         ),
         key=lambda r: (r["nom"] or "").lower(),
     )
+    return farsh, shprits_rows, tarozi_rows
+
+
+@frappe.whitelist()
+def kun_qogozlari(sana=None):
+    """Ishlab chiqarish uchun 3 qog'oz (tanlangan kun rejasidan):
+    1) FARSH REJASI — texnologga: qaysi norma qancha (+ zames soni);
+    2) SHPRITS REJASI — norma → qaysi SKU'ga qancha urilishi;
+    3) TAROZI VARAQASI — SKU (norma bilan): reja kg, fakt uchun bo'sh katak.
+    """
+    d = get_navbat(sana)
+    kesim, shprits, tarozi = _kun_kesim(d["guruhlar"])
+    s = _sozlamalar()
+    farsh, shprits_rows, tarozi_rows = _qogoz_format(kesim, shprits, tarozi, s.zames)
     return {
         "sana": d["sana"],
         "jami_kg": d["jami_kg"],
+        "farsh": farsh,
+        "shprits": shprits_rows,
+        "tarozi": tarozi_rows,
+    }
+
+
+@frappe.whitelist()
+def so_qogozlari(sales_order):
+    """BITTA zakazning 3 qog'ozi (egasi 2026-09-25: SO yaratilganda har
+    bo'limga alohida chiqariladi). Norma mijoz kartochkasidan (bo'lmasa
+    bundle'dan), ombordan band qilingan qism chiqarib tashlanadi."""
+    so = frappe.get_doc("Sales Order", sales_order)
+    if not frappe.has_permission("Sales Order", "read", doc=so):
+        frappe.throw(_("Huquq yo'q"))
+
+    gp_map = _bundle_gp_map(list({d.item_code for d in so.items}))
+    karta_cache = {}
+    items = []
+    for d in so.items:
+        row = {"item_code": d.item_code, "qty": d.qty,
+               "stock_qty": d.get("stock_qty"), "stock_uom": d.get("stock_uom")}
+        kg, gps, yoq = hisobla_qator_kg(row, gp_map)
+        gps = _karta_gps(so.customer, d.item_code, gps, kg, karta_cache)
+        items.append({
+            "item_code": d.item_code,
+            "item_name": d.item_name or d.item_code,
+            "kg": flt(kg, 1),
+            "ombordan_kg": flt(d.get("custom_ombordan_kg"), 1),
+            "gps": gps,
+        })
+
+    jami = flt(sum(i["kg"] for i in items), 1)
+    z = {
+        "kg": jami,
+        "ombordan": flt(so.custom_ombordan_jami, 1),
+        "kun_kg": jami,
+        "bolingan": False,
+        "items": items,
+    }
+    kesim, shprits, tarozi = _kun_kesim([{"zakazlar": [z]}])
+    s = _sozlamalar()
+    farsh, shprits_rows, tarozi_rows = _qogoz_format(kesim, shprits, tarozi, s.zames)
+    taqsimot = _so_taqsimot([so.name]).get(so.name) or []
+    return {
+        "so": so.name,
+        "mijoz": so.customer_name or so.customer,
+        "sana": str(taqsimot[0]["sana"]) if taqsimot else str(so.transaction_date or ""),
+        "taqsimot": [{"sana": str(t["sana"]), "kg": t["kg"]} for t in taqsimot],
+        "jami_kg": jami,
+        "ombordan_kg": flt(so.custom_ombordan_jami, 1),
         "farsh": farsh,
         "shprits": shprits_rows,
         "tarozi": tarozi_rows,
@@ -702,6 +772,86 @@ def get_navbat(sana=None, gorizont_boshi=None):
             "progress": _zakaz_progress(so_items),
             "items": so_items,
         })
+
+    # --- ZAPAS (Material Request/Manufacture): mijozsiz, omborga ishlab
+    #     chiqarish — kun rejasida alohida kartochka bo'lib turadi
+    zapas_ulush = {
+        r.parent: flt(r.kg)
+        for r in frappe.db.sql(
+            """
+            SELECT kt.parent, kt.kg
+            FROM `tabKun Taqsimot Qatori` kt
+            JOIN `tabMaterial Request` mr ON mr.name = kt.parent
+            WHERE kt.parenttype = 'Material Request'
+              AND mr.docstatus = 1
+              AND kt.sana = %(sana)s
+            """,
+            {"sana": sana},
+            as_dict=True,
+        )
+    }
+    for mr_name, zk_kun_kg in zapas_ulush.items():
+        mr = frappe.get_doc("Material Request", mr_name)
+        z_gp_map = _bundle_gp_map(list({d.item_code for d in mr.items}))
+        z_pe = {}
+        for p in frappe.get_all(
+            "Production Entry",
+            filters={"so_item": ("in", [d.name for d in mr.items]),
+                     "docstatus": ("<", 2)},
+            fields=["name", "so_item", "docstatus"],
+        ):
+            z_pe.setdefault(p.so_item, []).append(
+                {"name": p.name, "docstatus": p.docstatus})
+        z_items = []
+        for d in mr.items:
+            row = {"item_code": d.item_code, "qty": d.qty,
+                   "stock_qty": d.get("stock_qty"), "stock_uom": d.get("stock_uom")}
+            kg, gps, yoq = hisobla_qator_kg(row, z_gp_map)
+            norma = _zapas_norma(d.item_code)
+            if norma:
+                gps = [{"gp": norma, "kg": kg}]
+            z_items.append({
+                "row": d.name,
+                "item_code": d.item_code,
+                "item_name": d.item_name or d.item_code,
+                "qty": flt(d.qty),
+                "uom": d.uom,
+                "kg": flt(kg, 1),
+                "kg_nomalum": yoq,
+                "gps": gps,
+                "holat": d.custom_holat or "Kutilmoqda",
+                "fakt_kg": flt(d.custom_fakt_kg, 1),
+                "ombordan_kg": 0.0,
+                "pe": z_pe.get(d.name, []),
+                "chiqargan": d.custom_chiqargan or "",
+                "chiqarilgan_vaqt": str(d.custom_chiqarilgan_vaqt or ""),
+            })
+        z_taqsimot = [{"sana": str(t.sana), "kg": flt(t.kg, 1)}
+                      for t in mr.get("custom_kun_taqsimot") or []]
+        prog = _zakaz_progress(z_items)
+        if prog == "tayyor":
+            prog = "jonatildi"  # zapasda jo'natish yo'q — omborga kirdi = tugadi
+        guruhlar["__zapas__" + mr_name] = {
+            "mijoz": _("📦 ZAPAS (omborga)"),
+            "slot": "Boshqa vaqt",
+            "slot_izoh": "",
+            "kelgan": mr.creation,
+            "jami_kg": flt(zk_kun_kg, 1),
+            "zakazlar": [{
+                "name": mr_name,
+                "zapas": 1,
+                "kg": flt(mr.custom_jami_kg, 1),
+                "ombordan": 0.0,
+                "kun_kg": flt(zk_kun_kg, 1),
+                "bolingan": len(z_taqsimot) > 1,
+                "taqsimot": z_taqsimot,
+                "izoh": "",
+                "kg_nomalum": "",
+                "delivery_date": "",
+                "progress": prog,
+                "items": z_items,
+            }],
+        }
 
     tartiblangan = sorted(
         guruhlar.values(),
@@ -873,7 +1023,8 @@ def _umumiy_uchyot():
 # ---------------------------------------------------------------------------
 #  HOLAT HARAKATLARI (sahifadan)
 # ---------------------------------------------------------------------------
-ISHLAB_CHIQARISH_ROLLARI = ("Manufacturing Manager", "Manufacturing User", "System Manager")
+ISHLAB_CHIQARISH_ROLLARI = ("Manufacturing Manager", "Manufacturing User",
+                            "System Manager", "tarozi")
 SOTUV_ROLLARI = ("Sales Manager", "Sales User", "System Manager")
 
 
@@ -883,14 +1034,31 @@ def _rol_tekshir(rollar, xabar):
 
 
 def _qator(row_name):
+    """Zakaz qatori — Sales Order Item YOKI zapas (Material Request Item).
+    Ikkalasi bir xil ko'rinishda qaytadi, zapas=True belgisi bilan."""
     r = frappe.db.get_value(
         "Sales Order Item", row_name,
         ["name", "parent", "item_code", "docstatus", "custom_holat"],
         as_dict=True,
     )
-    if not r or r.docstatus != 1:
-        frappe.throw(_("Zakaz qatori topilmadi yoki tasdiqlanmagan"))
-    return r
+    if r:
+        if r.docstatus != 1:
+            frappe.throw(_("Zakaz qatori tasdiqlanmagan"))
+        r["zapas"] = False
+        return r
+
+    r = frappe.db.get_value(
+        "Material Request Item", row_name,
+        ["name", "parent", "item_code", "docstatus", "custom_holat"],
+        as_dict=True,
+    )
+    if r:
+        if r.docstatus != 1:
+            frappe.throw(_("Zapas so'rovi tasdiqlanmagan"))
+        r["zapas"] = True
+        return r
+
+    frappe.throw(_("Zakaz qatori topilmadi"))
 
 
 @frappe.whitelist()
@@ -906,6 +1074,19 @@ def chiqarildi(row_name, fakt_kg):
         frappe.throw(_("Bu qator allaqachon jo'natilgan"))
     if flt(fakt_kg) <= 0:
         frappe.throw(_("Fakt kg 0 dan katta bo'lishi kerak"))
+    # ZAPAS (Material Request/Manufacture) qatori: mijoz yo'q, jo'natish
+    # bosqichi yo'q — fakt kiritilishi bilan qator yakuniy holatga o'tadi.
+    if r.get("zapas"):
+        frappe.db.set_value("Material Request Item", row_name, {
+            "custom_holat": "Chiqarildi",
+            "custom_fakt_kg": flt(fakt_kg),
+            "custom_chiqarilgan_vaqt": frappe.utils.now_datetime(),
+            "custom_chiqargan": frappe.session.user,
+        }, update_modified=False)
+        pe_list, pe_xabar = _pe_zapas_yarat(r, flt(fakt_kg))
+        _notify()
+        return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar, "zapas": True}
+
     frappe.db.set_value("Sales Order Item", row_name, {
         "custom_holat": "Chiqarildi",
         "custom_fakt_kg": flt(fakt_kg),
@@ -1015,6 +1196,210 @@ def _pe_qoralama_yarat(qator, fakt_kg):
     return yaratildi, ("; ".join(ogohlantirish) if ogohlantirish else None)
 
 
+def _zapas_norma(sku):
+    """Zapas uchun SKU'ning asosiy normasi: bundle'dagi yagona ГП qatori.
+    DISABLED bundle ham hisobga olinadi — partiya rejimiga o'tgan SKU'da
+    bundle ataylab disabled qilingan, lekin norma ma'lumoti o'sha yerda."""
+    normalar = frappe.db.sql(
+        """
+        SELECT DISTINCT pbi.item_code
+        FROM `tabProduct Bundle` pb
+        JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+        JOIN `tabItem` i ON i.name = pbi.item_code
+        WHERE pb.new_item_code = %s AND i.item_group = %s
+        """,
+        (sku, GP_GROUP),
+    )
+    return normalar[0][0] if len(normalar) == 1 else None
+
+
+def _pe_zapas_yarat(qator, fakt_kg):
+    """Zapas (Material Request) qatori uchun PE qoralamasi — mijozsiz.
+    Norma bundle'dan; partiya rejimidagi SKU'da kirim SKU+partiya bilan,
+    eski rejimda ГП (norma) bilan. Avtomat SUBMIT QILINMAYDI."""
+    from pokiza.pokiza_for_business.doctype.production_entry.production_entry import (
+        get_bom_for_item, get_bom_items,
+    )
+    from pokiza.api.partiya import partiya_rejimda, pasport_qatorlari
+
+    for eski in frappe.get_all(
+        "Production Entry",
+        filters={"so_item": qator.name, "docstatus": 0},
+        pluck="name",
+    ):
+        frappe.delete_doc("Production Entry", eski,
+                          ignore_permissions=True, force=True)
+
+    norma = _zapas_norma(qator.item_code)
+    if not norma:
+        return [], _("{0} — normasi aniqlanmadi (bundle'da yagona ГП yo'q), "
+                     "ombor kirimini qo'lda yozing").format(qator.item_code)
+
+    bom = get_bom_for_item(norma)
+    if not bom:
+        return [], _("{0} — aktiv BOM yo'q, ombor kirimini qo'lda yozing").format(norma)
+
+    wh = frappe.db.get_value(
+        "Production Entry", {"docstatus": 1}, "target_warehouse",
+        order_by="creation desc",
+    ) or frappe.db.get_value("Warehouse", {"is_group": 0, "disabled": 0}, "name")
+
+    items = [
+        i for i in get_bom_items(bom, flt(fakt_kg), source_warehouse=wh)
+        if flt(i["required_qty"]) > EPS
+    ]
+    if not items:
+        return [], _("{0} — BOM bo'sh, ombor kirimini qo'lda yozing").format(norma)
+
+    sku_rejim = partiya_rejimda(qator.item_code)
+    if sku_rejim:
+        for p in pasport_qatorlari(qator.item_code):
+            if flt(p.qty) * flt(fakt_kg) > EPS:
+                items.append({
+                    "item_code": p.item,
+                    "required_qty": flt(p.qty) * flt(fakt_kg),
+                    "source_warehouse": wh,
+                })
+
+    pe = frappe.get_doc({
+        "doctype": "Production Entry",
+        "naming_series": "PE-.YYYY.-",
+        "posting_date": nowdate(),
+        "posting_time": frappe.utils.nowtime(),
+        "company": frappe.db.get_single_value("Global Defaults", "default_company"),
+        "item_to_manufacture": norma,
+        "sku_item": qator.item_code if sku_rejim else None,
+        "bom_no": bom,
+        "qty_to_manufacture": flt(fakt_kg, 2),
+        "target_warehouse": wh,
+        "items": items,
+        "material_request": qator.parent,
+        "so_item": qator.name,
+        "remarks": _("Zapas (omborga): {0} / {1}, fakt {2} kg").format(
+            qator.parent, qator.item_code, flt(fakt_kg, 2)
+        ),
+    })
+    pe.insert(ignore_permissions=True)
+    return [pe.name], None
+
+
+# ---------------------------------------------------------------------------
+#  ZAPAS — Material Request (Manufacture) hooklari.
+#  Mijoz YO'Q: bu ERPNext'ning make-to-stock standarti; kun-quvvat
+#  taqsimoti Sales Order bilan bir xil qoidada ishlaydi.
+# ---------------------------------------------------------------------------
+def _zapas_mi(doc):
+    return doc.material_request_type == "Manufacture"
+
+
+def zapas_before_submit(doc, method=None):
+    """Zapas so'rovi submit'da kun(lar)ga joy oladi — SO bilan bir xil
+    atomar qoida. Sotuv guruhidan bo'lmagan item aralashsa bloklanadi."""
+    if not _zapas_mi(doc):
+        return
+    yot = [d.item_code for d in doc.items
+           if frappe.get_cached_value("Item", d.item_code, "item_group")
+           != "Сотув махсулотлари"]
+    if yot:
+        frappe.throw(_("Zapas faqat sotuv mahsulotlari uchun: {0}")
+                     .format(", ".join(yot)))
+
+    jami, nomalum = hisobla_zakaz_kg(doc)
+    doc.custom_jami_kg = jami
+    taqsimot = kun_taqsimla(
+        frappe.utils.now_datetime(), jami, exclude_so=doc.name,
+        boshlanish_kun=doc.get("schedule_date"),
+    )
+    doc.set("custom_kun_taqsimot", [])
+    for t in taqsimot:
+        doc.append("custom_kun_taqsimot", {"sana": t["sana"], "kg": t["kg"]})
+    doc.custom_ishlab_chiqarish_kuni = taqsimot[-1]["sana"]
+    if nomalum:
+        frappe.msgprint(_("Kg aniqlanmagan qatorlar: {0}").format("; ".join(nomalum)),
+                        indicator="orange")
+
+
+def zapas_on_submit(doc, method=None):
+    if not _zapas_mi(doc):
+        return
+    _notify()
+    frappe.msgprint(
+        _("Zapas rejaga tushdi: {0} kg, kun(lar): {1}").format(
+            flt(doc.custom_jami_kg, 1),
+            ", ".join(str(t.sana) for t in doc.get("custom_kun_taqsimot") or []),
+        ),
+        indicator="green",
+    )
+
+
+def zapas_before_cancel(doc, method=None):
+    """Zapas bekor: qoralama PE'lar o'chadi; omborga kirgani bo'lsa blok."""
+    if not _zapas_mi(doc):
+        return
+    for pe in frappe.get_all(
+        "Production Entry",
+        filters={"material_request": doc.name},
+        fields=["name", "docstatus"],
+    ):
+        if pe.docstatus == 1:
+            frappe.throw(
+                _("Bu zapas bo'yicha mahsulot omborga KIRGAN ({0}). "
+                  "Avval o'sha kirimni bekor qiling.").format(pe.name))
+        elif pe.docstatus == 0:
+            frappe.delete_doc("Production Entry", pe.name,
+                              ignore_permissions=True, force=True)
+
+
+def zapas_on_cancel(doc, method=None):
+    if _zapas_mi(doc):
+        _notify()
+
+
+@frappe.whitelist()
+def zapas_qogozlari(material_request):
+    """Zapas so'rovining 3 qog'ozi (SO'nikiga o'xshash, mijoz o'rniga ZAPAS)."""
+    mr = frappe.get_doc("Material Request", material_request)
+    if not frappe.has_permission("Material Request", "read", doc=mr):
+        frappe.throw(_("Huquq yo'q"))
+
+    gp_map = _bundle_gp_map(list({d.item_code for d in mr.items}))
+    items = []
+    for d in mr.items:
+        row = {"item_code": d.item_code, "qty": d.qty,
+               "stock_qty": d.get("stock_qty"), "stock_uom": d.get("stock_uom")}
+        kg, gps, yoq = hisobla_qator_kg(row, gp_map)
+        norma = _zapas_norma(d.item_code)
+        if norma:
+            gps = [{"gp": norma, "kg": kg}]
+        items.append({
+            "item_code": d.item_code,
+            "item_name": d.item_name or d.item_code,
+            "kg": flt(kg, 1),
+            "ombordan_kg": 0.0,
+            "gps": gps,
+        })
+
+    jami = flt(sum(i["kg"] for i in items), 1)
+    z = {"kg": jami, "ombordan": 0.0, "kun_kg": jami, "bolingan": False,
+         "items": items}
+    kesim, shprits, tarozi = _kun_kesim([{"zakazlar": [z]}])
+    s = _sozlamalar()
+    farsh, shprits_rows, tarozi_rows = _qogoz_format(kesim, shprits, tarozi, s.zames)
+    taqsimot = [{"sana": str(t.sana), "kg": flt(t.kg, 1)}
+                for t in mr.get("custom_kun_taqsimot") or []]
+    return {
+        "so": mr.name,
+        "mijoz": _("📦 ZAPAS (omborga)"),
+        "sana": taqsimot[0]["sana"] if taqsimot else str(mr.transaction_date or ""),
+        "taqsimot": taqsimot,
+        "jami_kg": jami,
+        "ombordan_kg": 0.0,
+        "farsh": farsh,
+        "shprits": shprits_rows,
+        "tarozi": tarozi_rows,
+    }
+
+
 @frappe.whitelist()
 def chiqarish_bekor(row_name):
     """Xato tasdiqlangan bo'lsa — qaytarish (faqat jo'natilmagan bo'lsa).
@@ -1024,7 +1409,8 @@ def chiqarish_bekor(row_name):
     r = _qator(row_name)
     if r.custom_holat == "Jonatildi":
         frappe.throw(_("Jo'natilgan qatorni qaytarib bo'lmaydi"))
-    frappe.db.set_value("Sales Order Item", row_name, {
+    qator_dt = "Material Request Item" if r.get("zapas") else "Sales Order Item"
+    frappe.db.set_value(qator_dt, row_name, {
         "custom_holat": "Kutilmoqda",
         "custom_fakt_kg": 0,
         "custom_chiqarilgan_vaqt": None,
