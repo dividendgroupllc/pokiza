@@ -1019,7 +1019,7 @@ def _umumiy_uchyot():
 #  HOLAT HARAKATLARI (sahifadan)
 # ---------------------------------------------------------------------------
 ISHLAB_CHIQARISH_ROLLARI = ("Manufacturing Manager", "Manufacturing User",
-                            "System Manager", "tarozi")
+                            "System Manager", "tarozi", "kassa", "Ombor")
 SOTUV_ROLLARI = ("Sales Manager", "Sales User", "System Manager")
 
 
