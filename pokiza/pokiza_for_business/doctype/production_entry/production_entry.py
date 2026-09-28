@@ -24,8 +24,20 @@ class ProductionEntry(Document):
         Brauzerdan kelgan qiymatga ishonilmaydi: eski/keshlangan forma yoki
         saqlashdan oldin yetib kelmagan hisob-kitob xato qiymat yuborishi mumkin
         (2026-iyul/avgustda barcha PE'lar 1 birlik uchun saqlanib qolgan edi).
+
+        SARF ASOSI (2026-09-28, «reja bo'yicha sarf + fakt bo'yicha kirim»):
+        reja_kg to'ldirilgan bo'lsa sarflar O'SHANGA hisoblanadi — fakt
+        (qty_to_manufacture) o'zgarsa ham sarf o'zgarmaydi; farq tayyor
+        mahsulot tannarxiga singadi (process loss). Eski PE'larda reja_kg
+        bo'sh — sarf faktga tenglashadi (eski xatti-harakat).
         """
-        if not (self.bom_no and flt(self.qty_to_manufacture) > 0):
+        sarf_asosi = flt(self.reja_kg) or flt(self.qty_to_manufacture)
+        if flt(self.reja_kg) and flt(self.qty_to_manufacture) > 0:
+            self.chiqish_foiz = flt(self.qty_to_manufacture) / flt(self.reja_kg) * 100
+        else:
+            self.chiqish_foiz = 0
+
+        if not (self.bom_no and sarf_asosi > 0):
             return
 
         bom = frappe.get_doc("BOM", self.bom_no)
@@ -39,7 +51,7 @@ class ProductionEntry(Document):
         for item in self.items:
             if item.item_code in bom_qty:
                 item.required_qty = flt(
-                    bom_qty[item.item_code] * flt(self.qty_to_manufacture) / flt(bom.quantity),
+                    bom_qty[item.item_code] * sarf_asosi / flt(bom.quantity),
                     item.precision("required_qty"),
                 )
 
@@ -51,7 +63,7 @@ class ProductionEntry(Document):
             for item in self.items:
                 if item.item_code in pasport:
                     item.required_qty = flt(
-                        pasport[item.item_code] * flt(self.qty_to_manufacture),
+                        pasport[item.item_code] * sarf_asosi,
                         item.precision("required_qty"),
                     )
 

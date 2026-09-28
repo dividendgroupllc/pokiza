@@ -19,7 +19,9 @@
   "sku_item",
   "column_break_2",
   "bom_no",
+  "reja_kg",
   "qty_to_manufacture",
+  "chiqish_foiz",
   "target_warehouse",
   "section_break_items",
   "items",
@@ -121,11 +123,26 @@
    "reqd": 1
   },
   {
+   "fieldname": "reja_kg",
+   "fieldtype": "Float",
+   "label": "Reja kg (sarf asosi)",
+   "read_only": 1,
+   "description": "Xom ashyo/upakovka sarfi SHU miqdorga hisoblanadi va fakt o'zgarganda O'ZGARMAYDI (reja bo'yicha sarf + fakt bo'yicha kirim modeli)"
+  },
+  {
    "fieldname": "qty_to_manufacture",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Qty To Manufacture",
+   "label": "Fakt kg (tayyor kirim)",
    "reqd": 1
+  },
+  {
+   "fieldname": "chiqish_foiz",
+   "fieldtype": "Percent",
+   "label": "Chiqish koeffitsiyenti %",
+   "read_only": 1,
+   "precision": "1",
+   "in_list_view": 1
   },
   {
    "default": "Склад сырьё - P",
