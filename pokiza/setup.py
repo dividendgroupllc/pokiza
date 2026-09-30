@@ -96,6 +96,28 @@ def get_custom_fields():
                 "in_list_view": 0,
             },
         ],
+        # Brak (2026-09-30): tarozida yaroqsiz deb ajratilgan kg — sotuvga
+        # kirmaydi, farshi BOM bo'yicha xom ashyoga qaytadi (PE hisoblaydi)
+        "Sales Order Item": [
+            {
+                "fieldname": "custom_brak_kg",
+                "label": "Brak (kg)",
+                "fieldtype": "Float",
+                "insert_after": "custom_fakt_kg",
+                "read_only": 1,
+                "no_copy": 1,
+            },
+        ],
+        "Material Request Item": [
+            {
+                "fieldname": "custom_brak_kg",
+                "label": "Brak (kg)",
+                "fieldtype": "Float",
+                "insert_after": "custom_fakt_kg",
+                "read_only": 1,
+                "no_copy": 1,
+            },
+        ],
         # Schyotda zakaz soni ko'rinadi; qator soni (qty) esa tarozi fakti
         # bilan sinxronlanadi — mijozga fakt bo'yicha sotiladi (2026-09-30)
         "Sales Invoice Item": [

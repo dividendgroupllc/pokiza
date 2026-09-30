@@ -1,0 +1,114 @@
+{
+ "actions": [],
+ "autoname": "format:TT-{#####}",
+ "creation": "2026-09-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "qator",
+  "hujjat",
+  "item_code",
+  "kg",
+  "column_break_1",
+  "zapas",
+  "holat",
+  "kim",
+  "ochirgan"
+ ],
+ "fields": [
+  {
+   "fieldname": "qator",
+   "fieldtype": "Data",
+   "label": "Hujjat qatori (SO/MR Item)",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "hujjat",
+   "fieldtype": "Data",
+   "label": "Hujjat",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "label": "Mahsulot",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kg",
+   "fieldtype": "Float",
+   "label": "Tortilgan kg",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "zapas",
+   "fieldtype": "Check",
+   "label": "Zapas (MR)"
+  },
+  {
+   "default": "Aktiv",
+   "fieldname": "holat",
+   "fieldtype": "Select",
+   "label": "Holat",
+   "options": "Aktiv\nOchirilgan",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kim",
+   "fieldtype": "Data",
+   "label": "Kim tortdi",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ochirgan",
+   "fieldtype": "Data",
+   "label": "Kim o'chirdi",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Tarozi Tortish",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "role": "System Manager",
+   "export": 1,
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Manufacturing Manager",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "tarozi"
+  },
+  {
+   "read": 1,
+   "role": "kassa",
+   "report": 1
+  },
+  {
+   "read": 1,
+   "role": "Ombor",
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -31,9 +31,11 @@ class ProductionEntry(Document):
         mahsulot tannarxiga singadi (process loss). Eski PE'larda reja_kg
         bo'sh — sarf faktga tenglashadi (eski xatti-harakat).
         """
-        sarf_asosi = flt(self.reja_kg) or flt(self.qty_to_manufacture)
-        if flt(self.reja_kg) and flt(self.qty_to_manufacture) > 0:
-            self.chiqish_foiz = flt(self.qty_to_manufacture) / flt(self.reja_kg) * 100
+        # chiqish = qozondan chiqqan hammasi (sotuvga yaroqli + brak)
+        chiqqan = flt(self.qty_to_manufacture) + flt(self.brak_kg)
+        sarf_asosi = flt(self.reja_kg) or chiqqan
+        if flt(self.reja_kg) and chiqqan > 0:
+            self.chiqish_foiz = chiqqan / flt(self.reja_kg) * 100
         else:
             self.chiqish_foiz = 0
 
@@ -93,6 +95,12 @@ class ProductionEntry(Document):
     def validate_qty(self):
         if flt(self.qty_to_manufacture) <= 0:
             frappe.throw(_("Qty to Manufacture must be greater than 0"))
+
+        if flt(self.brak_kg) < 0:
+            frappe.throw(_("Brak kg manfiy bo'lishi mumkin emas"))
+        if flt(self.brak_kg) > 0 and not self.bom_no:
+            frappe.throw(_("Brak farsh qaytimi BOM bo'yicha hisoblanadi — "
+                           "BOM tanlanmagan PE'da brak yozib bo'lmaydi"))
 
         for item in self.items:
             if flt(item.required_qty) <= 0:
@@ -178,6 +186,32 @@ class ProductionEntry(Document):
                 "batch_no": partiya_ol(self.sku_item, self.item_to_manufacture),
             })
         se.append("items", fg_row)
+
+        # BRAK (2026-09-30): brak kg omborga KIRMAYDI — uning farshi (norma
+        # BOM tarkibi, brak kg ulushida) xom ashyo omboriga QAYTADI (scrap
+        # qatorlari), upakovkasi esa qaytmaydi — qiymati tayyor mahsulot
+        # tannarxiga singadi (rasxod).
+        if flt(self.brak_kg) > 0 and self.bom_no:
+            bom = frappe.get_doc("BOM", self.bom_no)
+            wh_map = {i.item_code: i.source_warehouse for i in self.items}
+            for bi in bom.items:
+                qaytim = flt(
+                    flt(bi.qty) * flt(self.brak_kg) / flt(bom.quantity or 1), 3
+                )
+                # juda mayda ulush (masalan ziravor) 0 ga yaxlitlansa —
+                # qatori yozilmaydi, qiymati tannarxda qoladi
+                if qaytim < 0.001:
+                    continue
+                uom = frappe.get_cached_value("Item", bi.item_code, "stock_uom")
+                se.append("items", {
+                    "item_code": bi.item_code,
+                    "qty": qaytim,
+                    "t_warehouse": wh_map.get(bi.item_code) or self.target_warehouse,
+                    "is_scrap_item": 1,
+                    "uom": uom,
+                    "stock_uom": uom,
+                    "conversion_factor": 1,
+                })
 
         se.flags.ignore_permissions = True
         se.insert()

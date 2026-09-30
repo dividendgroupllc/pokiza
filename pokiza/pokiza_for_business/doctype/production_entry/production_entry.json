@@ -21,6 +21,7 @@
   "bom_no",
   "reja_kg",
   "qty_to_manufacture",
+  "brak_kg",
   "chiqish_foiz",
   "target_warehouse",
   "section_break_items",
@@ -133,8 +134,15 @@
    "fieldname": "qty_to_manufacture",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Fakt kg (tayyor kirim)",
+   "label": "Fakt kg (sotuvga yaroqli kirim)",
    "reqd": 1
+  },
+  {
+   "fieldname": "brak_kg",
+   "fieldtype": "Float",
+   "label": "Brak kg",
+   "read_only": 1,
+   "description": "Tarozida brak deb ajratilgan kg. Omborga kirmaydi: farshi (norma BOM bo'yicha) xom ashyo omboriga qaytadi, upakovkasi rasxodda qoladi (tayyor mahsulot tannarxiga singadi)"
   },
   {
    "fieldname": "chiqish_foiz",

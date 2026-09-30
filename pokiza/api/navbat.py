@@ -1057,11 +1057,16 @@ def _qator(row_name):
 
 
 @frappe.whitelist()
-def chiqarildi(row_name, fakt_kg):
+def chiqarildi(row_name, fakt_kg, brak_kg=0):
     """Ishlab chiqarish rahbari: mahsulot chiqqanini fakt kg bilan tasdiqlaydi.
     Shu bilan birga OMBOR uchun Production Entry QORALAMASI avtomatik
     tayyorlanadi (egasi talabi 2026-08-23) — xodim ochib tekshiradi va
-    tasdiqlaydi, shunda tayyor mahsulot omborga kiradi."""
+    tasdiqlaydi, shunda tayyor mahsulot omborga kiradi.
+
+    BRAK (2026-09-30): fakt_kg = tarozida tortilgan HAMMASI, brak_kg shundan
+    yaroqsiz qismi. Sotuvga/omborga faqat fakt−brak kiradi; brakning farshi
+    (norma BOM bo'yicha) xom ashyoga qaytadi, upakovkasi rasxodda qoladi —
+    bu PE/Stock Entry darajasida hisoblanadi."""
     _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI,
                  _("Ishlab chiqarishni faqat ishlab chiqarish xodimi tasdiqlaydi"))
     r = _qator(row_name)
@@ -1069,26 +1074,35 @@ def chiqarildi(row_name, fakt_kg):
         frappe.throw(_("Bu qator allaqachon jo'natilgan"))
     if flt(fakt_kg) <= 0:
         frappe.throw(_("Fakt kg 0 dan katta bo'lishi kerak"))
+    brak_kg = flt(brak_kg)
+    if brak_kg < 0:
+        frappe.throw(_("Brak kg manfiy bo'lishi mumkin emas"))
+    if brak_kg >= flt(fakt_kg):
+        frappe.throw(_("Brak ({0} kg) tortilgan hammasidan ({1} kg) kam "
+                       "bo'lishi kerak").format(flt(brak_kg, 1), flt(fakt_kg, 1)))
+    sotuv_kg = flt(fakt_kg) - brak_kg
     # ZAPAS (Material Request/Manufacture) qatori: mijoz yo'q, jo'natish
     # bosqichi yo'q — fakt kiritilishi bilan qator yakuniy holatga o'tadi.
     if r.get("zapas"):
         frappe.db.set_value("Material Request Item", row_name, {
             "custom_holat": "Chiqarildi",
-            "custom_fakt_kg": flt(fakt_kg),
+            "custom_fakt_kg": sotuv_kg,
+            "custom_brak_kg": brak_kg,
             "custom_chiqarilgan_vaqt": frappe.utils.now_datetime(),
             "custom_chiqargan": frappe.session.user,
         }, update_modified=False)
-        pe_list, pe_xabar = _pe_zapas_yarat(r, flt(fakt_kg))
+        pe_list, pe_xabar = _pe_zapas_yarat(r, sotuv_kg, brak_kg)
         _notify()
         return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar, "zapas": True}
 
     frappe.db.set_value("Sales Order Item", row_name, {
         "custom_holat": "Chiqarildi",
-        "custom_fakt_kg": flt(fakt_kg),
+        "custom_fakt_kg": sotuv_kg,
+        "custom_brak_kg": brak_kg,
         "custom_chiqarilgan_vaqt": frappe.utils.now_datetime(),
         "custom_chiqargan": frappe.session.user,
     }, update_modified=False)
-    pe_list, pe_xabar = _pe_qoralama_yarat(r, flt(fakt_kg))
+    pe_list, pe_xabar = _pe_qoralama_yarat(r, sotuv_kg, brak_kg)
     si_name, si_xabar = _si_fakt_yangila(row_name)
     _notify()
     return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar,
@@ -1127,7 +1141,7 @@ def _si_fakt_yangila(so_item_name):
         return None, _("Schyotni yangilashda xato — Error Log'ni tekshiring ({0})").format(si_name)
 
 
-def _pe_qoralama_yarat(qator, fakt_kg):
+def _pe_qoralama_yarat(qator, fakt_kg, brak_kg=0):
     """Zakaz qatori tasdiqlanganda ГП bo'yicha Production Entry qoralamasi.
     Eski qoralama bo'lsa yangisi bilan almashtiriladi (miqdor o'zgargan
     bo'lishi mumkin). Avtomat SUBMIT QILINMAYDI — xodim tekshiradi.
@@ -1199,7 +1213,8 @@ def _pe_qoralama_yarat(qator, fakt_kg):
     yaratildi, ogohlantirish = [], []
     for g in gps:
         ulush = flt(g["kg_per_unit"]) / jami_u
-        gp_fakt = flt(fakt_kg) * ulush     # tayyor kirim
+        gp_fakt = flt(fakt_kg) * ulush     # tayyor kirim (sotuvga yaroqli)
+        gp_brak = flt(brak_kg) * ulush     # brak — farshi qaytadi
         gp_reja = flt(reja_kg) * ulush     # sarf asosi
         if gp_fakt <= EPS:
             continue
@@ -1237,6 +1252,7 @@ def _pe_qoralama_yarat(qator, fakt_kg):
             "bom_no": bom,
             "reja_kg": flt(gp_reja, 2),
             "qty_to_manufacture": flt(gp_fakt, 2),
+            "brak_kg": flt(gp_brak, 2),
             "target_warehouse": wh,
             "items": items,
             "sales_order": qator.parent,
@@ -1268,7 +1284,7 @@ def _zapas_norma(sku):
     return normalar[0][0] if len(normalar) == 1 else None
 
 
-def _pe_zapas_yarat(qator, fakt_kg):
+def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
     """Zapas (Material Request) qatori uchun PE qoralamasi — mijozsiz.
     Norma bundle'dan; partiya rejimidagi SKU'da kirim SKU+partiya bilan,
     eski rejimda ГП (norma) bilan. SARF = REJA (MR qatoridagi kg),
@@ -1332,6 +1348,7 @@ def _pe_zapas_yarat(qator, fakt_kg):
         "bom_no": bom,
         "reja_kg": flt(reja_kg, 2),
         "qty_to_manufacture": flt(fakt_kg, 2),
+        "brak_kg": flt(brak_kg, 2),
         "target_warehouse": wh,
         "items": items,
         "material_request": qator.parent,
@@ -1500,7 +1517,8 @@ def tarozi_royxat(sana=None):
             rows = frappe.db.sql(
                 """
                 SELECT name, item_code, item_name, qty, stock_qty, stock_uom,
-                       custom_holat, custom_fakt_kg, custom_ombordan_kg
+                       custom_holat, custom_fakt_kg, custom_brak_kg,
+                       custom_ombordan_kg
                 FROM `tabSales Order Item` WHERE parent = %s ORDER BY idx
                 """,
                 h.parent, as_dict=True,
@@ -1521,6 +1539,8 @@ def tarozi_royxat(sana=None):
                     "reja_kg": flt(reja, 1),
                     "holat": r.custom_holat or "Kutilmoqda",
                     "fakt_kg": flt(r.custom_fakt_kg, 1),
+                    "brak_kg": flt(r.get("custom_brak_kg"), 1),
+                    "tortishlar": _tortishlar(r.name),
                 })
         else:
             mr = frappe.get_doc("Material Request", h.parent)
@@ -1533,11 +1553,115 @@ def tarozi_royxat(sana=None):
                     "reja_kg": flt(d.qty, 1),
                     "holat": d.custom_holat or "Kutilmoqda",
                     "fakt_kg": flt(d.custom_fakt_kg, 1),
+                    "brak_kg": flt(d.get("custom_brak_kg"), 1),
+                    "tortishlar": _tortishlar(d.name),
                 })
 
     qatorlar.sort(key=lambda q: (q["holat"] != "Kutilmoqda",
                                  (q["sku"] or "").lower()))
-    return {"sana": str(sana), "qatorlar": qatorlar}
+    return {"sana": str(sana), "qatorlar": qatorlar,
+            "zames_kg": _sozlamalar().zames}
+
+
+# ---------------------------------------------------------------------------
+# BO'LIB-BO'LIB TORTISH (egasi talabi 2026-09-30): mahsulot tarozichiga
+# zames-zames keladi (masalan 200 kg rejadan 50 kg dan). Har keluv [+] bilan
+# alohida yoziladi (Tarozi Tortish jurnali), yig'indi darhol SO/MR faktiga,
+# PE qoralamasiga va draft schyotga tarqaladi ("omborga tushib turaveradi").
+# Yakunda tarozichi Tasdiqlaydi — mavjud `chiqarildi` (holat=Chiqarildi).
+# ---------------------------------------------------------------------------
+
+def _tortishlar(row_name):
+    return frappe.get_all(
+        "Tarozi Tortish",
+        filters={"qator": row_name, "holat": "Aktiv"},
+        fields=["name", "kg", "creation", "kim"],
+        order_by="creation asc",
+    )
+
+
+def _tortish_jami(row_name):
+    return flt(sum(flt(t.kg) for t in _tortishlar(row_name)))
+
+
+def _tortish_tarqat(r, jami):
+    """Oraliq yig'indini hujjatlarga tarqatish (holat O'ZGARMAYDI — yakuniy
+    emas): SO/MR qatori fakt, PE qoralama, zakazda draft schyot."""
+    qator_dt = "Material Request Item" if r.get("zapas") else "Sales Order Item"
+    frappe.db.set_value(qator_dt, r.name, "custom_fakt_kg", flt(jami),
+                        update_modified=False)
+
+    pe_list, pe_xabar, si_name = [], None, None
+    if jami > EPS:
+        if r.get("zapas"):
+            pe_list, pe_xabar = _pe_zapas_yarat(r, flt(jami))
+        else:
+            pe_list, pe_xabar = _pe_qoralama_yarat(r, flt(jami))
+            si_name, _x = _si_fakt_yangila(r.name)
+    else:
+        # hamma bo'lak o'chirildi — qoralama PE ham olib tashlanadi
+        for pe in frappe.get_all("Production Entry",
+                                 filters={"so_item": r.name, "docstatus": 0},
+                                 pluck="name"):
+            frappe.delete_doc("Production Entry", pe,
+                              ignore_permissions=True, force=True)
+        if not r.get("zapas"):
+            si_name, _x = _si_fakt_yangila(r.name)
+    return pe_list, pe_xabar, si_name
+
+
+@frappe.whitelist()
+def tortish_qosh(row_name, kg):
+    """Tarozichi: navbatdagi kelgan bo'lakni [+] bilan qo'shish."""
+    _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI, _("Huquq yo'q"))
+    r = _qator(row_name)
+    if r.custom_holat == "Jonatildi":
+        frappe.throw(_("Bu qator allaqachon jo'natilgan"))
+    if r.custom_holat == "Chiqarildi":
+        frappe.throw(_("Bu qator allaqachon tasdiqlangan — avval navbat "
+                       "sahifasidan bekor qiling"))
+    if flt(kg) <= 0:
+        frappe.throw(_("Kg 0 dan katta bo'lishi kerak"))
+
+    frappe.get_doc({
+        "doctype": "Tarozi Tortish",
+        "qator": r.name,
+        "hujjat": r.parent,
+        "item_code": r.item_code,
+        "kg": flt(kg),
+        "zapas": 1 if r.get("zapas") else 0,
+    }).insert(ignore_permissions=True)
+
+    jami = _tortish_jami(row_name)
+    _tortish_tarqat(r, jami)
+    _notify()
+    return {"ok": True, "jami": flt(jami, 1), "tortishlar": _tortishlar(row_name)}
+
+
+@frappe.whitelist()
+def tortish_ochir(tortish_name):
+    """Tarozichi: xato kiritilgan bo'lakni olib tashlash (yozuv o'chmaydi,
+    holat='Ochirilgan' — audit saqlanadi)."""
+    _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI, _("Huquq yo'q"))
+    t = frappe.db.get_value("Tarozi Tortish", tortish_name,
+                            ["name", "qator", "holat"], as_dict=True)
+    if not t:
+        frappe.throw(_("Yozuv topilmadi"))
+    if t.holat != "Aktiv":
+        frappe.throw(_("Bu yozuv allaqachon o'chirilgan"))
+    r = _qator(t.qator)
+    if r.custom_holat in ("Chiqarildi", "Jonatildi"):
+        frappe.throw(_("Qator yakunlangan — bo'lakni o'zgartirib bo'lmaydi"))
+
+    frappe.db.set_value("Tarozi Tortish", tortish_name, {
+        "holat": "Ochirilgan",
+        "ochirgan": frappe.session.user,
+    }, update_modified=False)
+
+    jami = _tortish_jami(t.qator)
+    _tortish_tarqat(r, jami)
+    _notify()
+    return {"ok": True, "jami": flt(jami, 1), "tortishlar": _tortishlar(t.qator)}
 
 
 @frappe.whitelist()
@@ -1553,9 +1677,19 @@ def chiqarish_bekor(row_name):
     frappe.db.set_value(qator_dt, row_name, {
         "custom_holat": "Kutilmoqda",
         "custom_fakt_kg": 0,
+        "custom_brak_kg": 0,
         "custom_chiqarilgan_vaqt": None,
         "custom_chiqargan": None,
     }, update_modified=False)
+
+    # bo'lib-bo'lib tortish yozuvlari ham bekor — tortish boshidan boshlanadi
+    for t in frappe.get_all("Tarozi Tortish",
+                            filters={"qator": row_name, "holat": "Aktiv"},
+                            pluck="name"):
+        frappe.db.set_value("Tarozi Tortish", t, {
+            "holat": "Ochirilgan",
+            "ochirgan": frappe.session.user,
+        }, update_modified=False)
 
     ogoh = None
     for pe in frappe.get_all(
