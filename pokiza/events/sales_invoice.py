@@ -12,6 +12,55 @@ from frappe.utils import flt
 NARX_GURUHI = "Сотув махсулотлари"
 
 
+def before_validate(doc, method=None) -> None:
+    """Zakaz ↔ tarozi fakt sinxroni (egasi talabi 2026-09-30).
+
+    Schyot qatori zakazdan (Sales Order) kelgan bo'lsa:
+      * custom_zakaz_kg = zakazda so'ralgan kg — sotuvchi qaysi zakaz
+        uchun qancha so'ralganini ko'radi;
+      * tarozichi fakt yozgan bo'lsa (SO Item.custom_fakt_kg) qator soni
+        MAJBURIY faktga tenglashtiriladi — mijozga tarozida tortilgan
+        son bilan sotiladi. Sinxron har saqlash/tasdiqlashda ishlaydi,
+        shuning uchun fakt keyin o'zgarsa ham schyot chetlab o'tolmaydi.
+    """
+    if doc.get("is_return"):
+        return
+    detallar = [r.so_detail for r in doc.get("items") or [] if r.get("so_detail")]
+    if not detallar:
+        return
+
+    so_map = {
+        d.name: d
+        for d in frappe.get_all(
+            "Sales Order Item",
+            filters={"name": ["in", detallar]},
+            fields=["name", "qty", "custom_fakt_kg"],
+        )
+    }
+
+    ozgardi = []
+    for row in doc.get("items") or []:
+        so_row = so_map.get(row.get("so_detail"))
+        if not so_row:
+            continue
+        row.custom_zakaz_kg = flt(so_row.qty)
+        fakt = flt(so_row.custom_fakt_kg)
+        if fakt > 0 and abs(flt(row.qty) - fakt) > 0.0005:
+            ozgardi.append(
+                f"<li><b>{frappe.utils.escape_html(row.item_name or row.item_code)}</b>: "
+                f"{flt(row.qty, 1)} → <b>{flt(fakt, 1)} kg</b></li>"
+            )
+            row.qty = fakt
+
+    if ozgardi:
+        frappe.msgprint(
+            _("Qator soni tarozi FAKTI bilan yangilandi:")
+            + "<ul>" + "".join(ozgardi) + "</ul>",
+            indicator="blue",
+            alert=True,
+        )
+
+
 def before_submit(doc, method=None) -> None:
     """'Сотув махсулотлари' guruhidagi tovar narxi 0 bo'lsa submit'ni to'xtatish."""
     narxsiz = []

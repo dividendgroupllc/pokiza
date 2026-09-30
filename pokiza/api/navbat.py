@@ -1089,8 +1089,42 @@ def chiqarildi(row_name, fakt_kg):
         "custom_chiqargan": frappe.session.user,
     }, update_modified=False)
     pe_list, pe_xabar = _pe_qoralama_yarat(r, flt(fakt_kg))
+    si_name, si_xabar = _si_fakt_yangila(row_name)
     _notify()
-    return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar}
+    return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar,
+            "si": si_name, "si_xabar": si_xabar}
+
+
+def _si_fakt_yangila(so_item_name):
+    """Tarozi fakt yozganda zakazga bog'liq QORALAMA schyot darhol yangilanadi:
+    saqlash chaqiriladi, before_validate hook qator sonini fakt bilan
+    tenglashtirib summalarni qayta hisoblaydi (egasi talabi 2026-09-30).
+    Schyot topilmasa yoki saqlashda xato bo'lsa tarozi yozuvi TO'XTAMAYDI —
+    sinxron baribir schyot saqlanish/tasdiqlanishida qayta ishlaydi."""
+    si_name = frappe.db.get_value(
+        "Sales Invoice Item", {"so_detail": so_item_name, "docstatus": 0}, "parent"
+    )
+    if not si_name:
+        return None, _("Qoralama schyot topilmadi — fakt schyot saqlanganda qo'llanadi")
+    try:
+        si = frappe.get_doc("Sales Invoice", si_name)
+        si.flags.ignore_permissions = True
+        # Eski qoralamada posting_date saqlashda bugunga suriladi — due_date
+        # (va payment_schedule sanalari, due_date ulardan qayta hisoblanadi)
+        # orqada qolsa validatsiya yiqiladi; tenglashtirib qo'yamiz
+        if si.due_date and getdate(si.due_date) < getdate(today()):
+            si.due_date = today()
+        for ps in si.get("payment_schedule") or []:
+            if ps.due_date and getdate(ps.due_date) < getdate(today()):
+                ps.due_date = today()
+        si.save()
+        return si.name, _("Qoralama schyot fakt bilan yangilandi: {0}").format(si.name)
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"Pokiza: {si_name} qoralama schyotida fakt yangilanmadi",
+        )
+        return None, _("Schyotni yangilashda xato — Error Log'ni tekshiring ({0})").format(si_name)
 
 
 def _pe_qoralama_yarat(qator, fakt_kg):

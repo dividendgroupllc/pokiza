@@ -373,6 +373,15 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 						if (m.pe_xabar) {
 							frappe.msgprint({ message: m.pe_xabar, indicator: "orange" });
 						}
+						// qoralama schyot fakt bilan yangilangani haqida
+						if (m.si) {
+							frappe.show_alert({
+								message: __("Qoralama schyot fakt bilan yangilandi: {0}", [
+									`<a href="/app/sales-invoice/${m.si}"><b>${m.si}</b></a>`,
+								]),
+								indicator: "blue",
+							});
+						}
 						yukla();
 					});
 			});

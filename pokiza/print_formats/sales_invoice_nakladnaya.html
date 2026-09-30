@@ -1,74 +1,82 @@
-{% set customer_phone = doc.contact_mobile or doc.contact_phone or doc.get("contact_number") or "" %}
-{% set customer_city = "" %}
-{% if doc.customer_address %}
-	{% set customer_city = frappe.db.get_value("Address", doc.customer_address, "city") or "" %}
-{% endif %}
-{% set customer_balance_rows = frappe.db.sql("""
-	SELECT
-		account_currency AS currency,
-		SUM(debit_in_account_currency) - SUM(credit_in_account_currency) AS balance
-	FROM `tabGL Entry`
-	WHERE party_type = 'Customer'
-		AND party = %s
-		AND company = %s
-		AND is_cancelled = 0
-	GROUP BY account_currency
-	HAVING ABS(balance) > 0.0001
-	ORDER BY account_currency
-""", (doc.customer, doc.company), as_dict=True) if doc.customer and doc.company else [] %}
-{% set discount_percent = doc.additional_discount_percentage or 0 %}
-{% set discount_amount = doc.discount_amount or 0 %}
-{% set bonus_amount = doc.get("custom_bonus") or doc.get("bonus") or 0 %}
-{% set has_discount_percent = (discount_percent or 0)|float > 0 %}
-{% set has_discount_amount = (discount_amount or 0)|float > 0 %}
-{% set has_bonus_amount = (bonus_amount or 0)|float > 0 %}
-{% set total_amount = doc.rounded_total or doc.grand_total or doc.total or 0 %}
-{% set items_per_page = 12 %}
-{% set page_count = ((doc.items|length + items_per_page - 1) // items_per_page) or 1 %}
+{#- Накладная (Pokiza) — Downloads/Нокладной.pdf namunasi asosida.
+    Har nusxa ALOHIDA portret A4 varaqda: 1-nusxa logotipli (mijozga),
+    2-nusxa logosiz (kompaniyada qoladi). Draft schyotda ham chop etiladi
+    (Print Settings.allow_print_for_draft). -#}
 
-{% macro money(value) -%}
-	{{ "{:,.0f}".format((value or 0)|float) }} сўм
-{%- endmacro %}
+{%- set company_row = frappe.db.get_value(
+	"Company", doc.company, ["company_name", "tax_id", "phone_no"], as_dict=True
+) or {} -%}
+{%- set company_address_name = frappe.db.get_value(
+	"Dynamic Link",
+	{"link_doctype": "Company", "link_name": doc.company, "parenttype": "Address"},
+	"parent",
+) -%}
+{%- set company_address = frappe.db.get_value(
+	"Address", company_address_name, ["address_line1", "city"], as_dict=True
+) or {} if company_address_name else {} -%}
+{%- set supplier_name = company_row.company_name or doc.company or "" -%}
+{%- set supplier_address = (
+	((company_address.city + ", ") if company_address.city else "")
+	+ (company_address.address_line1 or "")
+) or "г.Ташкент, ул.Фозилтепа" -%}
+{%- set supplier_inn = company_row.tax_id or "309 543 228" -%}
+{%- set supplier_phone = company_row.phone_no or "" -%}
 
-{% macro currency_amount(value, currency) -%}
-	{% set amount = (value or 0)|float %}
-	{% if currency == "USD" %}
-		{{ "{:,.2f}".format(amount) }} $
-	{% elif currency == "UZS" %}
-		{{ "{:,.0f}".format(amount) }} сум
-	{% else %}
-		{{ "{:,.2f}".format(amount) }} {{ currency }}
-	{% endif %}
-{%- endmacro %}
+{%- set customer_row = frappe.db.get_value(
+	"Customer", doc.customer, ["tax_id", "contact_number", "mobile_no"], as_dict=True
+) or {} if doc.customer else {} -%}
+{%- set customer_phone = doc.contact_mobile or doc.contact_phone
+	or customer_row.contact_number or customer_row.mobile_no or "" -%}
+{%- set customer_city = frappe.db.get_value("Address", doc.customer_address, "city")
+	or doc.territory or "" if doc.customer_address else (doc.territory or "") -%}
+{%- set customer_inn = doc.tax_id or customer_row.tax_id or "" -%}
 
-{% macro number(value) -%}
-	{{ "{:,.0f}".format((value or 0)|float) }}
-{%- endmacro %}
+{%- set discount_percent = (doc.additional_discount_percentage or 0)|float -%}
+{%- set discount_amount = (doc.discount_amount or 0)|float -%}
+{%- set ns = namespace(bonus_amount=0.0, total_qty=0.0) -%}
+{%- for item in doc.items -%}
+	{%- set ns.total_qty = ns.total_qty + (item.qty or 0)|float -%}
+	{%- if item.get("custom_bonus_foiz_qator") -%}
+		{%- set ns.bonus_amount = ns.bonus_amount
+			+ (item.amount or 0)|float * (item.custom_bonus_foiz_qator or 0)|float / 100 -%}
+	{%- endif -%}
+{%- endfor -%}
+{%- if not ns.bonus_amount -%}
+	{%- set customer_bonus_foiz = (frappe.db.get_value(
+		"Customer", doc.customer, "custom_bonus_foiz"
+	) or 0)|float if doc.customer else 0 -%}
+	{%- if customer_bonus_foiz > 0 -%}
+		{%- set ns.bonus_amount = (doc.total or 0)|float * customer_bonus_foiz / 100 -%}
+	{%- endif -%}
+{%- endif -%}
+{%- set total_amount = doc.rounded_total or doc.grand_total or doc.total or 0 -%}
+{%- set items_per_page = 22 -%}
+{%- set page_count = ((doc.items|length + items_per_page - 1) // items_per_page) or 1 -%}
 
-{% macro qty(value) -%}
-	{{ "{:,.3f}".format((value or 0)|float).rstrip("0").rstrip(".") }}
-{%- endmacro %}
+{%- macro num(value, decimals=0) -%}
+	{{- "{:,.{}f}".format((value or 0)|float, decimals).replace(",", " ").replace(".", ",") -}}
+{%- endmacro -%}
+
+{%- macro qty(value) -%}
+	{%- set v = (value or 0)|float -%}
+	{%- if v == v|round(0, "floor") -%}{{ num(v) }}{%- else -%}{{ num(v, 1) }}{%- endif -%}
+{%- endmacro -%}
 
 <style>
-	@page {
-		size: A4 portrait;
-		margin: 7mm;
-	}
-
 	.print-format {
 		orientation: Portrait;
 		page-size: A4;
-		margin-top: 7mm;
-		margin-bottom: 7mm;
-		margin-left: 7mm;
-		margin-right: 7mm;
+		margin-top: 6mm;
+		margin-bottom: 6mm;
+		margin-left: 6mm;
+		margin-right: 6mm;
 		padding: 0 !important;
 		width: 100% !important;
 		max-width: none !important;
-		color: #172033;
-		font-family: Calibri, Arial, sans-serif;
+		color: #1a1a1a;
+		font-family: Calibri, "Carlito", Arial, sans-serif;
 		font-size: 12px;
-		line-height: 1.32;
+		line-height: 1.3;
 	}
 
 	.print-format * {
@@ -76,198 +84,152 @@
 	}
 
 	.sheet-page {
-		width: 196mm;
-		min-height: 283mm;
+		width: 197mm;
 		margin: 0 auto;
 		position: relative;
-		overflow: hidden;
-	}
-
-	.print-page {
-		width: 283mm;
-		max-width: 283mm;
-		min-height: 196mm;
-		position: absolute;
-		top: 0;
-		left: 196mm;
-		transform: rotate(90deg);
-		transform-origin: top left;
-	}
-
-	.copy-grid {
-		display: table;
-		width: 100%;
-		table-layout: fixed;
-	}
-
-	.invoice-copy {
-		display: table-cell;
-		width: 50%;
-		position: relative;
-		vertical-align: top;
-	}
-
-	.invoice-copy:first-child {
-		padding-right: 4mm;
-		border-right: 1px dashed #94a3b8;
-	}
-
-	.invoice-copy:last-child {
-		padding-left: 4mm;
 	}
 
 	.page-break-after {
 		page-break-after: always;
 	}
 
-	.header-table,
-	.party-table,
-	.items-table,
-	.summary-table,
-	.signature-table {
-		width: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
+	.copy-inner {
+		position: relative;
+		min-height: 276mm;
+		padding-bottom: 18mm;
 	}
 
 	.header-table {
-		margin-bottom: 6px;
-		border-bottom: 2px solid #0f4c81;
-	}
-
-	.header-left {
-		width: 55%;
-		padding: 0 0 6px;
-		vertical-align: bottom;
-	}
-
-	.header-right {
-		width: 45%;
-		padding: 0 0 6px;
-		vertical-align: bottom;
-	}
-
-	.title {
-		margin: 0;
-		color: #0f4c81;
-		font-size: 22px;
-		font-style: italic;
-		font-weight: 700;
-		letter-spacing: 0;
-	}
-
-	.company {
-		margin-top: 2px;
-		color: #64748b;
-		font-size: 9.5px;
-		font-weight: 700;
-	}
-
-	.meta-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 10px;
+		table-layout: fixed;
+		margin-bottom: 4px;
 	}
 
-	.meta-table td {
-		padding: 4px 5px;
-		border: 1px solid #cbd5e1;
+	.header-logo-cell {
+		width: 46%;
+		vertical-align: bottom;
+		padding-bottom: 2px;
 	}
 
-	.meta-label {
+	.header-logo-cell img {
+		max-height: 30mm;
+		max-width: 100%;
+	}
+
+	.header-bar {
+		height: 5mm;
+		background: #1e7a3e;
+	}
+
+	.header-date-cell {
+		width: 22%;
+		vertical-align: bottom;
+		padding-bottom: 3px;
+		text-align: center;
+		font-family: Cambria, Georgia, serif;
+		font-weight: 700;
+		font-size: 13px;
+		color: #1a1a1a;
+	}
+
+	.header-title-cell {
 		width: 32%;
-		background: #eef4fa;
-		color: #334155;
-		text-align: right;
-		font-weight: 700;
+		vertical-align: bottom;
+		padding-bottom: 2px;
+		text-align: left;
 	}
 
-	.meta-value {
-		color: #0f172a;
+	.doc-title {
+		font-family: Cambria, Georgia, serif;
+		font-size: 19px;
 		font-weight: 700;
+		color: #1e7a3e;
+		margin: 0;
+	}
+
+	.doc-number {
+		font-family: Cambria, Georgia, serif;
+		font-size: 16px;
+		font-weight: 700;
+		color: #1a1a1a;
+		white-space: nowrap;
+	}
+
+	.doc-id {
+		font-size: 9px;
+		color: #777;
+		white-space: nowrap;
 	}
 
 	.party-table {
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
 		margin-bottom: 6px;
-		border: 1px solid #cbd5e1;
+		font-size: 12px;
 	}
 
 	.party-table td {
-		padding: 5px 6px;
-		border-right: 1px solid #e2e8f0;
+		padding: 2px 4px;
 		vertical-align: top;
 	}
 
-	.party-table td:last-child {
-		border-right: 0;
-	}
-
-	.field-label {
-		margin-bottom: 2px;
-		color: #64748b;
-		font-size: 8px;
-		font-weight: 700;
-		text-transform: uppercase;
-	}
-
-	.field-value {
-		min-height: 14px;
-		color: #111827;
+	.party-label {
+		width: 13%;
+		color: #1e7a3e;
 		font-size: 10.5px;
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.party-value {
+		width: 37%;
 		font-weight: 700;
+		color: #1a1a1a;
+	}
+
+	.party-name {
+		font-size: 13px;
 	}
 
 	.items-table {
-		border: 1px solid #0f4c81;
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+		border: 1.2px solid #1a1a1a;
 	}
 
-	.items-table col.idx {
-		width: 5%;
-	}
-
-	.items-table col.item {
-		width: 50%;
-	}
-
-	.items-table col.qty {
-		width: 12%;
-	}
-
-	.items-table col.rate {
-		width: 15%;
-	}
-
-	.items-table col.amount {
-		width: 18%;
-	}
+	.items-table col.c-idx { width: 7%; }
+	.items-table col.c-item { width: 43%; }
+	.items-table col.c-uom { width: 8%; }
+	.items-table col.c-qty { width: 12%; }
+	.items-table col.c-rate { width: 13%; }
+	.items-table col.c-amount { width: 17%; }
 
 	.items-table th {
 		padding: 4px 4px;
-		border: 1px solid #0f4c81;
-		background: #0f4c81;
-		color: #fff;
+		border: 1px solid #1a1a1a;
+		background: #fff;
+		color: #1a1a1a;
 		text-align: center;
-		font-size: 10px;
+		font-size: 12px;
 		font-weight: 700;
 	}
 
 	.items-table td {
-		height: 21px;
-		padding: 3px 4px;
-		border: 1px solid #d6e0ea;
+		height: 23px;
+		padding: 2px 5px;
+		border: 1px solid #8f9ba6;
 		vertical-align: middle;
-		font-size: 9.5px;
-		page-break-inside: avoid;
+		font-size: 11.5px;
 	}
 
-	.items-table tbody tr:nth-child(even) td {
-		background: #f8fbfe;
+	.items-table tbody tr:nth-child(odd) td {
+		background: #e2efda;
 	}
 
-	.idx-cell,
-	.center {
-		text-align: center;
-	}
+	.center { text-align: center; }
 
 	.number {
 		text-align: right;
@@ -275,85 +237,69 @@
 	}
 
 	.item-name {
-		color: #111827;
-		font-weight: 700;
+		white-space: nowrap;
+		overflow: hidden;
 	}
 
-	.item-code {
-		margin-top: 1px;
-		color: #64748b;
-		font-size: 8px;
-	}
-
-	.continued {
-		margin-top: 6px;
-		padding: 6px 8px;
-		border: 1px solid #cbd5e1;
-		background: #f8fafc;
-		color: #475569;
-		text-align: right;
-		font-size: 10px;
-		font-style: italic;
-	}
-
-	.footer-table {
+	.after-items-table {
 		width: 100%;
-		margin-top: 7px;
 		border-collapse: collapse;
 		table-layout: fixed;
+		margin-top: 2px;
 	}
 
-	.footer-left {
-		width: 52%;
-		padding-right: 14px;
+	.after-items-table > tbody > tr > td {
 		vertical-align: top;
 	}
 
-	.note-box {
-		min-height: 52px;
-		border: 1px solid #cbd5e1;
-		background: #fbfdff;
-		padding: 8px;
+	.thanks-cell {
+		width: 50%;
+		padding-top: 4px;
 	}
 
 	.thanks {
-		margin-bottom: 4px;
-		color: #0f4c81;
-		font-size: 12px;
+		color: #2eae4e;
+		font-family: Cambria, Georgia, serif;
+		font-size: 15px;
 		font-style: italic;
 		font-weight: 700;
 	}
 
-	.note-small {
-		color: #64748b;
-		font-size: 9px;
+	.total-qty {
+		margin-top: 3px;
+		font-weight: 700;
+		font-size: 13px;
 	}
 
-	.footer-right {
-		width: 48%;
-		vertical-align: top;
+	.continued {
+		margin-top: 4px;
+		color: #555;
+		font-size: 10px;
+		font-style: italic;
+	}
+
+	.summary-cell {
+		width: 50%;
 	}
 
 	.summary-table {
-		border: 1px solid #0f4c81;
-		font-size: 10px;
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+		font-size: 12px;
 	}
 
 	.summary-table td {
-		padding: 4px 5px;
-		border-bottom: 1px solid #d6e0ea;
-	}
-
-	.summary-table tr:last-child td {
-		border-bottom: 0;
+		padding: 3px 5px;
+		border: 1px solid #1a1a1a;
 	}
 
 	.summary-label {
-		width: 45%;
-		background: #f1f5f9;
-		color: #334155;
+		width: 48%;
+		background: #e2efda;
 		text-align: right;
 		font-weight: 700;
+		white-space: nowrap;
 	}
 
 	.summary-value {
@@ -362,202 +308,197 @@
 		font-weight: 700;
 	}
 
-	.grand-total .summary-label,
-	.grand-total .summary-value {
-		background: #0f4c81;
-		color: #fff;
-		font-size: 11px;
+	.summary-spacer td {
+		border: 0;
+		padding: 0;
+		height: 2px;
+	}
+
+	.grand-total td {
+		border: 1.4px solid #1a1a1a;
+		font-size: 13px;
 	}
 
 	.signature-table {
-		margin-top: 16px;
+		width: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+		margin-top: 22px;
 	}
 
 	.signature-table td {
 		width: 50%;
-		padding: 0 10px;
-		text-align: center;
-		color: #334155;
-		font-size: 10px;
+		padding: 0 6px;
+		font-family: Cambria, Georgia, serif;
+		font-style: italic;
+		font-weight: 700;
+		font-size: 13px;
 	}
 
-	.signature-line {
-		border-top: 1px solid #334155;
-		padding-top: 5px;
-	}
-
-	.page-counter {
-		margin-top: 5px;
-		color: #94a3b8;
+	.copy-footer {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		font-family: Cambria, Georgia, serif;
+		font-style: italic;
+		font-size: 10.5px;
+		color: #333;
 		text-align: right;
-		font-size: 10px;
 	}
+
+	.sheet-nologo .copy-footer { text-align: left; }
 </style>
 
-{% macro render_invoice_copy(page_items, page_index, page_number, page_is_last) %}
-	<table class="header-table">
-		<tr>
-			<td class="header-left">
-				<h1 class="title">Накладная</h1>
-				<div class="company">{{ doc.company }}</div>
-			</td>
-			<td class="header-right">
-				<table class="meta-table">
-					<tr>
-						<td class="meta-label">Номер</td>
-						<td class="meta-value">{{ doc.name }}</td>
-					</tr>
-					<tr>
-						<td class="meta-label">Дата</td>
-						<td class="meta-value">{{ doc.get_formatted("posting_date") }}</td>
-					</tr>
-				</table>
-			</td>
-		</tr>
-	</table>
-
-	<table class="party-table">
-		<tr>
-			<td style="width: 34%;">
-				<div class="field-label">Покупатель</div>
-				<div class="field-value">{{ doc.customer_name or doc.customer }}</div>
-			</td>
-			<td style="width: 20%;">
-				<div class="field-label">Телефон</div>
-				<div class="field-value">{{ customer_phone or "&nbsp;" }}</div>
-			</td>
-			<td style="width: 25%;">
-				<div class="field-label">Адрес / город</div>
-				<div class="field-value">{{ customer_city or doc.territory or "&nbsp;" }}</div>
-			</td>
-			<td style="width: 21%;">
-				<div class="field-label">Задолженность</div>
-				<div class="field-value">
-					{% if customer_balance_rows %}
-						{% for row in customer_balance_rows %}
-							{% set balance = (row.balance or 0)|float %}
-							<div>
-								{% if balance < 0 %}Переплата: {% endif %}{{ currency_amount(balance|abs, row.currency) }}
-							</div>
-						{% endfor %}
-					{% else %}
-						0 сум
-					{% endif %}
-				</div>
-			</td>
-		</tr>
-	</table>
-
-	<table class="items-table">
-		<colgroup>
-			<col class="idx">
-			<col class="item">
-			<col class="qty">
-			<col class="rate">
-			<col class="amount">
-		</colgroup>
-		<thead>
+{%- macro render_copy(page_items, page_index, page_number, page_is_last, with_logo) %}
+	<div class="copy-inner">
+		<table class="header-table">
 			<tr>
-				<th>№</th>
-				<th>Товар</th>
-				<th>Кол-во</th>
-				<th>Цена</th>
-				<th>Сумма</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% for item in page_items %}
-				{% if item %}
-					<tr>
-						<td class="idx-cell">{{ page_index * items_per_page + loop.index }}</td>
-						<td>
-							<div class="item-name">{{ item.item_name or item.item_code }}</div>
-							{% if item.item_code and item.item_code != item.item_name %}
-								<div class="item-code">{{ item.item_code }}</div>
-							{% endif %}
-						</td>
-						<td class="center">{{ qty(item.qty) }}</td>
-						<td class="number">{{ number(item.rate or item.net_rate) }}</td>
-						<td class="number">{{ money(item.amount or item.net_amount) }}</td>
-					</tr>
-				{% else %}
-					<tr>
-						<td>&nbsp;</td>
-						<td>&nbsp;</td>
-						<td>&nbsp;</td>
-						<td>&nbsp;</td>
-						<td>&nbsp;</td>
-					</tr>
-				{% endif %}
-			{% endfor %}
-		</tbody>
-	</table>
-
-	{% if page_is_last %}
-		<table class="footer-table">
-			<tr>
-				<td class="footer-left">
-					<div class="note-box">
-						<div class="thanks">Спасибо за покупку</div>
-						<div class="note-small">Товар отпущен согласно данным настоящей накладной.</div>
-					</div>
+				<td class="header-logo-cell">
+					{%- if with_logo -%}
+						<img src="__POKIZA_LOGO_SRC__" alt="Burxanov">
+					{%- else -%}
+						<div class="header-bar"></div>
+					{%- endif -%}
 				</td>
-				<td class="footer-right">
-					<table class="summary-table">
+				<td class="header-date-cell">{{ doc.get_formatted("posting_date") }}</td>
+				<td class="header-title-cell">
+					<div class="doc-title">Накладная:</div>
+					<div class="doc-number">№ {{ doc.name.split("-")[-1].lstrip("0") or doc.name }}</div>
+					<div class="doc-id">{{ doc.name }}</div>
+				</td>
+			</tr>
+		</table>
+
+		<table class="party-table">
+			<tr>
+				<td class="party-label">Поставщик:</td>
+				<td class="party-value party-name">{{ supplier_name }}</td>
+				<td class="party-label">Клиент&nbsp;:</td>
+				<td class="party-value party-name">{{ doc.customer_name or doc.customer or "" }}</td>
+			</tr>
+			<tr>
+				<td class="party-label">Адрес:</td>
+				<td class="party-value">{{ supplier_address }}</td>
+				<td class="party-label">Адрес:</td>
+				<td class="party-value">{{ customer_city or "&nbsp;" }}</td>
+			</tr>
+			<tr>
+				<td class="party-label">ИНН:</td>
+				<td class="party-value">{{ supplier_inn }}</td>
+				<td class="party-label">ИНН:</td>
+				<td class="party-value">{{ customer_inn or "&nbsp;" }}</td>
+			</tr>
+			<tr>
+				<td class="party-label">тел:</td>
+				<td class="party-value">{{ supplier_phone or "&nbsp;" }}</td>
+				<td class="party-label">тел:</td>
+				<td class="party-value">{{ customer_phone or "&nbsp;" }}</td>
+			</tr>
+		</table>
+
+		<table class="items-table">
+			<colgroup>
+				<col class="c-idx">
+				<col class="c-item">
+				<col class="c-uom">
+				<col class="c-qty">
+				<col class="c-rate">
+				<col class="c-amount">
+			</colgroup>
+			<thead>
+				<tr>
+					<th>№</th>
+					<th>Наименования</th>
+					<th>Ед.</th>
+					<th>Кол-во</th>
+					<th>Цена</th>
+					<th>Всего</th>
+				</tr>
+			</thead>
+			<tbody>
+				{%- for item in page_items -%}
+					{%- if item -%}
 						<tr>
-							<td class="summary-label">Итого</td>
-							<td class="summary-value">{{ money(doc.total or doc.net_total or total_amount) }}</td>
+							<td class="center">{{ page_index * items_per_page + loop.index }}</td>
+							<td class="item-name">{{ item.item_name or item.item_code }}</td>
+							<td class="center">{{ (item.uom or item.stock_uom or "")|lower }}</td>
+							<td class="number">{{ qty(item.qty) }}</td>
+							<td class="number">{{ num(item.rate or item.net_rate) }}</td>
+							<td class="number">{{ num(item.amount or item.net_amount) }}</td>
 						</tr>
-						{% if has_discount_percent %}
-							<tr>
-								<td class="summary-label">Скидка</td>
-								<td class="summary-value">{{ "{:,.2f}".format((discount_percent or 0)|float).rstrip("0").rstrip(".") }}%</td>
-							</tr>
-						{% endif %}
-						{% if has_discount_amount %}
-							<tr>
-								<td class="summary-label">Сумма скидки</td>
-								<td class="summary-value">{{ money(discount_amount) }}</td>
-							</tr>
-						{% endif %}
-						{% if has_bonus_amount %}
-							<tr>
-								<td class="summary-label">Бонус</td>
-								<td class="summary-value">{{ money(bonus_amount) }}</td>
-							</tr>
-						{% endif %}
-						<tr class="grand-total">
-							<td class="summary-label">Всего</td>
-							<td class="summary-value">{{ money(total_amount) }}</td>
+					{%- else -%}
+						<tr>
+							<td>&nbsp;</td><td></td><td></td><td></td><td></td>
+							<td class="number">-</td>
 						</tr>
-					</table>
+					{%- endif -%}
+				{%- endfor -%}
+			</tbody>
+		</table>
+
+		<table class="after-items-table">
+			<tr>
+				<td class="thanks-cell">
+					{%- if page_is_last -%}
+						<div class="thanks">Спасибо за ваш бизнес!</div>
+						<div class="total-qty">{{ qty(ns.total_qty) }} кг</div>
+					{%- else -%}
+						<div class="continued">Продолжение на следующей странице ({{ page_number }}/{{ page_count }})</div>
+					{%- endif -%}
+				</td>
+				<td class="summary-cell">
+					{%- if page_is_last -%}
+						<table class="summary-table">
+							<tr>
+								<td class="summary-label">Итого:</td>
+								<td class="summary-value">{{ num(doc.total) }}</td>
+							</tr>
+							<tr>
+								<td class="summary-label">Скидка:</td>
+								<td class="summary-value">{{ num(discount_percent) }}%</td>
+							</tr>
+							<tr>
+								<td class="summary-label">Бонус:</td>
+								<td class="summary-value">{% if ns.bonus_amount %}{{ num(ns.bonus_amount) }}{% else %}-{% endif %}</td>
+							</tr>
+							<tr>
+								<td class="summary-label">Скидка сумма:</td>
+								<td class="summary-value">{% if discount_amount %}{{ num(discount_amount) }}{% else %}-{% endif %}</td>
+							</tr>
+							<tr class="summary-spacer"><td></td><td></td></tr>
+							<tr class="grand-total">
+								<td class="summary-label">ВСЕГО</td>
+								<td class="summary-value">{{ num(total_amount) }}</td>
+							</tr>
+						</table>
+					{%- endif -%}
 				</td>
 			</tr>
 		</table>
 
-		<table class="signature-table">
-			<tr>
-				<td><div class="signature-line">Отпустил</div></td>
-				<td><div class="signature-line">Получил</div></td>
-			</tr>
-		</table>
-	{% else %}
-		<div class="continued">Продолжение на следующей странице</div>
-	{% endif %}
+		{%- if page_is_last -%}
+			<table class="signature-table">
+				<tr>
+					<td>Отпустил___________________</td>
+					<td style="text-align: right;">Получил___________________</td>
+				</tr>
+			</table>
+		{%- endif -%}
 
-	<div class="page-counter">Страница {{ page_number }} из {{ page_count }}</div>
-{% endmacro %}
-
-{% for page_items in doc.items|batch(items_per_page, none) %}
-	{% set page_index = loop.index0 %}
-	{% set page_number = loop.index %}
-	{% set page_is_last = loop.last %}
-	<div class="sheet-page{% if not loop.last %} page-break-after{% endif %}">
-		<div class="print-page">
-			<div class="copy-grid">
-				<div class="invoice-copy">{{ render_invoice_copy(page_items, page_index, page_number, page_is_last) }}</div>
-				<div class="invoice-copy">{{ render_invoice_copy(page_items, page_index, page_number, page_is_last) }}</div>
-			</div>
+		<div class="copy-footer">
+			по вопросам, касающимся этого счета, обращайтесь<br>
+			Одил (99899) 305-12-43<br>
+			www.facebook.com/pokizaniyat.uz
 		</div>
 	</div>
-{% endfor %}
+{%- endmacro %}
+
+{%- for with_logo in [True, False] %}
+	{%- set copy_is_last = loop.last -%}
+	{%- for page_items in doc.items|batch(items_per_page, none) %}
+		<div class="sheet-page{% if not with_logo %} sheet-nologo{% endif %}{% if not (copy_is_last and loop.last) %} page-break-after{% endif %}">
+			{{ render_copy(page_items, loop.index0, loop.index, loop.last, with_logo) }}
+		</div>
+	{%- endfor %}
+{%- endfor %}

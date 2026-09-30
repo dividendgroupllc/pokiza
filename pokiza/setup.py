@@ -96,6 +96,20 @@ def get_custom_fields():
                 "in_list_view": 0,
             },
         ],
+        # Schyotda zakaz soni ko'rinadi; qator soni (qty) esa tarozi fakti
+        # bilan sinxronlanadi — mijozga fakt bo'yicha sotiladi (2026-09-30)
+        "Sales Invoice Item": [
+            {
+                "fieldname": "custom_zakaz_kg",
+                "label": "Zakaz kg (SO)",
+                "fieldtype": "Float",
+                "insert_after": "qty",
+                "read_only": 1,
+                "in_list_view": 1,
+                "columns": 1,
+                "no_copy": 1,
+            },
+        ],
     }
 
 
@@ -225,6 +239,22 @@ def set_bom_unique_code_property():
         )
 
 
+def sync_so_item_fakt_visibility():
+    """SO items jadvalida tarozi faktini ko'rsatish (egasi talabi 2026-09-30).
+    Maydonlar add_navbat_item_fields patchida yaratilgan — bu yerda faqat
+    ko'rinish xususiyati yangilanadi."""
+    cf = frappe.db.get_value(
+        "Custom Field",
+        {"dt": "Sales Order Item", "fieldname": "custom_fakt_kg"},
+        "name",
+    )
+    if cf:
+        frappe.db.set_value(
+            "Custom Field", cf, {"in_list_view": 1, "columns": 1}
+        )
+        frappe.clear_cache(doctype="Sales Order")
+
+
 def sync_production_entry_list_settings():
     """Production Entry ro'yxatida ishlab chiqarilayotgan miqdor ustunini ko'rsatish.
 
@@ -250,12 +280,14 @@ def sync_production_entry_list_settings():
 
 def after_install():
     sync_custom_fields()
+    sync_so_item_fakt_visibility()
     sync_production_entry_list_settings()
     create_nakladnaya_print_format()
 
 
 def after_migrate():
     sync_custom_fields()
+    sync_so_item_fakt_visibility()
     sync_production_entry_list_settings()
     create_nakladnaya_print_format()
 
@@ -264,6 +296,19 @@ def create_nakladnaya_print_format():
     html = Path(__file__).parent.joinpath(
         "print_formats", "sales_invoice_nakladnaya.html"
     ).read_text(encoding="utf-8")
+
+    # Logo data-URI sifatida joylanadi — wkhtmltopdf tarmoqdan rasm olmasin
+    # (saytga HTTP so'rov HostNotFoundError berishi mumkin).
+    logo_path = Path(__file__).parent.joinpath("public", "images", "burxanov_logo.png")
+    if logo_path.exists():
+        import base64
+
+        logo_src = "data:image/png;base64," + base64.b64encode(
+            logo_path.read_bytes()
+        ).decode()
+    else:
+        logo_src = "/assets/pokiza/images/burxanov_logo.png"
+    html = html.replace("__POKIZA_LOGO_SRC__", logo_src)
 
     values = {
         "doc_type": "Sales Invoice",
@@ -322,5 +367,9 @@ def create_nakladnaya_print_format():
                 "value": NAKLADNAYA_PRINT_FORMAT,
             }
         )
+
+    # Qoralama (draft) schyotda ham nakladnoy PDF chiqishi uchun
+    if not frappe.db.get_single_value("Print Settings", "allow_print_for_draft"):
+        frappe.db.set_single_value("Print Settings", "allow_print_for_draft", 1)
 
     frappe.clear_cache(doctype="Sales Invoice")
