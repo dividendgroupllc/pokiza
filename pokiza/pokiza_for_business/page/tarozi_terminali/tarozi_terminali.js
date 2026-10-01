@@ -7,6 +7,11 @@
 // 50...), yig'indi darhol omborga (PE qoralama) va schyotga tarqaladi,
 // qoldiq "yana N zames" ko'rinib turadi; yakunda [Tasdiqlash] bosadi.
 // Orqada: sarf = REJA bo'yicha (o'zgarmaydi), kirim = FAKT bo'yicha.
+//
+// 2026-10-01 (egasi talabi): fakt TO'LIQ yoziladi (brak ichida), brak esa
+// KUN OXIRIDA alohida «🗑 Brak vozvrat» oynasidan mahsulot kesimida
+// qaytariladi — farshi norma (ГП) bo'lib omborga qaytadi, upakovkasi
+// rasxodga ketadi (hisob serverda: pokiza.api.navbat.brak_vozvrat).
 
 frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
@@ -60,6 +65,7 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 			<div class="tz-sana"></div>
 			<button class="btn btn-default tz-next">›</button>
 			<button class="btn btn-default tz-bugun">${__("Bugun")}</button>
+			<button class="btn btn-default tz-brak-oyna">🗑 ${__("Brak vozvrat")}</button>
 		</div>`).appendTo($wrap);
 	const $list = $('<div></div>').appendTo($wrap);
 
@@ -145,8 +151,6 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 								<div class="tz-amal">
 									<input type="number" step="0.1" min="0" class="form-control tz-fakt" placeholder="kg">
 									<button class="btn btn-primary tz-qosh">+ ${__("Qo'shish")}</button>
-									<span class="tz-brak-lbl">${__("Brak")}:</span>
-									<input type="number" step="0.1" min="0" class="form-control tz-brak" placeholder="0">
 									<button class="btn btn-success tz-tasdiq" ${jami > 0 ? "" : "disabled"}>
 										✓ ${__("Tasdiqlash")}${jami > 0 ? ` (${kg1(jami)} kg)` : ""}</button>
 								</div>
@@ -190,54 +194,34 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 					.then(() => yukla());
 			});
 
-			// yakuniy tasdiqlash (brak bilan)
+			// yakuniy tasdiqlash — fakt TO'LIQ yoziladi (brak kun oxirida
+			// alohida «Brak vozvrat» oynasidan qaytariladi)
 			$r.find(".tz-tasdiq").on("click", () => {
-				const brak = flt($r.find(".tz-brak").val());
-				if (brak < 0 || brak >= jami) {
-					frappe.show_alert({
-						message: __("Brak 0 dan tortilgan jamigacha bo'lishi kerak"),
-						indicator: "orange",
-					});
-					return;
-				}
-				const sotuv = jami - brak;
 				const qoldiq = flt(q.reja_kg) - jami;
 				const tasdiqla = () => {
 					$r.find(".tz-tasdiq").prop("disabled", true);
 					frappe
 						.call({
 							method: "pokiza.api.navbat.chiqarildi",
-							args: { row_name: q.row, fakt_kg: jami, brak_kg: brak },
+							args: { row_name: q.row, fakt_kg: jami },
 						})
 						.then(() => {
 							frappe.show_alert({
-								message: brak > 0
-									? __("✓ Tasdiqlandi: {0} — {1} kg (brak {2} kg)", [q.sku, kg1(sotuv), kg1(brak)])
-									: __("✓ Tasdiqlandi: {0} — {1} kg", [q.sku, kg1(jami)]),
+								message: __("✓ Tasdiqlandi: {0} — {1} kg", [q.sku, kg1(jami)]),
 								indicator: "green",
 							});
 							yukla();
 						})
 						.catch(() => $r.find(".tz-tasdiq").prop("disabled", false));
 				};
-				const savollar = [];
-				if (brak > 0) {
-					savollar.push(
-						__("Brak: <b>{0} kg</b> — omborga/sotuvga {1} kg kiradi, brak farshi ishlab chiqarishga qaytadi.", [
-							kg1(brak), kg1(sotuv),
-						])
-					);
-				}
 				if (qoldiq > 0.05) {
 					const zames = zamesKg > 0 ? ` (≈ ${format_number(qoldiq / zamesKg, null, 1)} ${__("zames")})` : "";
-					savollar.push(
-						__("Reja {0} kg, tortildi {1} kg — <b>qoldi {2} kg{3}</b>.", [
+					frappe.confirm(
+						__("Reja {0} kg, tortildi {1} kg — <b>qoldi {2} kg{3}</b>.<br><br>Tasdiqlaysizmi?", [
 							kg1(q.reja_kg), kg1(jami), kg1(qoldiq), zames,
-						])
+						]),
+						tasdiqla
 					);
-				}
-				if (savollar.length) {
-					frappe.confirm(savollar.join("<br><br>") + "<br><br>" + __("Tasdiqlaysizmi?"), tasdiqla);
 				} else {
 					tasdiqla();
 				}
@@ -246,6 +230,78 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 			$list.append($r);
 		});
 	}
+
+	// ----- BRAK VOZVRAT OYNASI (kun oxirida) -----
+	function brakOyna() {
+		const d = new frappe.ui.Dialog({
+			title: __("🗑 Brak vozvrat (kun oxirida)"),
+			fields: [
+				{
+					fieldname: "item",
+					fieldtype: "Link",
+					label: __("Mahsulot"),
+					options: "Item",
+					reqd: 1,
+					get_query: () => ({ filters: { item_group: "Сотув махсулотлари" } }),
+				},
+				{
+					fieldname: "kg",
+					fieldtype: "Float",
+					label: __("Brak kg"),
+					reqd: 1,
+				},
+				{ fieldname: "royxat", fieldtype: "HTML" },
+			],
+			primary_action_label: __("Vozvrat qilish"),
+			primary_action(v) {
+				if (!v.item || flt(v.kg) <= 0) {
+					frappe.show_alert({ message: __("Mahsulot va kg kiriting"), indicator: "orange" });
+					return;
+				}
+				frappe
+					.call({
+						method: "pokiza.api.navbat.brak_vozvrat",
+						args: { item_code: v.item, kg: flt(v.kg) },
+					})
+					.then((res) => {
+						const m = res.message || {};
+						frappe.show_alert({
+							message: __("✓ Brak qaytdi: {0} — {1} kg (farsh: {2})", [
+								v.item, kg1(flt(v.kg)), m.norma || "-",
+							]),
+							indicator: "green",
+						});
+						d.set_value("item", "");
+						d.set_value("kg", null);
+						royxatYukla();
+					});
+			},
+		});
+		function royxatYukla() {
+			frappe
+				.call({ method: "pokiza.api.navbat.brak_royxat", args: {} })
+				.then((r) => {
+					const m = r.message || {};
+					const rows = (m.qatorlar || [])
+						.map(
+							(q) =>
+								`<tr><td>${frappe.utils.escape_html(q.item_code)}</td>
+								 <td class="text-muted">${frappe.utils.escape_html(q.norma || "-")}</td>
+								 <td style="text-align:right"><b>${kg1(q.kg)} kg</b></td></tr>`
+						)
+						.join("");
+					d.fields_dict.royxat.$wrapper.html(
+						rows
+							? `<div style="margin-top:8px"><b>${__("Bugungi vozvratlar")} (${__("jami")} ${kg1(m.jami)} kg):</b>
+								<table class="table table-sm" style="margin-top:4px">${rows}</table></div>`
+							: `<div class="text-muted" style="margin-top:8px">${__("Bugun hali vozvrat yo'q")}</div>`
+					);
+				});
+		}
+		royxatYukla();
+		d.show();
+	}
+	$nav.find(".tz-brak-oyna").on("click", brakOyna);
 
 	frappe.realtime.on("navbat_update", () => yukla());
 	yukla();

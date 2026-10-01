@@ -1,7 +1,8 @@
-{#- Накладная (Pokiza) — Downloads/Нокладной.pdf namunasi asosida.
-    Har nusxa ALOHIDA portret A4 varaqda: 1-nusxa logotipli (mijozga),
-    2-nusxa logosiz (kompaniyada qoladi). Draft schyotda ham chop etiladi
-    (Print Settings.allow_print_for_draft). -#}
+{#- Накладная (Pokiza) — Downloads/Нокладной.pdf namunasi asosida:
+    BITTA landshaft A4, varaq ikkiga bo'lingan — chap yarmi logosiz
+    (kompaniyada qoladi), o'ng yarmi logoli (mijozga). Xulosada faqat
+    Итого va ВСЕГО (bonus/skidka ko'rsatilmaydi — egasi talabi 2026-10-01).
+    Draft schyotda ham chop etiladi (Print Settings.allow_print_for_draft). -#}
 
 {%- set company_row = frappe.db.get_value(
 	"Company", doc.company, ["company_name", "tax_id", "phone_no"], as_dict=True
@@ -31,26 +32,12 @@
 	or doc.territory or "" if doc.customer_address else (doc.territory or "") -%}
 {%- set customer_inn = doc.tax_id or customer_row.tax_id or "" -%}
 
-{%- set discount_percent = (doc.additional_discount_percentage or 0)|float -%}
-{%- set discount_amount = (doc.discount_amount or 0)|float -%}
-{%- set ns = namespace(bonus_amount=0.0, total_qty=0.0) -%}
+{%- set ns = namespace(total_qty=0.0) -%}
 {%- for item in doc.items -%}
 	{%- set ns.total_qty = ns.total_qty + (item.qty or 0)|float -%}
-	{%- if item.get("custom_bonus_foiz_qator") -%}
-		{%- set ns.bonus_amount = ns.bonus_amount
-			+ (item.amount or 0)|float * (item.custom_bonus_foiz_qator or 0)|float / 100 -%}
-	{%- endif -%}
 {%- endfor -%}
-{%- if not ns.bonus_amount -%}
-	{%- set customer_bonus_foiz = (frappe.db.get_value(
-		"Customer", doc.customer, "custom_bonus_foiz"
-	) or 0)|float if doc.customer else 0 -%}
-	{%- if customer_bonus_foiz > 0 -%}
-		{%- set ns.bonus_amount = (doc.total or 0)|float * customer_bonus_foiz / 100 -%}
-	{%- endif -%}
-{%- endif -%}
 {%- set total_amount = doc.rounded_total or doc.grand_total or doc.total or 0 -%}
-{%- set items_per_page = 22 -%}
+{%- set items_per_page = 14 -%}
 {%- set page_count = ((doc.items|length + items_per_page - 1) // items_per_page) or 1 -%}
 
 {%- macro num(value, decimals=0) -%}
@@ -64,7 +51,7 @@
 
 <style>
 	.print-format {
-		orientation: Portrait;
+		orientation: Landscape;
 		page-size: A4;
 		margin-top: 6mm;
 		margin-bottom: 6mm;
@@ -75,8 +62,8 @@
 		max-width: none !important;
 		color: #1a1a1a;
 		font-family: Calibri, "Carlito", Arial, sans-serif;
-		font-size: 12px;
-		line-height: 1.3;
+		font-size: 11px;
+		line-height: 1.25;
 	}
 
 	.print-format * {
@@ -84,8 +71,7 @@
 	}
 
 	.sheet-page {
-		width: 197mm;
-		margin: 0 auto;
+		width: 283mm;
 		position: relative;
 	}
 
@@ -93,10 +79,32 @@
 		page-break-after: always;
 	}
 
+	.copy-grid {
+		display: table;
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	.invoice-copy {
+		display: table-cell;
+		width: 50%;
+		position: relative;
+		vertical-align: top;
+	}
+
+	.invoice-copy.copy-left {
+		padding-right: 5mm;
+		border-right: 1px dashed #9aa5b1;
+	}
+
+	.invoice-copy.copy-right {
+		padding-left: 5mm;
+	}
+
 	.copy-inner {
 		position: relative;
-		min-height: 276mm;
-		padding-bottom: 18mm;
+		min-height: 186mm;
+		padding-bottom: 16mm;
 	}
 
 	.header-table {
@@ -104,61 +112,60 @@
 		border-collapse: collapse;
 		table-layout: fixed;
 		margin-bottom: 4px;
+		border-bottom: 1.5px solid #1e7a3e;
 	}
 
+	/* ikkala nusxada sarlavha balandligi BIR XIL — jadvallar bir chiziqda
+	   boshlanadi (logo balandligi farq qilmasin) */
 	.header-logo-cell {
 		width: 46%;
+		height: 19mm;
 		vertical-align: bottom;
-		padding-bottom: 2px;
+		padding-bottom: 1.5mm;
 	}
 
+	/* logo biroz gorizontal cho'zilgan (namunadagidek keng turadi) */
 	.header-logo-cell img {
-		max-height: 30mm;
-		max-width: 100%;
+		width: 40mm;
+		height: 15mm;
 	}
 
-	.header-bar {
-		height: 5mm;
-		background: #1e7a3e;
-	}
-
+	/* sana — o'rtada, chiziq ustida */
 	.header-date-cell {
-		width: 22%;
+		width: 26%;
+		height: 19mm;
 		vertical-align: bottom;
-		padding-bottom: 3px;
+		padding-bottom: 1.5mm;
 		text-align: center;
 		font-family: Cambria, Georgia, serif;
-		font-weight: 700;
-		font-size: 13px;
-		color: #1a1a1a;
-	}
-
-	.header-title-cell {
-		width: 32%;
-		vertical-align: bottom;
-		padding-bottom: 2px;
-		text-align: left;
-	}
-
-	.doc-title {
-		font-family: Cambria, Georgia, serif;
-		font-size: 19px;
-		font-weight: 700;
-		color: #1e7a3e;
-		margin: 0;
-	}
-
-	.doc-number {
-		font-family: Cambria, Georgia, serif;
-		font-size: 16px;
+		font-size: 15px;
 		font-weight: 700;
 		color: #1a1a1a;
 		white-space: nowrap;
 	}
 
-	.doc-id {
-		font-size: 9px;
-		color: #777;
+	/* «Накладная:» — o'ngda, nomer uning tagida, chiziq ustida */
+	.header-title-cell {
+		width: 28%;
+		height: 19mm;
+		vertical-align: bottom;
+		padding-bottom: 1.5mm;
+		text-align: left;
+	}
+
+	.doc-title {
+		font-family: Cambria, Georgia, serif;
+		font-size: 15px;
+		font-weight: 700;
+		color: #1e7a3e;
+		margin: 0 0 1px;
+	}
+
+	.doc-number {
+		font-family: Cambria, Georgia, serif;
+		font-size: 13px;
+		font-weight: 700;
+		color: #1a1a1a;
 		white-space: nowrap;
 	}
 
@@ -166,19 +173,19 @@
 		width: 100%;
 		border-collapse: collapse;
 		table-layout: fixed;
-		margin-bottom: 6px;
-		font-size: 12px;
+		margin-bottom: 4px;
+		font-size: 10px;
 	}
 
 	.party-table td {
-		padding: 2px 4px;
+		padding: 1px 3px;
 		vertical-align: top;
 	}
 
 	.party-label {
 		width: 13%;
 		color: #1e7a3e;
-		font-size: 10.5px;
+		font-size: 9px;
 		text-align: right;
 		white-space: nowrap;
 	}
@@ -190,7 +197,7 @@
 	}
 
 	.party-name {
-		font-size: 13px;
+		font-size: 11px;
 	}
 
 	.items-table {
@@ -208,21 +215,21 @@
 	.items-table col.c-amount { width: 17%; }
 
 	.items-table th {
-		padding: 4px 4px;
+		padding: 3px 3px;
 		border: 1px solid #1a1a1a;
 		background: #fff;
 		color: #1a1a1a;
 		text-align: center;
-		font-size: 12px;
+		font-size: 10.5px;
 		font-weight: 700;
 	}
 
 	.items-table td {
-		height: 23px;
-		padding: 2px 5px;
+		height: 17px;
+		padding: 1px 4px;
 		border: 1px solid #8f9ba6;
 		vertical-align: middle;
-		font-size: 11.5px;
+		font-size: 10px;
 	}
 
 	.items-table tbody tr:nth-child(odd) td {
@@ -260,15 +267,15 @@
 	.thanks {
 		color: #2eae4e;
 		font-family: Cambria, Georgia, serif;
-		font-size: 15px;
+		font-size: 12.5px;
 		font-style: italic;
 		font-weight: 700;
 	}
 
 	.total-qty {
-		margin-top: 3px;
+		margin-top: 2px;
 		font-weight: 700;
-		font-size: 13px;
+		font-size: 11px;
 	}
 
 	.continued {
@@ -286,11 +293,11 @@
 		width: 100%;
 		border-collapse: collapse;
 		table-layout: fixed;
-		font-size: 12px;
+		font-size: 10.5px;
 	}
 
 	.summary-table td {
-		padding: 3px 5px;
+		padding: 2px 4px;
 		border: 1px solid #1a1a1a;
 	}
 
@@ -316,7 +323,7 @@
 
 	.grand-total td {
 		border: 1.4px solid #1a1a1a;
-		font-size: 13px;
+		font-size: 11.5px;
 	}
 
 	.signature-table {
@@ -332,7 +339,7 @@
 		font-family: Cambria, Georgia, serif;
 		font-style: italic;
 		font-weight: 700;
-		font-size: 13px;
+		font-size: 11px;
 	}
 
 	.copy-footer {
@@ -342,12 +349,12 @@
 		right: 0;
 		font-family: Cambria, Georgia, serif;
 		font-style: italic;
-		font-size: 10.5px;
+		font-size: 9px;
 		color: #333;
 		text-align: right;
 	}
 
-	.sheet-nologo .copy-footer { text-align: left; }
+	.invoice-copy.copy-left .copy-footer { text-align: left; }
 </style>
 
 {%- macro render_copy(page_items, page_index, page_number, page_is_last, with_logo) %}
@@ -358,14 +365,13 @@
 					{%- if with_logo -%}
 						<img src="__POKIZA_LOGO_SRC__" alt="Burxanov">
 					{%- else -%}
-						<div class="header-bar"></div>
+						&nbsp;
 					{%- endif -%}
 				</td>
 				<td class="header-date-cell">{{ doc.get_formatted("posting_date") }}</td>
 				<td class="header-title-cell">
 					<div class="doc-title">Накладная:</div>
 					<div class="doc-number">№ {{ doc.name.split("-")[-1].lstrip("0") or doc.name }}</div>
-					<div class="doc-id">{{ doc.name }}</div>
 				</td>
 			</tr>
 		</table>
@@ -454,18 +460,6 @@
 								<td class="summary-label">Итого:</td>
 								<td class="summary-value">{{ num(doc.total) }}</td>
 							</tr>
-							<tr>
-								<td class="summary-label">Скидка:</td>
-								<td class="summary-value">{{ num(discount_percent) }}%</td>
-							</tr>
-							<tr>
-								<td class="summary-label">Бонус:</td>
-								<td class="summary-value">{% if ns.bonus_amount %}{{ num(ns.bonus_amount) }}{% else %}-{% endif %}</td>
-							</tr>
-							<tr>
-								<td class="summary-label">Скидка сумма:</td>
-								<td class="summary-value">{% if discount_amount %}{{ num(discount_amount) }}{% else %}-{% endif %}</td>
-							</tr>
 							<tr class="summary-spacer"><td></td><td></td></tr>
 							<tr class="grand-total">
 								<td class="summary-label">ВСЕГО</td>
@@ -494,11 +488,11 @@
 	</div>
 {%- endmacro %}
 
-{%- for with_logo in [True, False] %}
-	{%- set copy_is_last = loop.last -%}
-	{%- for page_items in doc.items|batch(items_per_page, none) %}
-		<div class="sheet-page{% if not with_logo %} sheet-nologo{% endif %}{% if not (copy_is_last and loop.last) %} page-break-after{% endif %}">
-			{{ render_copy(page_items, loop.index0, loop.index, loop.last, with_logo) }}
+{%- for page_items in doc.items|batch(items_per_page, none) %}
+	<div class="sheet-page{% if not loop.last %} page-break-after{% endif %}">
+		<div class="copy-grid">
+			<div class="invoice-copy copy-left">{{ render_copy(page_items, loop.index0, loop.index, loop.last, False) }}</div>
+			<div class="invoice-copy copy-right">{{ render_copy(page_items, loop.index0, loop.index, loop.last, True) }}</div>
 		</div>
-	{%- endfor %}
+	</div>
 {%- endfor %}
