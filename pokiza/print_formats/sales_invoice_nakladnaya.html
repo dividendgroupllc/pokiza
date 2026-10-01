@@ -238,6 +238,14 @@
 		background: #e2efda;
 	}
 
+	/* jadval tagida jami kg — Кол-во ustuni ostida */
+	.items-table tr.jami-row td {
+		background: #fff !important;
+		border-top: 1.4px solid #1a1a1a;
+		font-weight: 700;
+		font-size: 11px;
+	}
+
 	.center { text-align: center; }
 
 	.number {
@@ -442,6 +450,16 @@
 						</tr>
 					{%- endif -%}
 				{%- endfor -%}
+			{%- if page_is_last -%}
+					<tr class="jami-row">
+						<td></td>
+						<td class="number">Итого:</td>
+						<td></td>
+						<td class="number">{{ qty(ns.total_qty) }}</td>
+						<td></td>
+						<td></td>
+					</tr>
+				{%- endif -%}
 			</tbody>
 		</table>
 
@@ -450,7 +468,6 @@
 				<td class="thanks-cell">
 					{%- if page_is_last -%}
 						<div class="thanks">Спасибо за ваш бизнес!</div>
-						<div class="total-qty">{{ qty(ns.total_qty) }} кг</div>
 					{%- else -%}
 						<div class="continued">Продолжение на следующей странице ({{ page_number }}/{{ page_count }})</div>
 					{%- endif -%}
@@ -458,13 +475,8 @@
 				<td class="summary-cell">
 					{%- if page_is_last -%}
 						<table class="summary-table">
-							<tr>
-								<td class="summary-label">Итого:</td>
-								<td class="summary-value">{{ num(doc.total) }}</td>
-							</tr>
-							<tr class="summary-spacer"><td></td><td></td></tr>
 							<tr class="grand-total">
-								<td class="summary-label">ВСЕГО</td>
+								<td class="summary-label">Итого:</td>
 								<td class="summary-value">{{ num(total_amount) }}</td>
 							</tr>
 						</table>
