@@ -9,9 +9,9 @@
 // Orqada: sarf = REJA bo'yicha (o'zgarmaydi), kirim = FAKT bo'yicha.
 //
 // 2026-10-01 (egasi talabi): fakt TO'LIQ yoziladi (brak ichida), brak esa
-// KUN OXIRIDA alohida «🗑 Brak vozvrat» oynasidan mahsulot kesimida
+// KUN OXIRIDA ALOHIDA SAHIFADA (/app/brak-vozvrat-sahifa) jadval bilan
 // qaytariladi — farshi norma (ГП) bo'lib omborga qaytadi, upakovkasi
-// rasxodga ketadi (hisob serverda: pokiza.api.navbat.brak_vozvrat).
+// rasxodga ketadi (server: pokiza.api.navbat.brak_vozvrat_toplu).
 
 frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
@@ -231,77 +231,8 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 		});
 	}
 
-	// ----- BRAK VOZVRAT OYNASI (kun oxirida) -----
-	function brakOyna() {
-		const d = new frappe.ui.Dialog({
-			title: __("🗑 Brak vozvrat (kun oxirida)"),
-			fields: [
-				{
-					fieldname: "item",
-					fieldtype: "Link",
-					label: __("Mahsulot"),
-					options: "Item",
-					reqd: 1,
-					get_query: () => ({ filters: { item_group: "Сотув махсулотлари" } }),
-				},
-				{
-					fieldname: "kg",
-					fieldtype: "Float",
-					label: __("Brak kg"),
-					reqd: 1,
-				},
-				{ fieldname: "royxat", fieldtype: "HTML" },
-			],
-			primary_action_label: __("Vozvrat qilish"),
-			primary_action(v) {
-				if (!v.item || flt(v.kg) <= 0) {
-					frappe.show_alert({ message: __("Mahsulot va kg kiriting"), indicator: "orange" });
-					return;
-				}
-				frappe
-					.call({
-						method: "pokiza.api.navbat.brak_vozvrat",
-						args: { item_code: v.item, kg: flt(v.kg) },
-					})
-					.then((res) => {
-						const m = res.message || {};
-						frappe.show_alert({
-							message: __("✓ Brak qaytdi: {0} — {1} kg (farsh: {2})", [
-								v.item, kg1(flt(v.kg)), m.norma || "-",
-							]),
-							indicator: "green",
-						});
-						d.set_value("item", "");
-						d.set_value("kg", null);
-						royxatYukla();
-					});
-			},
-		});
-		function royxatYukla() {
-			frappe
-				.call({ method: "pokiza.api.navbat.brak_royxat", args: {} })
-				.then((r) => {
-					const m = r.message || {};
-					const rows = (m.qatorlar || [])
-						.map(
-							(q) =>
-								`<tr><td>${frappe.utils.escape_html(q.item_code)}</td>
-								 <td class="text-muted">${frappe.utils.escape_html(q.norma || "-")}</td>
-								 <td style="text-align:right"><b>${kg1(q.kg)} kg</b></td></tr>`
-						)
-						.join("");
-					d.fields_dict.royxat.$wrapper.html(
-						rows
-							? `<div style="margin-top:8px"><b>${__("Bugungi vozvratlar")} (${__("jami")} ${kg1(m.jami)} kg):</b>
-								<table class="table table-sm" style="margin-top:4px">${rows}</table></div>`
-							: `<div class="text-muted" style="margin-top:8px">${__("Bugun hali vozvrat yo'q")}</div>`
-					);
-				});
-		}
-		royxatYukla();
-		d.show();
-	}
-	$nav.find(".tz-brak-oyna").on("click", brakOyna);
+	// Brak vozvrat — ALOHIDA sahifa (egasi talabi 2026-10-01: modal emas)
+	$nav.find(".tz-brak-oyna").on("click", () => frappe.set_route("brak-vozvrat-sahifa"));
 
 	frappe.realtime.on("navbat_update", () => yukla());
 	yukla();

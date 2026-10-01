@@ -1810,6 +1810,40 @@ def brak_vozvrat(item_code, kg):
 
 
 @frappe.whitelist()
+def brak_vozvrat_toplu(qatorlar):
+    """Kun oxiri brak jadvali (SAP scrap posting / Odoo scrap uslubi):
+    bitta oynada ko'p mahsulot [{item_code, kg}, ...], bitta Save.
+    Har qator MUSTAQIL o'tadi (savepoint) — bittasida xato (masalan qoldiq
+    yetmasa) qolganlari bekor bo'lmaydi, natijada qaysi qator o'tgani/
+    o'tmagani qaytariladi."""
+    _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI, _("Huquq yo'q"))
+    if isinstance(qatorlar, str):
+        import json
+        qatorlar = json.loads(qatorlar)
+
+    natijalar = []
+    for q in qatorlar or []:
+        item = (q.get("item_code") or "").strip()
+        kg = flt(q.get("kg"))
+        if not item or kg <= 0:
+            continue
+        sp = "brak_" + frappe.generate_hash(length=8)
+        frappe.db.savepoint(sp)
+        try:
+            r = brak_vozvrat(item, kg)
+            natijalar.append({"item_code": item, "kg": kg, "ok": True,
+                              "norma": r.get("norma"),
+                              "stock_entry": r.get("stock_entry")})
+        except Exception as e:
+            frappe.db.rollback(save_point=sp)
+            natijalar.append({"item_code": item, "kg": kg, "ok": False,
+                              "xato": str(e)})
+    return {"natijalar": natijalar,
+            "otdi": sum(1 for n in natijalar if n["ok"]),
+            "xato": sum(1 for n in natijalar if not n["ok"])}
+
+
+@frappe.whitelist()
 def brak_royxat(sana=None):
     """Kun bo'yicha yozilgan brak vozvratlar (terminal ro'yxati uchun)."""
     _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI, _("Huquq yo'q"))

@@ -53,10 +53,10 @@
 	.print-format {
 		orientation: Landscape;
 		page-size: A4;
-		margin-top: 6mm;
-		margin-bottom: 6mm;
-		margin-left: 6mm;
-		margin-right: 6mm;
+		margin-top: 5mm;
+		margin-bottom: 5mm;
+		margin-left: 5mm;
+		margin-right: 5mm;
 		padding: 0 !important;
 		width: 100% !important;
 		max-width: none !important;
@@ -70,8 +70,10 @@
 		box-sizing: border-box;
 	}
 
+	/* A4 landshaft 297mm − 2×5mm chekka = 287mm: varaq to'liq band,
+	   50/50 kataklar chegarasi aynan qog'oz o'rtasiga (148.5mm) tushadi */
 	.sheet-page {
-		width: 283mm;
+		width: 287mm;
 		position: relative;
 	}
 
@@ -103,7 +105,7 @@
 
 	.copy-inner {
 		position: relative;
-		min-height: 186mm;
+		min-height: 196mm;
 		padding-bottom: 16mm;
 	}
 
