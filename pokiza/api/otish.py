@@ -1,0 +1,246 @@
+"""SODDA REJIMGA O'TISH — Maintain Stock flip, PARTIYASIZ (2026-10-02).
+
+Egasi tasdiqlagan model: Maintain Stock + SKU BOM + mijoz kartasi +
+tannarx. Partiya/norma qatlami YOQILMAYDI (has_batch_no=0 qoladi).
+
+ERPNext `Item.cant_change` Maintain Stock'ni tasdiqlangan SO/Bundle/BOM
+borligi uchun bloklaydi — lekin asl himoya predmeti SLE (ombor harakati),
+u bu itemlarda NOL. Shuning uchun flip `db_set` bilan nazoratli chetlab
+o'tiladi; HECH QANDAY eski hujjat cancel qilinmaydi.
+
+Har SKU uchun shartlar: guruh sotuv, disabled emas, SLE=0, stock_uom kg.
+Flip: bundle disable → is_stock_item=1 → default sklad = ГП → reserved
+qayta hisob. Norma/retsept topilmasa flip BARIBIR bo'ladi (sotuvga
+to'siq emas), faqat ogohlantiriladi (ishlab chiqarish uchun BOM kerak).
+"""
+
+import frappe
+from frappe import _
+from frappe.utils import flt
+
+from pokiza.api.partiya import (
+    NORMA_GURUH, SOTUV_GURUH, asosiy_ombor, bom_yagona_gp, sku_bom,
+)
+
+KG_UOMS = ("кг", "Kg", "kg", "KG", "Кг")
+
+
+def _sku_audit(sku):
+    a = {"sku": sku, "tayyor": True, "sabablar": [], "ogohlar": []}
+    it = frappe.db.get_value(
+        "Item", sku,
+        ["item_group", "disabled", "is_stock_item", "has_batch_no", "stock_uom"],
+        as_dict=True,
+    )
+    if not it:
+        a["tayyor"] = False
+        a["sabablar"].append("item topilmadi")
+        return a
+    if it.item_group != SOTUV_GURUH:
+        a["tayyor"] = False
+        a["sabablar"].append("guruh noto'g'ri")
+    if it.disabled:
+        a["tayyor"] = False
+        a["sabablar"].append("item disabled")
+    if it.is_stock_item:
+        a["allaqachon"] = True
+        a["tayyor"] = False
+        a["sabablar"].append("allaqachon stock item")
+        if it.has_batch_no:
+            a["ogohlar"].append("DIQQAT: has_batch_no=1 — sodda rejimda bo'lmasligi kerak")
+        return a
+
+    sle = frappe.db.count("Stock Ledger Entry", {"item_code": sku, "is_cancelled": 0})
+    if sle:
+        a["tayyor"] = False
+        a["sabablar"].append("SLE bor (%d) — flip TAQIQLANADI" % sle)
+
+    if it.stock_uom not in KG_UOMS:
+        a["tayyor"] = False
+        a["sabablar"].append("stock_uom='%s' — kg emas, alohida qaror" % it.stock_uom)
+
+    # retsept manbai (faqat ogohlantirish — sotuvga to'siq emas)
+    if not sku_bom(sku):
+        bundle_gp = frappe.db.sql(
+            """
+            SELECT COUNT(DISTINCT pbi.item_code)
+            FROM `tabProduct Bundle` pb
+            JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+            JOIN `tabItem` i ON i.name = pbi.item_code
+            WHERE pb.new_item_code = %s AND i.item_group = %s
+            """,
+            (sku, NORMA_GURUH),
+        )[0][0]
+        if not bundle_gp:
+            a["ogohlar"].append("BOM ham, bundle normasi ham yo'q — ishlab chiqarib bo'lmaydi, BOM to'ldirilsin")
+        else:
+            a["ogohlar"].append("SKU BOM hali yo'q — retsept bundle'dan olinadi, BOM to'ldirilsin")
+    return a
+
+
+def _default_ombor_qoy(sku):
+    """Item default sklad = ГП (sotuv/zakaz qatorlariga avto tushadi)."""
+    wh = asosiy_ombor()
+    company = frappe.db.get_single_value("Global Defaults", "default_company")
+    it = frappe.get_doc("Item", sku)
+    qator = next((d for d in it.item_defaults if d.company == company), None)
+    if qator:
+        if qator.default_warehouse == wh:
+            return
+        qator.default_warehouse = wh
+    else:
+        it.append("item_defaults", {"company": company, "default_warehouse": wh})
+    it.flags.ignore_permissions = True
+    it.save()
+
+
+def _flip(sku):
+    for pb in frappe.get_all("Product Bundle",
+                             filters={"new_item_code": sku, "disabled": 0},
+                             pluck="name"):
+        frappe.db.set_value("Product Bundle", pb, "disabled", 1)
+
+    # cant_change ATAYIN chetlab o'tiladi — SLE=0 auditda tekshirilgan
+    frappe.db.set_value("Item", sku, {
+        "is_stock_item": 1,
+        "has_batch_no": 0,
+        "is_sales_item": 1,
+    }, update_modified=True)
+    frappe.clear_cache(doctype="Item")
+
+    _default_ombor_qoy(sku)
+
+    try:
+        from erpnext.stock.stock_balance import get_reserved_qty, update_bin_qty
+        wh = asosiy_ombor()
+        update_bin_qty(sku, wh, {"reserved_qty": get_reserved_qty(sku, wh)})
+    except Exception:
+        frappe.log_error(title="otish: reserved_qty", message=frappe.get_traceback())
+
+
+@frappe.whitelist()
+def ommaviy_audit():
+    """Quruq tekshiruv — hech narsa yozmaydi."""
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    natija = {"tayyor": [], "otkazilmaydi": [], "allaqachon": []}
+    for sku in frappe.get_all("Item", filters={"item_group": SOTUV_GURUH},
+                              order_by="name", pluck="name"):
+        a = _sku_audit(sku)
+        if a.get("allaqachon"):
+            natija["allaqachon"].append({"sku": sku, "ogohlar": a["ogohlar"]})
+        elif a["tayyor"]:
+            natija["tayyor"].append({"sku": sku, "ogohlar": a["ogohlar"]})
+        else:
+            natija["otkazilmaydi"].append({"sku": sku, "sabablar": a["sabablar"]})
+    natija["jami"] = {k: len(v) for k, v in natija.items() if isinstance(v, list)}
+    return natija
+
+
+@frappe.whitelist()
+def ommaviy_otkaz(tasdiq=None):
+    """Auditdan TAYYOR chiqqanlarni flip qiladi (har biri savepoint'da).
+    tasdiq='OTKAZ' shart."""
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    if tasdiq != "OTKAZ":
+        frappe.throw(_("tasdiq='OTKAZ' yuboring"))
+
+    natija = {"otkazildi": [], "xato": [], "otkazilmaydi": 0, "allaqachon": 0}
+    for sku in frappe.get_all("Item", filters={"item_group": SOTUV_GURUH},
+                              order_by="name", pluck="name"):
+        a = _sku_audit(sku)
+        if a.get("allaqachon"):
+            natija["allaqachon"] += 1
+            continue
+        if not a["tayyor"]:
+            natija["otkazilmaydi"] += 1
+            continue
+        try:
+            frappe.db.savepoint("flip_sku")
+            _flip(sku)
+            natija["otkazildi"].append(sku)
+        except Exception:
+            frappe.db.rollback(save_point="flip_sku")
+            natija["xato"].append({"sku": sku, "xato": frappe.get_traceback()[-250:]})
+    frappe.clear_cache(doctype="Item")
+    natija["jami"] = {"otkazildi": len(natija["otkazildi"]),
+                      "xato": len(natija["xato"]),
+                      "otkazilmaydi": natija["otkazilmaydi"],
+                      "allaqachon": natija["allaqachon"]}
+    return natija
+
+
+@frappe.whitelist()
+def lokal_batch_tozalash(tasdiq=None):
+    """FAQAT SINOV SAYTI uchun: avvalgi partiya-sinovlari izini tozalaydi —
+    partiyaga tegishli SI/SE'lar bekor qilinadi, partiyalar o'chiriladi,
+    has_batch_no=0 qilinadi. Jonlida ishlatilmaydi (u yerda partiya yo'q).
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    if tasdiq != "TOZALA":
+        frappe.throw(_("tasdiq='TOZALA' yuboring"))
+
+    natija = {"si_bekor": [], "se_bekor": [], "batch_ochirildi": 0,
+              "has_batch_oчирildi": 0, "xato": []}
+
+    # 1) partiyali SLE'ga ega hujjatlar — avval SI, keyin SE bekor
+    hujjatlar = frappe.db.sql(
+        """
+        SELECT DISTINCT sle.voucher_type, sle.voucher_no
+        FROM `tabStock Ledger Entry` sle
+        JOIN `tabItem` i ON i.name = sle.item_code
+        WHERE i.item_group = %s AND sle.is_cancelled = 0
+        """,
+        SOTUV_GURUH, as_dict=True,
+    )
+    for turi in ("Sales Invoice", "Stock Entry"):
+        for h in [x for x in hujjatlar if x.voucher_type == turi]:
+            try:
+                d = frappe.get_doc(turi, h.voucher_no)
+                if d.docstatus == 1:
+                    # PE'ga bog'langan SE bo'lsa PE orqali bekor qilinadi
+                    if turi == "Stock Entry" and d.get("custom_production_entry"):
+                        pe = frappe.get_doc("Production Entry",
+                                            d.custom_production_entry)
+                        pe.cancel()
+                    else:
+                        d.cancel()
+                    natija["se_bekor" if turi == "Stock Entry" else "si_bekor"]\
+                        .append(h.voucher_no)
+            except Exception:
+                natija["xato"].append({"hujjat": h.voucher_no,
+                                       "xato": frappe.get_traceback()[-200:]})
+
+    # 2) partiyalarni o'chirish
+    for b in frappe.get_all("Batch", pluck="name"):
+        try:
+            frappe.delete_doc("Batch", b, ignore_permissions=True, force=True)
+            natija["batch_ochirildi"] += 1
+        except Exception:
+            natija["xato"].append({"hujjat": b,
+                                   "xato": frappe.get_traceback()[-200:]})
+
+    # 3) has_batch_no=0 (SLE'lar endi bekor — xavfsiz)
+    skular = frappe.get_all("Item", filters={
+        "item_group": SOTUV_GURUH, "has_batch_no": 1}, pluck="name")
+    for sku in skular:
+        frappe.db.set_value("Item", sku, {"has_batch_no": 0},
+                            update_modified=False)
+    natija["has_batch_oчирildi"] = len(skular)
+    frappe.clear_cache(doctype="Item")
+    return natija
+
+
+@frappe.whitelist()
+def default_ombor_backfill():
+    """Barcha stock sotuv itemlarga default sklad = ГП."""
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    n = 0
+    for sku in frappe.get_all("Item", filters={
+        "item_group": SOTUV_GURUH, "is_stock_item": 1}, pluck="name"):
+        _default_ombor_qoy(sku)
+        n += 1
+    return {"yangilandi": n}

@@ -110,9 +110,40 @@ def bundle_normasi(sku):
 
 @frappe.whitelist()
 def tannarx_hisobla(sku, norma=None):
-    """1 kg tannarx = farsh (norma BOM) + upakovka (bundle). Izoh bilan."""
+    """1 kg tannarx.
+
+    ASOSIY MANBA (egasi 2026-10-02): SKU'ning O'Z BOM'i — har qatori
+    hozirgi sklad narxida: ГП (farsh) qatori o'z retsepti (BOM'i) orqali,
+    qolganlari to'g'ridan-to'g'ri. SKU BOM'i bo'lmasa — eski usul:
+    norma BOM (farsh) + bundle (upakovka)."""
     if not frappe.has_permission("Item", "read"):
         frappe.throw(_("Huquq yo'q"))
+
+    from pokiza.api.partiya import sku_bom
+    b = sku_bom(sku) if sku else None
+    if b:
+        q = flt(b.quantity) or 1.0
+        farsh = upakovka = 0.0
+        for r in frappe.db.sql(
+            """
+            SELECT bi.item_code, SUM(bi.qty) qty, i.item_group
+            FROM `tabBOM Item` bi JOIN `tabItem` i ON i.name = bi.item_code
+            WHERE bi.parent = %s GROUP BY bi.item_code
+            """,
+            b.name, as_dict=True,
+        ):
+            if r.item_group == NORMA_GURUH:
+                narx = _norma_farsh_narxi(r.item_code) or _item_narxi(r.item_code)
+                farsh += flt(r.qty) / q * narx
+            else:
+                upakovka += flt(r.qty) / q * _item_narxi(r.item_code)
+        return {
+            "tannarx": farsh + upakovka,
+            "farsh": farsh,
+            "upakovka": upakovka,
+            "izoh": "SKU BOM: farsh %s, upakovka %s" % (
+                fmt_money(farsh, 0), fmt_money(upakovka, 0)),
+        }
 
     farsh = _norma_farsh_narxi(norma)
     upakovka = _upakovka_narxi(sku) if sku else 0.0

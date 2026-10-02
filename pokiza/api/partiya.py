@@ -23,9 +23,59 @@ NORMA_GURUH = "Готовый продукт"
 
 
 def asosiy_ombor():
+    """TAYYOR mahsulot ombori: nomida ГП bo'lgani, bo'lmasa birinchisi."""
     return frappe.db.get_value(
+        "Warehouse", {"is_group": 0, "disabled": 0, "name": ("like", "%ГП%")}, "name"
+    ) or frappe.db.get_value(
         "Warehouse", {"is_group": 0, "disabled": 0}, "name"
     )
+
+
+def syryo_ombor():
+    """Xom ashyo/sarf ombori: nomida сырь bo'lgani, bo'lmasa birinchisi."""
+    return frappe.db.get_value(
+        "Warehouse", {"is_group": 0, "disabled": 0, "name": ("like", "%сырь%")}, "name"
+    ) or frappe.db.get_value(
+        "Warehouse", {"is_group": 0, "disabled": 0}, "name"
+    )
+
+
+def stock_rejimda(item_code):
+    """SODDA REJIM belgisi (2026-10-02, egasi: «Maintain Stock + BOM +
+    karta + tannarx»): sotuv itemi ombor yuritadimi — shu yetarli.
+    Partiya/norma qatlami ishlatilmaydi (has_batch_no=0)."""
+    return bool(frappe.get_cached_value("Item", item_code, "is_stock_item"))
+
+
+def sku_bom(sku):
+    """SKU'ning o'z BOM'i (bundle o'rnini bosuvchi retsept, UI'da
+    to'ldiriladi): aktiv+default → aktiv → istalgan submitted."""
+    return frappe.db.get_value(
+        "BOM", {"item": sku, "docstatus": 1, "is_active": 1, "is_default": 1},
+        ["name", "quantity"], as_dict=True,
+    ) or frappe.db.get_value(
+        "BOM", {"item": sku, "docstatus": 1, "is_active": 1},
+        ["name", "quantity"], as_dict=True, order_by="modified desc",
+    ) or frappe.db.get_value(
+        "BOM", {"item": sku, "docstatus": 1},
+        ["name", "quantity"], as_dict=True, order_by="modified desc",
+    )
+
+
+def bom_yagona_gp(sku):
+    """SKU BOM'idagi yagona ГП (farsh) qatori — retsept normasi."""
+    b = sku_bom(sku)
+    if not b:
+        return None
+    gplar = frappe.db.sql(
+        """
+        SELECT DISTINCT bi.item_code FROM `tabBOM Item` bi
+        JOIN `tabItem` i ON i.name = bi.item_code
+        WHERE bi.parent = %s AND i.item_group = %s
+        """,
+        (b.name, NORMA_GURUH),
+    )
+    return gplar[0][0] if len(gplar) == 1 else None
 
 
 def partiya_rejimda(item_code):
@@ -81,7 +131,29 @@ def norma_qoldiqlar(sku, warehouse=None):
 
 
 def pasport_qatorlari(sku):
-    """SKU pasportidagi materiallar: [{item, qty}] (1 kg uchun)."""
+    """SKU'ning 1 kg uchun upakovka/sarf materiallari: [{item, qty}].
+
+    MANBA (egasi 2026-10-02, «bundle'dan kechib BOM'da»): SKU'ning o'z
+    BOM'idagi ГП bo'lmagan qatorlar; BOM bo'lmasa — SKU Pasporti
+    (bundle'dan ko'chma). Farsh (ГП) qatori kirmaydi — u norma BOM'iga
+    portlatiladi."""
+    b = sku_bom(sku)
+    if b:
+        q = flt(b.quantity) or 1.0
+        rows = [
+            frappe._dict({"item": r[0], "qty": flt(r[1]) / q})
+            for r in frappe.db.sql(
+                """
+                SELECT bi.item_code, SUM(bi.qty) FROM `tabBOM Item` bi
+                JOIN `tabItem` i ON i.name = bi.item_code
+                WHERE bi.parent = %s AND i.item_group != %s
+                GROUP BY bi.item_code
+                """,
+                (b.name, NORMA_GURUH),
+            )
+        ]
+        if rows:
+            return rows
     nomi = frappe.db.get_value("SKU Pasporti", {"sku": sku})
     if not nomi:
         return []

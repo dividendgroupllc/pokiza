@@ -146,7 +146,14 @@ class ProductionEntry(Document):
         sku_rejim = bool(self.sku_item)
 
         se = frappe.new_doc("Stock Entry")
-        se.stock_entry_type = "Repack" if sku_rejim else "Manufacture"
+        # Har doim Manufacture: Repack'da ERPNext barcha kirim qatorlarni
+        # majburan finished deb belgilab (mark_finished_and_scrap_items),
+        # brak-scrap qatorlari «ikkinchi tayyor mahsulot»ga aylanib,
+        # ko'p-FG taqig'iga urilardi. Manufacture'da bizning
+        # is_finished/is_scrap belgilarimiz saqlanadi, scrap qiymati
+        # standart hisoblanadi. SKU rejimda SE'ga bom yozilmaydi
+        # (tayyor mahsulot BOM itemidan farq qiladi).
+        se.stock_entry_type = "Manufacture"
         se.posting_date = self.posting_date
         se.posting_time = self.posting_time
         se.set_posting_time = 1
@@ -179,7 +186,10 @@ class ProductionEntry(Document):
             "stock_uom": frappe.get_cached_value("Item", fg_item, "stock_uom"),
             "conversion_factor": 1
         }
-        if sku_rejim:
+        # SODDA REJIM (2026-10-02): partiya faqat itemda has_batch_no
+        # yoqilgan bo'lsagina qo'yiladi — hozirgi modelda yoqilmaydi,
+        # SKU oddiy qoldiq bo'lib kiradi
+        if sku_rejim and frappe.get_cached_value("Item", fg_item, "has_batch_no"):
             from pokiza.api.partiya import partiya_ol
             fg_row.update({
                 "use_serial_batch_fields": 1,

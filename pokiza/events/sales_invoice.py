@@ -100,8 +100,20 @@ def _kartochka_muzlat_va_stop(doc) -> None:
     """
     from pokiza.api.kartochka import aktiv_map
     from pokiza.api.partiya import (
-        norma_qoldiqlar, partiya_ol, partiya_qoldiq, partiya_rejimda,
+        asosiy_ombor, norma_qoldiqlar, partiya_ol, partiya_qoldiq,
+        partiya_rejimda, stock_rejimda,
     )
+
+    # SODDA REJIM (2026-10-02): ombor yuritadigan sotuv mahsuloti DOIM
+    # tayyor (ГП) skladdan sotiladi — Stock Settings'dagi umumiy default
+    # (сырьё) set_warehouse orqali qatorni bosib ketmasin. Bu kartochkaga
+    # bog'liq emas, har qanday mijozga amal qiladi.
+    gp_sklad = None
+    for row in doc.get("items") or []:
+        if row.item_code and stock_rejimda(row.item_code) and \
+                frappe.get_cached_value("Item", row.item_code, "item_group") == NARX_GURUHI:
+            gp_sklad = gp_sklad or asosiy_ombor()
+            row.warehouse = gp_sklad
 
     karta = aktiv_map(doc.customer)
     if not karta:
@@ -113,9 +125,18 @@ def _kartochka_muzlat_va_stop(doc) -> None:
     for row in doc.get("items") or []:
         k = karta.get(row.item_code)
         if k:
-            # --- muzlatish (partiya rejimidan qat'i nazar)
+            # --- muzlatish (marja hisoboti uchun)
             row.custom_norma = k.norma
-            row.custom_tannarx_kg = flt(k.tannarx)
+            tannarx = flt(k.tannarx)
+            if not tannarx:
+                # karta qatorida tannarx saqlanmagan (qo'lda kiritilgan
+                # qator) — jonli hisobdan olinadi
+                from pokiza.api.kartochka import tannarx_hisobla
+                try:
+                    tannarx = flt(tannarx_hisobla(row.item_code, k.norma)["tannarx"])
+                except Exception:
+                    tannarx = 0
+            row.custom_tannarx_kg = tannarx
             row.custom_bonus_foiz_qator = flt(
                 k.bonus_foiz if flt(k.bonus_foiz) else k.umumiy_bonus
             )

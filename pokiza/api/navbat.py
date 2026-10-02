@@ -1193,21 +1193,31 @@ def _pe_qoralama_yarat(qator, fakt_kg, brak_kg=0):
         if karta_norma:
             gps = [{"gp": karta_norma, "kg_per_unit": 1.0}]
 
-    # Faza 3: SKU partiya rejimida bo'lsa PE ombor kirimini SKU'ga
-    # (SKU, norma) partiyasi bilan yozadi, jadvalga pasport upakovkasi
-    # ham qo'shiladi
-    from pokiza.api.partiya import partiya_rejimda, pasport_qatorlari
-    sku_rejim = bool(karta_norma) and partiya_rejimda(qator.item_code)
+    # SODDA REJIM (egasi 2026-10-02): sotuv itemi ombor yuritsa, PE tayyor
+    # kirimni SKU'ning O'ZIGA yozadi (partiyasiz) — sarf esa norma BOM'i
+    # (syryo) + SKU retsepti (BOM/pasport upakovkasi) bo'yicha
+    from pokiza.api.partiya import (
+        asosiy_ombor, bom_yagona_gp, pasport_qatorlari, stock_rejimda,
+        syryo_ombor,
+    )
+    sku_rejim = stock_rejimda(qator.item_code)
+
+    # stock-itemda norma topilmasa SKU BOM'idagi yagona ГП ham urinadi
+    if sku_rejim and len(gps) != 1:
+        bom_gp = bom_yagona_gp(qator.item_code)
+        if bom_gp:
+            gps = [{"gp": bom_gp, "kg_per_unit": 1.0}]
 
     jami_u = sum(flt(g["kg_per_unit"]) for g in gps)
     if not gps or jami_u <= EPS:
         return [], _("{0} — retsepti (to'plamdagi tayyor mahsulot) topilmadi, "
                      "ombor kirimini qo'lda yozing").format(qator.item_code)
+    if sku_rejim and len(gps) != 1:
+        return [], _("{0} — bir nechta norma, retsept aniqlanmadi; "
+                     "ombor kirimini qo'lda yozing").format(qator.item_code)
 
-    wh = frappe.db.get_value(
-        "Production Entry", {"docstatus": 1}, "target_warehouse",
-        order_by="creation desc",
-    ) or frappe.db.get_value("Warehouse", {"is_group": 0, "disabled": 0}, "name")
+    wh = syryo_ombor()                                  # sarf manbai
+    wh_fg = asosiy_ombor() if sku_rejim else wh          # tayyor kirim
     company = frappe.db.get_single_value("Global Defaults", "default_company")
 
     yaratildi, ogohlantirish = [], []
@@ -1253,7 +1263,7 @@ def _pe_qoralama_yarat(qator, fakt_kg, brak_kg=0):
             "reja_kg": flt(gp_reja, 2),
             "qty_to_manufacture": flt(gp_fakt, 2),
             "brak_kg": flt(gp_brak, 2),
-            "target_warehouse": wh,
+            "target_warehouse": wh_fg,
             "items": items,
             "sales_order": qator.parent,
             "so_item": qator.name,
@@ -1292,7 +1302,10 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
     from pokiza.pokiza_for_business.doctype.production_entry.production_entry import (
         get_bom_for_item, get_bom_items,
     )
-    from pokiza.api.partiya import partiya_rejimda, pasport_qatorlari
+    from pokiza.api.partiya import (
+        asosiy_ombor, bom_yagona_gp, pasport_qatorlari, stock_rejimda,
+        syryo_ombor,
+    )
 
     for eski in frappe.get_all(
         "Production Entry",
@@ -1302,7 +1315,7 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
         frappe.delete_doc("Production Entry", eski,
                           ignore_permissions=True, force=True)
 
-    norma = _zapas_norma(qator.item_code)
+    norma = _zapas_norma(qator.item_code) or bom_yagona_gp(qator.item_code)
     if not norma:
         return [], _("{0} — normasi aniqlanmadi (bundle'da yagona ГП yo'q), "
                      "ombor kirimini qo'lda yozing").format(qator.item_code)
@@ -1315,10 +1328,9 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
     if reja_kg <= EPS:
         reja_kg = flt(fakt_kg)
 
-    wh = frappe.db.get_value(
-        "Production Entry", {"docstatus": 1}, "target_warehouse",
-        order_by="creation desc",
-    ) or frappe.db.get_value("Warehouse", {"is_group": 0, "disabled": 0}, "name")
+    wh = syryo_ombor()
+    sku_rejim = stock_rejimda(qator.item_code)
+    wh_fg = asosiy_ombor() if sku_rejim else wh
 
     items = [
         i for i in get_bom_items(bom, reja_kg, source_warehouse=wh)
@@ -1326,8 +1338,6 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
     ]
     if not items:
         return [], _("{0} — BOM bo'sh, ombor kirimini qo'lda yozing").format(norma)
-
-    sku_rejim = partiya_rejimda(qator.item_code)
     if sku_rejim:
         for p in pasport_qatorlari(qator.item_code):
             if flt(p.qty) * reja_kg > EPS:
@@ -1349,7 +1359,7 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
         "reja_kg": flt(reja_kg, 2),
         "qty_to_manufacture": flt(fakt_kg, 2),
         "brak_kg": flt(brak_kg, 2),
-        "target_warehouse": wh,
+        "target_warehouse": wh_fg,
         "items": items,
         "material_request": qator.parent,
         "so_item": qator.name,
