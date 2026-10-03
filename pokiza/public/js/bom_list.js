@@ -8,7 +8,7 @@ frappe.listview_settings["BOM"] = frappe.listview_settings["BOM"] || {};
 	s.add_fields = [...new Set([...eski_fields, "custom_sotuv_sku", "is_active", "is_default"])];
 
 	s.get_indicator = function (doc) {
-		if (doc.custom_sotuv_sku) {
+		if (doc.custom_sotuv_sku && doc.is_active) {
 			return [__("🛒 Sotuv SKU"), "purple", "custom_sotuv_sku,=,1"];
 		}
 		if (doc.is_default) {

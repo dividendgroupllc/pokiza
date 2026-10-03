@@ -320,3 +320,111 @@ def default_ombor_backfill():
         _default_ombor_qoy(sku)
         n += 1
     return {"yangilandi": n}
+
+
+@frappe.whitelist()
+def eski_bom_almashtir(tasdiq=None):
+    """Eski QO'LDA yasalgan xomashyo-BOM'larni bundle'dan yangilash.
+
+    Muammo (egasi 2026-10-03): ba'zi sotuv SKU'larda (asosan «Ак.»
+    to'plamlar) eskidan to'liq xomashyo retsepti yozilgan BOM bor —
+    ichida farsh (ГП) ham, upakovka ham yo'q. To'g'ri tarkib: bundle'dagi
+    kabi farsh ГП qatorlari + upakovka. Tannarx ham sku_bom orqali shu
+    eski BOM'dan noto'g'ri hisoblanadi.
+
+    Qoidalar:
+      - nomzod: aktiv submitted BOM'ida ГП qatori umuman yo'q, YOKI
+        upakovka qatori yo'q (bundle'da esa bor) — ikkala holatda ham
+        bundle'ida ГП bo'lishi shart;
+      - eski BOM'lar CANCEL QILINMAYDI (tarixiy SE'lar bog'langan) —
+        faqat is_active=0, is_default=0 qilinadi;
+      - yangi BOM bundle qatorlaridan (1 birlik uchun), aktiv+default.
+    tasdiq='ALMASHTIR' shart; tasdiqsiz quruq ro'yxat.
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    quruq = tasdiq != "ALMASHTIR"
+
+    nomzodlar = frappe.db.sql(
+        """
+        SELECT b.item sku, b.name bom
+        FROM `tabBOM` b
+        JOIN `tabItem` s ON s.name = b.item AND s.item_group = %s
+        WHERE b.docstatus = 1 AND b.is_active = 1
+          AND (
+            -- ГП qatori umuman yo'q (sof xomashyo retsepti)
+            NOT EXISTS (
+              SELECT 1 FROM `tabBOM Item` bi
+              JOIN `tabItem` i ON i.name = bi.item_code
+              WHERE bi.parent = b.name AND i.item_group = %s)
+            -- yoki upakovkasiz (bundle'da upakovka bor)
+            OR (NOT EXISTS (
+                  SELECT 1 FROM `tabBOM Item` bi
+                  JOIN `tabItem` i ON i.name = bi.item_code
+                  WHERE bi.parent = b.name AND i.item_group = 'Упаковка')
+                AND EXISTS (
+                  SELECT 1 FROM `tabProduct Bundle` pb
+                  JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+                  JOIN `tabItem` i ON i.name = pbi.item_code
+                  WHERE pb.new_item_code = b.item
+                    AND i.item_group = 'Упаковка'))
+          )
+          AND EXISTS (
+            SELECT 1 FROM `tabProduct Bundle` pb
+            JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+            JOIN `tabItem` i ON i.name = pbi.item_code
+            WHERE pb.new_item_code = b.item AND i.item_group = %s)
+        ORDER BY b.item
+        """,
+        (SOTUV_GURUH, NORMA_GURUH, NORMA_GURUH), as_dict=True,
+    )
+    natija = {"almashdi": [], "xato": [], "quruq": quruq,
+              "nomzodlar": [n.sku for n in nomzodlar]}
+    if quruq:
+        return natija
+
+    for n in nomzodlar:
+        try:
+            frappe.db.savepoint("bom_almash")
+            # SKU'ning BARCHA submitted BOM'lari noaktiv qilinadi
+            for eski in frappe.get_all("BOM", filters={
+                    "item": n.sku, "docstatus": 1}, pluck="name"):
+                frappe.db.set_value(
+                    "BOM", eski, {"is_active": 0, "is_default": 0},
+                    update_modified=False)
+            qatorlar = frappe.db.sql(
+                """
+                SELECT pbi.item_code, SUM(pbi.qty) qty
+                FROM `tabProduct Bundle` pb
+                JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+                WHERE pb.new_item_code = %s
+                GROUP BY pbi.item_code
+                """,
+                n.sku, as_dict=True,
+            )
+            bom = frappe.get_doc({
+                "doctype": "BOM",
+                "item": n.sku,
+                "quantity": 1,
+                "is_active": 1,
+                "is_default": 1,
+                "rm_cost_as_per": "Valuation Rate",
+                "company": frappe.db.get_single_value(
+                    "Global Defaults", "default_company"),
+                "items": [
+                    {"item_code": q.item_code, "qty": flt(q.qty)}
+                    for q in qatorlar if flt(q.qty) > 0
+                ],
+            })
+            bom.flags.ignore_permissions = True
+            bom.insert()
+            bom.submit()
+            natija["almashdi"].append({"sku": n.sku, "eski": n.bom,
+                                       "yangi": bom.name})
+        except Exception:
+            frappe.db.rollback(save_point="bom_almash")
+            natija["xato"].append({"sku": n.sku,
+                                   "xato": frappe.get_traceback()[-250:]})
+    natija["jami"] = {"almashdi": len(natija["almashdi"]),
+                      "xato": len(natija["xato"])}
+    return natija
