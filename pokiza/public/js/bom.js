@@ -30,6 +30,9 @@ frappe.ui.form.on("BOM Item", {
 });
 
 function hisoblaSarfJami(frm) {
+    // FAQAT qoralamada: submit'dan keyin qayta hisoblash JS float dumi
+    // tufayli "Cannot Update After Submit" xatosiga olib keladi
+    if (frm.doc.docstatus !== 0) return;
     let soni = 0;
     let summa = 0;
     (frm.doc.items || []).forEach((d) => {
@@ -45,7 +48,8 @@ function setBomItemQuery(frm) {
         return {
             filters: {
                 disabled: 0,
-                item_group: BOM_FINISHED_GOODS_ITEM_GROUP,
+                // farsh BOM'lari + sotuv SKU BOM'lari (sodda rejim 2026-10)
+                item_group: ["in", [BOM_FINISHED_GOODS_ITEM_GROUP, "Сотув махсулотлари"]],
             },
         };
     });
