@@ -428,3 +428,78 @@ def eski_bom_almashtir(tasdiq=None):
     natija["jami"] = {"almashdi": len(natija["almashdi"]),
                       "xato": len(natija["xato"])}
     return natija
+
+
+@frappe.whitelist()
+def bom_yarat_sht(tasdiq=None):
+    """шт NABORLARGA bundle'dan BOM yaratish (egasi 2026-10-03).
+
+    UI stock bo'lmagan itemga BOM ochtirmaydi; bu naborlar esa hali eski
+    (bundle) usulda sotiladi — Maintain Stock YOQILMAYDI. BOM faqat
+    kartochkadagi tannarx/norma uchun kerak, server yo'li bilan yaratiladi.
+
+    Nomzod: sotuv guruhidagi stock BO'LMAGAN, disabled emas, submitted
+    BOM'i yo'q, bundle'ida ГП bor itemlar. tasdiq='YARAT' shart.
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    quruq = tasdiq != "YARAT"
+
+    nomzodlar = frappe.db.sql(
+        """
+        SELECT DISTINCT pb.new_item_code sku
+        FROM `tabProduct Bundle` pb
+        JOIN `tabItem` s ON s.name = pb.new_item_code
+          AND s.item_group = %s AND s.disabled = 0 AND s.is_stock_item = 0
+        JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+        JOIN `tabItem` i ON i.name = pbi.item_code AND i.item_group = %s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM `tabBOM` b
+            WHERE b.item = pb.new_item_code AND b.docstatus = 1)
+        ORDER BY sku
+        """,
+        (SOTUV_GURUH, NORMA_GURUH), as_dict=True,
+    )
+    natija = {"yaratildi": [], "xato": [], "quruq": quruq,
+              "nomzodlar": [n.sku for n in nomzodlar]}
+    if quruq:
+        return natija
+
+    for n in nomzodlar:
+        try:
+            frappe.db.savepoint("bom_sht")
+            qatorlar = frappe.db.sql(
+                """
+                SELECT pbi.item_code, SUM(pbi.qty) qty
+                FROM `tabProduct Bundle` pb
+                JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+                WHERE pb.new_item_code = %s
+                GROUP BY pbi.item_code
+                """,
+                n.sku, as_dict=True,
+            )
+            bom = frappe.get_doc({
+                "doctype": "BOM",
+                "item": n.sku,
+                "quantity": 1,
+                "is_active": 1,
+                "is_default": 1,
+                "rm_cost_as_per": "Valuation Rate",
+                "company": frappe.db.get_single_value(
+                    "Global Defaults", "default_company"),
+                "items": [
+                    {"item_code": q.item_code, "qty": flt(q.qty)}
+                    for q in qatorlar if flt(q.qty) > 0
+                ],
+            })
+            bom.flags.ignore_permissions = True
+            bom.insert()
+            bom.submit()
+            natija["yaratildi"].append({"sku": n.sku, "bom": bom.name})
+        except Exception:
+            frappe.db.rollback(save_point="bom_sht")
+            natija["xato"].append({"sku": n.sku,
+                                   "xato": frappe.get_traceback()[-250:]})
+    natija["jami"] = {"yaratildi": len(natija["yaratildi"]),
+                      "xato": len(natija["xato"])}
+    return natija
