@@ -39,8 +39,10 @@ function hisoblaSarfJami(frm) {
         soni += flt(d.qty);
         summa += flt(d.amount);
     });
-    frm.set_value("custom_sarf_jami_soni", soni);
-    frm.set_value("custom_sarf_jami_summa", summa);
+    // server (events/bom.py) bilan BIR XIL yaxlitlash — aks holda forma
+    // har ochilganda "Not Saved" bo'lib, Submit tugmasi chiqmay qoladi
+    frm.set_value("custom_sarf_jami_soni", flt(soni, 6));
+    frm.set_value("custom_sarf_jami_summa", flt(summa, 2));
 }
 
 function setBomItemQuery(frm) {
