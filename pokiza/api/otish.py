@@ -438,8 +438,9 @@ def bom_yarat_sht(tasdiq=None):
     (bundle) usulda sotiladi — Maintain Stock YOQILMAYDI. BOM faqat
     kartochkadagi tannarx/norma uchun kerak, server yo'li bilan yaratiladi.
 
-    Nomzod: sotuv guruhidagi stock BO'LMAGAN, disabled emas, submitted
-    BOM'i yo'q, bundle'ida ГП bor itemlar. tasdiq='YARAT' shart.
+    Nomzod: sotuv guruhidagi stock BO'LMAGAN, disabled emas, AKTIV
+    submitted BOM'i yo'q (eski noaktiv BOM bo'lsa ham mayli — WELMAR,
+    Говядина kabi), bundle'ida ГП bor itemlar. tasdiq='YARAT' shart.
     """
     if "System Manager" not in frappe.get_roles():
         frappe.throw(_("Huquq yo'q"))
@@ -455,7 +456,8 @@ def bom_yarat_sht(tasdiq=None):
         JOIN `tabItem` i ON i.name = pbi.item_code AND i.item_group = %s
         WHERE NOT EXISTS (
             SELECT 1 FROM `tabBOM` b
-            WHERE b.item = pb.new_item_code AND b.docstatus = 1)
+            WHERE b.item = pb.new_item_code AND b.docstatus = 1
+              AND b.is_active = 1)
         ORDER BY sku
         """,
         (SOTUV_GURUH, NORMA_GURUH), as_dict=True,
@@ -501,5 +503,70 @@ def bom_yarat_sht(tasdiq=None):
             natija["xato"].append({"sku": n.sku,
                                    "xato": frappe.get_traceback()[-250:]})
     natija["jami"] = {"yaratildi": len(natija["yaratildi"]),
+                      "xato": len(natija["xato"])}
+    return natija
+
+
+@frappe.whitelist()
+def nabor_otkaz(tasdiq=None, faqat=None):
+    """шт NABORLARNI to'liq stock modelga o'tkazish (egasi 2026-10-03:
+    «ularni ham bomda ishlatmoqchimiz»).
+
+    kg-flip'dan farqi: stock_uom шт bo'lishiga ruxsat. Qolgan tartib
+    bir xil: bundle disable -> is_stock_item=1 -> default sklad ГП ->
+    reserved qayta hisob.
+
+    XAVFSIZLIK SHARTLARI (har biri majburiy):
+      - sotuv guruhi, item disabled emas, hali stock emas, SLE=0;
+      - submitted AKTIV BOM bo'lishi SHART (flip'dan keyin sotuv faqat
+        skladdan bo'ladi — retseptsiz ishlab chiqarib bo'lmaydi).
+    DIQQAT: flip'dan keyin darhol 29.09 kirim (SE/SR) kiritilishi kerak,
+    aks holda nabor sotuvi skladda qoldiq yo'qligidan to'xtaydi.
+
+    faqat — vergul bilan nom bo'laklari: faqat shu bo'laklardan biri
+    QATNASHGAN nomlar olinadi (masalan faqat='Ак.,КО 6,КС').
+    Bo'sh qoldirilsa HAMMA mos item nomzod bo'ladi (WELMAR, Тушеный ham) —
+    ehtiyot bo'ling. tasdiq='NABOR' shart; tasdiqsiz quruq ro'yxat.
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    quruq = tasdiq != "NABOR"
+    bolaklar = [b.strip() for b in (faqat or "").split(",") if b.strip()]
+
+    nomzodlar = []
+    otkazilmaydi = []
+    for sku in frappe.get_all("Item", filters={
+        "item_group": SOTUV_GURUH, "disabled": 0, "is_stock_item": 0,
+    }, order_by="name", pluck="name"):
+        if bolaklar and not any(b in sku for b in bolaklar):
+            continue
+        sabablar = []
+        if frappe.db.count("Stock Ledger Entry",
+                           {"item_code": sku, "is_cancelled": 0}):
+            sabablar.append("SLE bor")
+        if not frappe.db.exists("BOM", {"item": sku, "docstatus": 1,
+                                        "is_active": 1}):
+            sabablar.append("aktiv BOM yo'q")
+        if sabablar:
+            otkazilmaydi.append({"sku": sku, "sabablar": sabablar})
+        else:
+            nomzodlar.append(sku)
+
+    natija = {"nomzodlar": nomzodlar, "otkazilmaydi": otkazilmaydi,
+              "otkazildi": [], "xato": [], "quruq": quruq}
+    if quruq:
+        return natija
+
+    for sku in nomzodlar:
+        try:
+            frappe.db.savepoint("nabor_flip")
+            _flip(sku)
+            natija["otkazildi"].append(sku)
+        except Exception:
+            frappe.db.rollback(save_point="nabor_flip")
+            natija["xato"].append({"sku": sku,
+                                   "xato": frappe.get_traceback()[-250:]})
+    frappe.clear_cache(doctype="Item")
+    natija["jami"] = {"otkazildi": len(natija["otkazildi"]),
                       "xato": len(natija["xato"])}
     return natija
