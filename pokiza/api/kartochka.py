@@ -75,7 +75,7 @@ def _upakovka_narxi(sku):
         FROM `tabProduct Bundle` pb
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` i ON i.name = pbi.item_code
-        WHERE pb.new_item_code = %s AND IFNULL(pb.disabled, 0) = 0
+        WHERE pb.new_item_code = %s
         """,
         sku,
         as_dict=True,
@@ -94,18 +94,23 @@ def bundle_normasi(sku):
     Bitta bo'lsa (143 tadan 137 tasi shunday) o'shani qaytaradi,
     aksiya-to'plamlarda (2-3 norma) None: normani odam tanlaydi.
     """
+    # DISABLED bundle ham manba: flip'da bundlelar ataylab o'chirilgan,
+    # tarixiy retsept ma'lumoti o'sha yerda qoladi
     normalar = frappe.db.sql(
         """
-        SELECT pbi.item_code
+        SELECT DISTINCT pbi.item_code
         FROM `tabProduct Bundle` pb
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` i ON i.name = pbi.item_code
-        WHERE pb.new_item_code = %s AND IFNULL(pb.disabled, 0) = 0
-          AND i.item_group = %s
+        WHERE pb.new_item_code = %s AND i.item_group = %s
         """,
         (sku, NORMA_GURUH),
     )
-    return normalar[0][0] if len(normalar) == 1 else None
+    if len(normalar) == 1:
+        return normalar[0][0]
+    # bundle'siz (yangi) mahsulot: SKU BOM'idagi yagona ГП qatori
+    from pokiza.api.partiya import bom_yagona_gp
+    return bom_yagona_gp(sku)
 
 
 @frappe.whitelist()
