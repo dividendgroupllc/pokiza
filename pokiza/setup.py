@@ -312,6 +312,34 @@ def after_migrate():
     sync_so_item_fakt_visibility()
     sync_production_entry_list_settings()
     create_nakladnaya_print_format()
+    set_revaluation_rounding_allowance()
+
+
+def set_revaluation_rounding_allowance():
+    """Exchange Rate Revaluation'da Rounding Loss Allowance standarti 0 (ERPNext'da 0.05):
+    aks holda 0.05 gacha qoldiqlar «nol» deb hisobdan tashlab ketiladi."""
+    name = frappe.db.exists(
+        "Property Setter",
+        {
+            "doc_type": "Exchange Rate Revaluation",
+            "field_name": "rounding_loss_allowance",
+            "property": "default",
+        },
+    )
+    if name:
+        frappe.db.set_value("Property Setter", name, "value", "0")
+    else:
+        frappe.make_property_setter(
+            {
+                "doctype": "Exchange Rate Revaluation",
+                "fieldname": "rounding_loss_allowance",
+                "property": "default",
+                "property_type": "Text",
+                "value": "0",
+            },
+            ignore_validate=True,
+            validate_fields_for_doctype=False,
+        )
 
 
 def create_nakladnaya_print_format():

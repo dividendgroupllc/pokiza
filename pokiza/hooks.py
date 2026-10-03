@@ -151,6 +151,11 @@ after_migrate = ["pokiza.setup.after_migrate"]
 # ---------------
 # Hook on document methods and events
 
+# revaluation jurnali tiyinigacha aniq (nol qatorlarsiz) -- pokiza/overrides/exchange_rate_revaluation.py
+override_doctype_class = {
+	"Exchange Rate Revaluation": "pokiza.overrides.exchange_rate_revaluation.PokizaExchangeRateRevaluation",
+}
+
 doc_events = {
 	"BOM": {
 		"validate": "pokiza.events.bom.validate",
