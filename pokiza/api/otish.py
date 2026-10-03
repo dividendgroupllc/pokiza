@@ -234,6 +234,82 @@ def lokal_batch_tozalash(tasdiq=None):
 
 
 @frappe.whitelist()
+def bom_yarat_bundledan(tasdiq=None):
+    """BOM'i YO'Q sotuv mahsulotlariga Product Bundle tarkibidan BOM
+    yaratadi (egasi 2026-10-03: «BOM'ga qancha mahsulot ketishini
+    bundle'dan olib to'g'irlaymiz»).
+
+    Qoidalar:
+      - qo'lda yaratilgan BOM bor SKU'larga TEGILMAYDI (istalgan submitted
+        BOM bo'lsa — o'tkazib yuboriladi);
+      - bundle qatorlari AYNAN ko'chiriladi (norma ГП + upakovka + syryo),
+        disabled bundle ham manba (flip'da ataylab o'chirilgan edi);
+      - BOM: 1 kg uchun, aktiv, default, narxlar Valuation Rate'dan;
+      - faqat stock (flip bo'lgan) itemlarga; шт'larga keyin.
+    tasdiq='YARAT' shart. Avval quruq ko'rish uchun tasdiq bermasdan
+    chaqiring — nimalar yaratilishini sanab beradi.
+    """
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Huquq yo'q"))
+    quruq = tasdiq != "YARAT"
+
+    natija = {"yaratiladi": [], "bom_bor": 0, "bundlesiz": [],
+              "xato": [], "quruq": quruq}
+    for sku in frappe.get_all("Item", filters={
+        "item_group": SOTUV_GURUH, "disabled": 0, "is_stock_item": 1,
+    }, order_by="name", pluck="name"):
+        if sku_bom(sku):
+            natija["bom_bor"] += 1
+            continue
+        qatorlar = frappe.db.sql(
+            """
+            SELECT pbi.item_code, SUM(pbi.qty) qty
+            FROM `tabProduct Bundle` pb
+            JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+            WHERE pb.new_item_code = %s
+            GROUP BY pbi.item_code
+            """,
+            sku, as_dict=True,
+        )
+        if not qatorlar:
+            natija["bundlesiz"].append(sku)
+            continue
+        natija["yaratiladi"].append(
+            {"sku": sku, "qatorlar": len(qatorlar)})
+        if quruq:
+            continue
+        try:
+            frappe.db.savepoint("bom_sku")
+            bom = frappe.get_doc({
+                "doctype": "BOM",
+                "item": sku,
+                "quantity": 1,
+                "is_active": 1,
+                "is_default": 1,
+                "rm_cost_as_per": "Valuation Rate",
+                "company": frappe.db.get_single_value(
+                    "Global Defaults", "default_company"),
+                "items": [
+                    {"item_code": q.item_code, "qty": flt(q.qty)}
+                    for q in qatorlar if flt(q.qty) > 0
+                ],
+            })
+            bom.flags.ignore_permissions = True
+            bom.insert()
+            bom.submit()
+        except Exception:
+            frappe.db.rollback(save_point="bom_sku")
+            natija["xato"].append({"sku": sku,
+                                   "xato": frappe.get_traceback()[-250:]})
+            natija["yaratiladi"].pop()
+    natija["jami"] = {"yaratiladi": len(natija["yaratiladi"]),
+                      "bom_bor": natija["bom_bor"],
+                      "bundlesiz": len(natija["bundlesiz"]),
+                      "xato": len(natija["xato"])}
+    return natija
+
+
+@frappe.whitelist()
 def default_ombor_backfill():
     """Barcha stock sotuv itemlarga default sklad = ГП."""
     if "System Manager" not in frappe.get_roles():
