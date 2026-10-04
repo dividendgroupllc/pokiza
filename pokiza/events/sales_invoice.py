@@ -198,6 +198,13 @@ def on_submit(doc, method=None) -> None:
     Kartochkasiz mijoz (eski usul): Customer.custom_bonus_foiz × schyot
     umumiy summasi.
 
+    ARALASH schyot (2026-10-04 tuzatish): karta foizi muzlagan qatorlar
+    yonida foizsiz (0 muzlagan) qatorlar bo'lsa, ularga mijozning umumiy
+    foizi qo'llanadi — avval bunday qatorlar bonussiz tushib qolardi
+    (sentyabrda 3 schyotda 2.56 mln yo'qolgan edi). «Ataylab 0%» holati
+    bo'lmaydi: muzlatish qator foizi bo'sh bo'lsa baribir karta umumiy
+    foizini yozadi.
+
     Dt «Бонус» (rasxod) / Kt Debtors (mijoz, schyotga bog'langan) —
     mijoz qarzi bonus summasiga kamayadi. Manfiy foiz = ustama (teskari
     yozuv, qarz oshadi). JE avto submit bo'ladi.
@@ -211,6 +218,15 @@ def on_submit(doc, method=None) -> None:
             flt(r.base_amount) * flt(r.custom_bonus_foiz_qator) / 100
             for r in qatorlik
         ), 2)
+        # foizsiz qolgan qatorlar — mijoz umumiy foizida
+        umumiy = flt(frappe.get_cached_value(
+            "Customer", doc.customer, "custom_bonus_foiz"))
+        if umumiy:
+            summa += flt(sum(
+                flt(r.base_amount) * umumiy / 100
+                for r in (doc.get("items") or [])
+                if not flt(r.get("custom_bonus_foiz_qator"))
+            ), 2)
         bonus = "qatorlik"
     else:
         bonus = flt(frappe.get_cached_value("Customer", doc.customer, "custom_bonus_foiz"))
