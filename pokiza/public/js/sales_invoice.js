@@ -8,6 +8,7 @@ frappe.ui.form.on("Sales Invoice", {
         if (frm.is_new() && !frm.doc.amended_from) {
             frm.set_value("set_posting_time", 1);
             frm.set_value("posting_time", "15:00:00");
+            gpSkladDefault(frm);
         }
         kartaFiltrYuklash(frm);
     },
@@ -26,6 +27,25 @@ frappe.ui.form.on("Sales Invoice", {
         nolQatorlarniTozalash(frm);
     },
 });
+
+// Yangi schyotda ombor defaulti — tayyor mahsulot (ГП) skladi: Stock
+// Settings'dagi umumiy default сырьё, sotuvga mos emas. Operator xohlasa
+// qo'lda boshqa skladga o'zgartira oladi.
+function gpSkladDefault(frm) {
+    if (frm.doc.set_warehouse) return; // SO'dan kelganida yozilgan bo'ladi
+    frappe.db
+        .get_value(
+            "Warehouse",
+            { is_group: 0, disabled: 0, name: ["like", "%ГП%"] },
+            "name"
+        )
+        .then((r) => {
+            const ombor = r && r.message && r.message.name;
+            if (ombor && frm.is_new() && !frm.doc.set_warehouse) {
+                frm.set_value("set_warehouse", ombor);
+            }
+        });
+}
 
 // Mijoz kartochkasi bo'lsa item tanlash FAQAT undagi Aktiv SKU'lar bilan
 // cheklanadi (Disabled qatorlar chiqmaydi); kartochkasiz mijozda eski
