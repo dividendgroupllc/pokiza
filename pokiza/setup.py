@@ -277,6 +277,55 @@ def sync_so_item_fakt_visibility():
         frappe.clear_cache(doctype="Sales Order")
 
 
+OMBOR_REPORT = "Ombor Qoldigi Fakt"
+OMBOR_REPORT_LABEL = "Ombor qoldig'i (fakt)"
+OMBOR_REPORT_WORKSPACES = ["Kassa-admin", "Ombor", "Sotuv", "Ishlab chiqarish"]
+
+
+def sync_ombor_report_shortcuts():
+    """«Ombor Qoldigi Fakt» hisobotini kassa/ombor/sotuv/ishlab chiqarish
+    workspace'lariga shortcut qilib qo'shadi (egasi talabi 2026-10-06).
+    Workspace'lar bazada qo'lda yaratilgan (custom) — shuning uchun bu
+    sinxron migrate'da ishlaydi: workspace topilmasa jim o'tadi, shortcut
+    allaqachon bo'lsa takrorlamaydi. Shortcut ko'rinishi uchun child
+    jadval QATORI ham, content JSON'dagi BLOK ham kerak (UI ikkalasini
+    birga yozadi)."""
+    import json as _json
+
+    for ws_name in OMBOR_REPORT_WORKSPACES:
+        if not frappe.db.exists("Workspace", ws_name):
+            continue
+        ws = frappe.get_doc("Workspace", ws_name)
+        if any(sc.type == "Report" and sc.link_to == OMBOR_REPORT
+               for sc in ws.shortcuts):
+            continue
+        ws.append("shortcuts", {
+            "type": "Report",
+            "link_to": OMBOR_REPORT,
+            "label": OMBOR_REPORT_LABEL,
+        })
+        try:
+            content = _json.loads(ws.content or "[]")
+        except Exception:
+            content = []
+        blok = {
+            "id": frappe.generate_hash(length=10),
+            "type": "shortcut",
+            "data": {"shortcut_name": OMBOR_REPORT_LABEL, "col": 3},
+        }
+        shortcut_idx = [i for i, b in enumerate(content)
+                        if b.get("type") == "shortcut"]
+        if shortcut_idx:
+            content.insert(shortcut_idx[-1] + 1, blok)
+        else:
+            content.append(blok)
+        ws.content = _json.dumps(content)
+        ws.flags.ignore_permissions = True
+        ws.save()
+
+    frappe.clear_cache()
+
+
 def sync_production_entry_list_settings():
     """Production Entry ro'yxatida ishlab chiqarilayotgan miqdor ustunini ko'rsatish.
 
@@ -303,6 +352,7 @@ def sync_production_entry_list_settings():
 def after_install():
     sync_custom_fields()
     sync_so_item_fakt_visibility()
+    sync_ombor_report_shortcuts()
     sync_production_entry_list_settings()
     create_nakladnaya_print_format()
 
@@ -310,6 +360,7 @@ def after_install():
 def after_migrate():
     sync_custom_fields()
     sync_so_item_fakt_visibility()
+    sync_ombor_report_shortcuts()
     sync_production_entry_list_settings()
     create_nakladnaya_print_format()
     set_revaluation_rounding_allowance()

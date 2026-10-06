@@ -24,3 +24,4 @@ pokiza.patches.v0_0.add_zapas_mr_fields
 pokiza.patches.v0_0.add_bom_sotuv_belgi
 pokiza.patches.v0_0.set_warehouse_gp_default
 pokiza.patches.v0_0.add_stock_balance_roles
+pokiza.patches.v0_0.add_brak_holat_setup

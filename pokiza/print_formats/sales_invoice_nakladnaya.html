@@ -126,10 +126,10 @@
 		padding-bottom: 1.5mm;
 	}
 
-	/* logo biroz gorizontal cho'zilgan (namunadagidek keng turadi) */
+	/* logo tabiiy nisbatda (cho'zilmaydi) */
 	.header-logo-cell img {
-		width: 40mm;
 		height: 15mm;
+		width: auto;
 	}
 
 	/* sana — o'rtada, chiziq ustida */
@@ -372,11 +372,7 @@
 		<table class="header-table">
 			<tr>
 				<td class="header-logo-cell">
-					{%- if with_logo -%}
-						<img src="__POKIZA_LOGO_SRC__" alt="Burxanov">
-					{%- else -%}
-						&nbsp;
-					{%- endif -%}
+					<img src="__POKIZA_LOGO_SRC__" alt="Burxanov">
 				</td>
 				<td class="header-date-cell">{{ doc.get_formatted("posting_date") }}</td>
 				<td class="header-title-cell">

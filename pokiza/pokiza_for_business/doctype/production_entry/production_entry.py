@@ -197,31 +197,11 @@ class ProductionEntry(Document):
             })
         se.append("items", fg_row)
 
-        # BRAK (2026-09-30): brak kg omborga KIRMAYDI — uning farshi (norma
-        # BOM tarkibi, brak kg ulushida) xom ashyo omboriga QAYTADI (scrap
-        # qatorlari), upakovkasi esa qaytmaydi — qiymati tayyor mahsulot
-        # tannarxiga singadi (rasxod).
-        if flt(self.brak_kg) > 0 and self.bom_no:
-            bom = frappe.get_doc("BOM", self.bom_no)
-            wh_map = {i.item_code: i.source_warehouse for i in self.items}
-            for bi in bom.items:
-                qaytim = flt(
-                    flt(bi.qty) * flt(self.brak_kg) / flt(bom.quantity or 1), 3
-                )
-                # juda mayda ulush (masalan ziravor) 0 ga yaxlitlansa —
-                # qatori yozilmaydi, qiymati tannarxda qoladi
-                if qaytim < 0.001:
-                    continue
-                uom = frappe.get_cached_value("Item", bi.item_code, "stock_uom")
-                se.append("items", {
-                    "item_code": bi.item_code,
-                    "qty": qaytim,
-                    "t_warehouse": wh_map.get(bi.item_code) or self.target_warehouse,
-                    "is_scrap_item": 1,
-                    "uom": uom,
-                    "stock_uom": uom,
-                    "conversion_factor": 1,
-                })
+        # BRAK (egasi 2026-10-06): eski «farsh scrap bo'lib сырьё'ga qaytadi»
+        # modeli BEKOR — brak endi PE'da umuman qatnashmaydi. Tarozi faktni
+        # TO'LIQ yozadi (brak ichida), hammasi omborga kiradi; kun oxirida
+        # «Brak vozvrat» sahifasi SKU'ni ombordan chiqarib to'liq tannarxini
+        # «Брак» rasxod hisobiga o'tkazadi (navbat.brak_vozvrat).
 
         se.flags.ignore_permissions = True
         se.insert()

@@ -335,35 +335,41 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 				: "";
 		const toliqOmbordan = it.ombordan_kg > 0 && ishlabKg < 0.05 && !it.kg_nomalum;
 
-		// KUTILMOQDA: ishlab chiqarish xodimi fakt kg kiritib tasdiqlaydi
+		// KUTILMOQDA (egasi 2026-10-06): ishlab chiqarish FAKT KIRITMAYDI —
+		// reja faqat ko'rinadi, «Ishlab chiqarildi» tugmasi bosiladi; shundan
+		// keyin qator tarozi terminalida tortiladigan bo'ladi.
 		if (it.holat === "Kutilmoqda") {
 			const $r = $(`
 				<div class="nv-item-row ${it.kg_nomalum ? "nv-warn" : ""}">
 					<span class="nv-holat-ikon">○</span>
 					<span class="nv-item-nom">${nom} <span class="text-muted">(${qty})</span>${omborBadge}</span>
+					<span class="nv-item-kg">${kg}</span>
 					${
 						ICH_ROL
-							? `<input type="number" class="nv-fakt" value="${ishlabKg || ""}" placeholder="kg">
-							   <button class="btn btn-xs btn-success nv-tasdiq">${__("Tasdiqlash")}</button>`
-							: `<span class="nv-item-kg">${kg}</span>`
+							? `<button class="btn btn-xs btn-success nv-tasdiq">🏭 ${__("Ishlab chiqarildi")}</button>`
+							: ""
 					}
 				</div>`);
 			$r.find(".nv-tasdiq").on("click", () => {
-				const fakt = $r.find(".nv-fakt").val();
+				$r.find(".nv-tasdiq").prop("disabled", true);
 				frappe
 					.call({
-						method: "pokiza.api.navbat.chiqarildi",
-						args: { row_name: it.row, fakt_kg: fakt },
+						method: "pokiza.api.navbat.ishlab_chiqarildi",
+						args: { row_name: it.row },
 					})
 					.then((res) => {
 						const m = res.message || {};
-						// ombor kirimi uchun avtomatik tayyorlangan qoralama(lar)
+						frappe.show_alert({
+							message: __("🏭 {0} — tarozi terminaliga tushdi (reja {1} kg)", [
+								nom, m.reja,
+							]),
+							indicator: "green",
+						});
 						if ((m.pe || []).length) {
-							frappe.msgprint({
-								title: __("Ombor kirimi tayyorlandi"),
+							frappe.show_alert({
 								message:
-									__("Tasdiqlandi. Ombor kirimi uchun qoralama tayyor — ochib tekshiring va tasdiqlang:") +
-									"<br>" +
+									__("Ombor kirimi qoralamasi tayyor (reja bilan, tarozi fakti kelgach yangilanadi):") +
+									" " +
 									m.pe
 										.map((p) => `<a href="/app/production-entry/${p}"><b>${p}</b></a>`)
 										.join(", "),
@@ -373,17 +379,35 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 						if (m.pe_xabar) {
 							frappe.msgprint({ message: m.pe_xabar, indicator: "orange" });
 						}
-						// qoralama schyot fakt bilan yangilangani haqida
-						if (m.si) {
-							frappe.show_alert({
-								message: __("Qoralama schyot fakt bilan yangilandi: {0}", [
-									`<a href="/app/sales-invoice/${m.si}"><b>${m.si}</b></a>`,
-								]),
-								indicator: "blue",
-							});
-						}
 						yukla();
-					});
+					})
+					.catch(() => $r.find(".nv-tasdiq").prop("disabled", false));
+			});
+			return $r;
+		}
+
+		// ISHLAB CHIQARILDI: tarozi tortishi kutilmoqda — fakt bu yerda
+		// KIRITILMAYDI (faqat tarozi terminalida)
+		if (it.holat === "Ishlab chiqarildi") {
+			const tortilgan = flt(it.fakt_kg) > 0
+				? ` <span class="nv-mini text-muted">${__("tortilmoqda")}: <b>${fmt(it.fakt_kg)} kg</b></span>`
+				: "";
+			const $r = $(`
+				<div class="nv-item-row">
+					<span class="nv-holat-ikon">⚖️</span>
+					<span class="nv-item-nom">${nom} <span class="text-muted">(${qty})</span>${omborBadge}
+						<span class="nv-mini nv-warn">${__("tarozi kutilmoqda")}</span>${tortilgan}</span>
+					<span class="nv-item-kg">${kg}</span>
+					${
+						ICH_ROL
+							? `<button class="btn btn-xs btn-default nv-bekor">${__("bekor")}</button>`
+							: ""
+					}
+				</div>`);
+			$r.find(".nv-bekor").on("click", () => {
+				frappe
+					.call({ method: "pokiza.api.navbat.chiqarish_bekor", args: { row_name: it.row } })
+					.then(() => yukla());
 			});
 			return $r;
 		}

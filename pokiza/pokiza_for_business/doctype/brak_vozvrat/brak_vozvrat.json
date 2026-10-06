@@ -45,7 +45,7 @@
    "fieldname": "rejim",
    "fieldtype": "Select",
    "label": "Rejim",
-   "options": "partiya\noddiy",
+   "options": "partiya\noddiy\nrasxod",
    "in_list_view": 1
   },
   {

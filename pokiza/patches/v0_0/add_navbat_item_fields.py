@@ -13,7 +13,7 @@ FIELDS = {
             "fieldname": "custom_holat",
             "fieldtype": "Select",
             "label": "Ishlab chiqarish holati",
-            "options": "Kutilmoqda\nChiqarildi\nJonatildi",
+            "options": "Kutilmoqda\nIshlab chiqarildi\nChiqarildi\nJonatildi",
             "default": "Kutilmoqda",
             "read_only": 1,
             "insert_after": "delivered_qty",

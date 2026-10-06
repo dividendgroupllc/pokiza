@@ -2,8 +2,10 @@
 // (egasi talabi 2026-10-01: modal emas, ikkinchi list bo'lib ochilsin).
 // Dunyo standarti (SAP scrap posting / Odoo scrap / MES waste log):
 // jadval — har mahsulot alohida qator («bunisidan 5, bunisidan 3»),
-// bitta Saqlash → orqada har qator uchun Stock Entry avto submit:
-// farsh norma (ГП) bo'lib omborga qaytadi, upakovka rasxodga chiqadi.
+// bitta Saqlash → orqada har qator uchun Stock Entry avto submit.
+// 2026-10-06 (egasi talabi): skladga HECH NARSA qaytmaydi — SKU ombordan
+// Material Issue bilan chiqadi, to'liq tannarxi (farsh + upakovka) «Брак»
+// rasxod hisobiga tushadi.
 // Server: pokiza.api.navbat.brak_vozvrat_toplu / brak_royxat.
 
 frappe.pages["brak-vozvrat-sahifa"].on_page_load = function (wrapper) {
@@ -24,7 +26,7 @@ frappe.pages["brak-vozvrat-sahifa"].on_page_load = function (wrapper) {
 	const kg1 = (v) => format_number(v, null, 1);
 
 	$wrap.append(`<div class="bv-eslatma">
-		${__("Kun davomida yig'ilgan brakni mahsulot kesimida kiriting. Saqlashda har qator uchun ombor harakati avtomatik o'tadi: farsh norma (ГП) bo'lib qaytadi, upakovka rasxodga chiqadi.")}
+		${__("Kun davomida yig'ilgan brakni mahsulot kesimida kiriting. Saqlashda har qator uchun ombor harakati avtomatik o'tadi: mahsulot ombordan chiqadi va to'liq tannarxi «Брак» rasxod hisobiga tushadi — skladga hech narsa qaytmaydi.")}
 	</div>`);
 
 	// jadval (FieldGroup ichida Table control)

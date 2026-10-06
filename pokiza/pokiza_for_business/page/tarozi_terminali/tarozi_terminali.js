@@ -10,8 +10,12 @@
 //
 // 2026-10-01 (egasi talabi): fakt TO'LIQ yoziladi (brak ichida), brak esa
 // KUN OXIRIDA ALOHIDA SAHIFADA (/app/brak-vozvrat-sahifa) jadval bilan
-// qaytariladi — farshi norma (ГП) bo'lib omborga qaytadi, upakovkasi
-// rasxodga ketadi (server: pokiza.api.navbat.brak_vozvrat_toplu).
+// yoziladi.
+//
+// 2026-10-06 (egasi talabi) — KETMA-KETLIK: ishlab chiqarish sahifasida
+// «Ishlab chiqarildi» belgilanmagan qator TORTILMAYDI (qulf bilan
+// ko'rinadi). Brak endi skladga QAYTMAYDI — SKU ombordan chiqib to'liq
+// tannarxi «Брак» rasxod hisobiga tushadi (navbat.brak_vozvrat).
 
 frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
@@ -111,7 +115,10 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 		const zamesKg = flt(d.zames_kg);
 
 		d.qatorlar.forEach((q) => {
-			const done = q.holat !== "Kutilmoqda";
+			// KETMA-KETLIK: Kutilmoqda = ishlab chiqarish hali belgilamagan —
+			// qulflangan; faqat «Ishlab chiqarildi» holatda tortish mumkin
+			const kutilmoqda = q.holat === "Kutilmoqda";
+			const done = !kutilmoqda && q.holat !== "Ishlab chiqarildi";
 			const tortishlar = q.tortishlar || [];
 			const jami = tortishlar.reduce((s, t) => s + flt(t.kg), 0);
 
@@ -124,7 +131,7 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 				.join("");
 
 			const $r = $(`
-				<div class="tz-row ${done ? "tz-done" : ""}">
+				<div class="tz-row ${done || kutilmoqda ? "tz-done" : ""}">
 					<div class="tz-top">
 						<div class="tz-nom">
 							<div class="tz-sku">${frappe.utils.escape_html(q.sku)}</div>
@@ -133,17 +140,19 @@ frappe.pages["tarozi-terminali"].on_page_load = function (wrapper) {
 						</div>
 						<div class="tz-reja">${__("reja")}: <b>${kg1(q.reja_kg)} kg</b></div>
 						${
-							done
-								? `<div class="tz-ok">✓ ${kg1(q.fakt_kg)} kg${
-										flt(q.brak_kg) > 0
-											? ` <span class="tz-brak-badge">(${__("brak")} ${kg1(q.brak_kg)} kg)</span>`
-											: ""
-									}</div>`
-								: ""
+							kutilmoqda
+								? `<div class="tz-holat tz-kam">⏳ ${__("ishlab chiqarish hali belgilamagan")}</div>`
+								: done
+									? `<div class="tz-ok">✓ ${kg1(q.fakt_kg)} kg${
+											flt(q.brak_kg) > 0
+												? ` <span class="tz-brak-badge">(${__("brak")} ${kg1(q.brak_kg)} kg)</span>`
+												: ""
+										}</div>`
+									: ""
 						}
 					</div>
 					${
-						done
+						done || kutilmoqda
 							? ""
 							: `<div class="tz-body">
 								<div class="tz-chips">${chips}</div>

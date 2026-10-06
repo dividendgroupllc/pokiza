@@ -1056,22 +1056,71 @@ def _qator(row_name):
     frappe.throw(_("Zakaz qatori topilmadi"))
 
 
+def _so_reja_kg(qator):
+    """SO qatorining ishlab chiqariladigan REJA kg'i (ombordan band qismi
+    ayirilgan) — _pe_qoralama_yarat bilan bir xil hisob."""
+    t = frappe.db.get_value(
+        "Sales Order Item", qator.name,
+        ["qty", "stock_qty", "stock_uom", "custom_ombordan_kg"],
+        as_dict=True,
+    ) or frappe._dict()
+    row = {"item_code": qator.item_code, "qty": t.get("qty"),
+           "stock_qty": t.get("stock_qty"), "stock_uom": t.get("stock_uom")}
+    jami, _g, _y = hisobla_qator_kg(row, _bundle_gp_map([qator.item_code]))
+    return max(flt(jami) - flt(t.get("custom_ombordan_kg")), 0.0)
+
+
+@frappe.whitelist()
+def ishlab_chiqarildi(row_name):
+    """KETMA-KETLIK 1-QADAM (egasi 2026-10-06): ishlab chiqarish xodimi
+    «chiqardik» deb belgilaydi — FAKT KIRITMAYDI (reja faqat ko'rinadi,
+    o'zgartirib bo'lmaydi). Shu belgidan keyingina qator tarozi terminalida
+    tortiladigan bo'ladi, orqada ombor uchun PE qoralamasi REJA kg bilan
+    oldindan tayyorlanadi (tarozi tortgan sari fakt bilan qayta yoziladi)."""
+    _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI,
+                 _("Ishlab chiqarishni faqat ishlab chiqarish xodimi belgilaydi"))
+    r = _qator(row_name)
+    holat = r.custom_holat or "Kutilmoqda"
+    if holat != "Kutilmoqda":
+        frappe.throw(_("Qator allaqachon «{0}» holatida").format(holat))
+
+    qator_dt = "Material Request Item" if r.get("zapas") else "Sales Order Item"
+    frappe.db.set_value(qator_dt, row_name, "custom_holat",
+                        "Ishlab chiqarildi", update_modified=False)
+
+    if r.get("zapas"):
+        reja = flt(frappe.db.get_value("Material Request Item", row_name, "qty"))
+    else:
+        reja = _so_reja_kg(r)
+
+    pe_list, pe_xabar = [], None
+    if reja > EPS:
+        if r.get("zapas"):
+            pe_list, pe_xabar = _pe_zapas_yarat(r, reja)
+        else:
+            pe_list, pe_xabar = _pe_qoralama_yarat(r, reja)
+    _notify()
+    return {"ok": True, "pe": pe_list, "pe_xabar": pe_xabar,
+            "reja": flt(reja, 1)}
+
+
 @frappe.whitelist()
 def chiqarildi(row_name, fakt_kg, brak_kg=0):
-    """Ishlab chiqarish rahbari: mahsulot chiqqanini fakt kg bilan tasdiqlaydi.
-    Shu bilan birga OMBOR uchun Production Entry QORALAMASI avtomatik
-    tayyorlanadi (egasi talabi 2026-08-23) — xodim ochib tekshiradi va
-    tasdiqlaydi, shunda tayyor mahsulot omborga kiradi.
-
-    BRAK (2026-09-30): fakt_kg = tarozida tortilgan HAMMASI, brak_kg shundan
-    yaroqsiz qismi. Sotuvga/omborga faqat fakt−brak kiradi; brakning farshi
-    (norma BOM bo'yicha) xom ashyoga qaytadi, upakovkasi rasxodda qoladi —
-    bu PE/Stock Entry darajasida hisoblanadi."""
+    """KETMA-KETLIK 3-QADAM: TAROZICHI tortib bo'lgach fakt kg bilan
+    tasdiqlaydi (2026-10-06 dan ishlab chiqarish sahifasi fakt kiritmaydi).
+    OMBOR uchun Production Entry QORALAMASI fakt bilan qayta tayyorlanadi —
+    ombor xodimi ochib tekshiradi va tasdiqlaydi, shunda tayyor mahsulot
+    omborga kiradi. Fakt TO'LIQ yoziladi (brak ichida); brak KUN OXIRIDA
+    «Brak vozvrat» sahifasida yoziladi va rasxodga chiqadi."""
     _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI,
-                 _("Ishlab chiqarishni faqat ishlab chiqarish xodimi tasdiqlaydi"))
+                 _("Faqat tarozi/ishlab chiqarish xodimi tasdiqlaydi"))
     r = _qator(row_name)
     if r.custom_holat == "Jonatildi":
         frappe.throw(_("Bu qator allaqachon jo'natilgan"))
+    if (r.custom_holat or "Kutilmoqda") == "Kutilmoqda":
+        frappe.throw(_("Avval ishlab chiqarish sahifasida «Ishlab chiqarildi» "
+                       "deb belgilanishi kerak — ketma-ketlik: ishlab "
+                       "chiqarish → tarozi"))
     if flt(fakt_kg) <= 0:
         frappe.throw(_("Fakt kg 0 dan katta bo'lishi kerak"))
     brak_kg = flt(brak_kg)
@@ -1567,7 +1616,9 @@ def tarozi_royxat(sana=None):
                     "tortishlar": _tortishlar(d.name),
                 })
 
-    qatorlar.sort(key=lambda q: (q["holat"] != "Kutilmoqda",
+    # tartib: tortiladiganlar (Ishlab chiqarildi) → kutilayotganlar → tayyorlar
+    tartib = {"Ishlab chiqarildi": 0, "Kutilmoqda": 1}
+    qatorlar.sort(key=lambda q: (tartib.get(q["holat"], 2),
                                  (q["sku"] or "").lower()))
     return {"sana": str(sana), "qatorlar": qatorlar,
             "zames_kg": _sozlamalar().zames}
@@ -1630,6 +1681,12 @@ def tortish_qosh(row_name, kg):
     if r.custom_holat == "Chiqarildi":
         frappe.throw(_("Bu qator allaqachon tasdiqlangan — avval navbat "
                        "sahifasidan bekor qiling"))
+    # KETMA-KETLIK (egasi 2026-10-06): ishlab chiqarish «Ishlab chiqarildi»
+    # deb belgilamaguncha tarozi torta olmaydi
+    if (r.custom_holat or "Kutilmoqda") == "Kutilmoqda":
+        frappe.throw(_("Bu qator hali ishlab chiqarilmagan — avval ishlab "
+                       "chiqarish sahifasida «Ishlab chiqarildi» belgilanadi, "
+                       "keyin tarozi tortadi"))
     if flt(kg) <= 0:
         frappe.throw(_("Kg 0 dan katta bo'lishi kerak"))
 
@@ -1675,22 +1732,32 @@ def tortish_ochir(tortish_name):
 
 
 # ---------------------------------------------------------------------------
-# BRAK VOZVRAT (egasi talabi 2026-10-01): tarozichi faktni TO'LIQ yozadi
-# (200 chiqsa 200, brak ichida), kun oxirida esa yig'ilgan brakni mahsulot
-# kesimida qaytaradi («bunisidan 3 kg, bunisidan 2 kg»). Hisob:
-#   * farsh NORMA bo'lib qaytadi — СОС тилла dan chiqqan bo'lsa omborga
-#     +N kg СОС тилла (ГП) yoziladi;
-#   * upakovka QAYTMAYDI — qiymati rasxodga ketadi.
-# Partiya-rejim SKU: Repack SE (SKU partiyadan −N, norma ГП +N o'z narxida,
-# farq=upakovka Stock Adjustment rasxodiga). Oddiy SKU: ombordagi qoldiq
-# allaqachon ГП (norma) ko'rinishida — farsh qaytishi uchun harakat shart
-# emas, faqat upakovka (bundle'ning ГП bo'lmagan qatorlari) Material Issue
-# bilan rasxod qilinadi.
+# BRAK (egasi talabi 2026-10-06 — eski «farsh qaytadi» modeli BEKOR):
+# tarozichi faktni TO'LIQ yozadi (200 chiqsa 200, brak ichida), kun oxirida
+# yig'ilgan brakni mahsulot kesimida yozadi («bunisidan 3 kg, bunisidan
+# 2 kg»). Hisob endi TO'LIQ RASXOD:
+#   * SKU ГП skladdan Material Issue bilan chiqadi;
+#   * qiymati (farsh + upakovka, ya'ni to'liq tannarx) «Брак» rasxod
+#     hisobiga tushadi — skladga HECH NARSA qaytmaydi.
 # ---------------------------------------------------------------------------
+
+def _brak_hisob():
+    """«Брак» rasxod hisobi (patch add_brak_holat_setup yaratadi)."""
+    company = frappe.db.get_single_value("Global Defaults", "default_company")
+    hisob = frappe.db.get_value(
+        "Account", {"account_name": "Брак", "company": company, "is_group": 0}
+    )
+    if not hisob:
+        frappe.throw(_("«Брак» rasxod hisobi topilmadi — Chart of Accounts'da "
+                       "«Производственные расходы» ostida yarating"))
+    return hisob
+
 
 @frappe.whitelist()
 def brak_vozvrat(item_code, kg):
-    """Kun oxiridagi brak qaytarish — bitta mahsulot bo'yicha."""
+    """Kun oxiridagi brak — bitta mahsulot bo'yicha, tannarxi butunligicha
+    «Брак» rasxodiga. Mahsulot omborga kirgan bo'lishi shart (PE submit) —
+    aks holda qoldiq yetmasligi haqida tushunarli xato beradi."""
     _rol_tekshir(ISHLAB_CHIQARISH_ROLLARI, _("Huquq yo'q"))
     kg = flt(kg)
     if kg <= 0:
@@ -1698,111 +1765,45 @@ def brak_vozvrat(item_code, kg):
     if frappe.get_cached_value("Item", item_code, "item_group") != "Сотув махсулотлари":
         frappe.throw(_("Brak faqat sotuv mahsuloti bo'yicha yoziladi"))
 
-    from pokiza.api.partiya import (
-        asosiy_ombor, norma_qoldiqlar, partiya_ol, partiya_rejimda,
-    )
+    from pokiza.api.partiya import asosiy_ombor, stock_rejimda
+
+    if not stock_rejimda(item_code):
+        frappe.throw(_("{0} ombor yuritmaydi — brak yozib bo'lmaydi "
+                       "(avval Maintain Stock yoqilishi kerak)").format(item_code))
 
     wh = asosiy_ombor()
-    se_name, izoh = None, ""
+    qoldiq = flt(frappe.db.get_value(
+        "Bin", {"item_code": item_code, "warehouse": wh}, "actual_qty"))
+    if kg > qoldiq + 0.005:
+        frappe.throw(_("{0} — «{1}» da qoldiq {2} kg, {3} kg brak sig'maydi. "
+                       "Ombor kirimi (PE) hali tasdiqlanmagan bo'lishi "
+                       "mumkin — avval uni tasdiqlang.")
+                     .format(item_code, wh, flt(qoldiq, 1), flt(kg, 1)))
 
-    if partiya_rejimda(item_code):
-        # qaysi normadan — qoldig'i eng katta partiyadan
-        qoldiqlar = {n: q for n, q in norma_qoldiqlar(item_code, wh).items()
-                     if q > EPS}
-        if not qoldiqlar:
-            frappe.throw(_("{0} — omborda partiya qoldig'i yo'q, vozvrat "
-                           "yozib bo'lmaydi").format(item_code))
-        norma = max(qoldiqlar, key=qoldiqlar.get)
-        if kg > qoldiqlar[norma] + 0.005:
-            frappe.throw(_("{0} / {1} qoldig'i {2} kg — {3} kg vozvrat sig'maydi")
-                         .format(item_code, norma, flt(qoldiqlar[norma], 1), flt(kg, 1)))
-        batch = partiya_ol(item_code, norma)
-
-        gp_rate = flt(frappe.db.get_value(
-            "Bin", {"item_code": norma, "warehouse": wh}, "valuation_rate"
-        )) or flt(frappe.get_cached_value("Item", norma, "valuation_rate"))
-
-        se = frappe.get_doc({
-            "doctype": "Stock Entry",
-            "stock_entry_type": "Repack",
-            "company": frappe.db.get_single_value("Global Defaults", "default_company"),
-            "items": [
-                {
-                    "item_code": item_code,
-                    "qty": kg,
-                    "s_warehouse": wh,
-                    "use_serial_batch_fields": 1,
-                    "batch_no": batch,
-                    "uom": frappe.get_cached_value("Item", item_code, "stock_uom"),
-                    "conversion_factor": 1,
-                },
-                {
-                    "item_code": norma,
-                    "qty": kg,
-                    "t_warehouse": wh,
-                    "is_finished_item": 1,
-                    "set_basic_rate_manually": 1,
-                    "basic_rate": gp_rate,
-                    "uom": frappe.get_cached_value("Item", norma, "stock_uom"),
-                    "conversion_factor": 1,
-                },
-            ],
-            "remarks": _("Brak vozvrat: {0} → {1}, {2} kg (farsh norma bo'lib "
-                         "qaytdi, upakovka rasxodda)").format(item_code, norma, flt(kg, 1)),
-        })
-        se.flags.ignore_permissions = True
-        se.insert()
-        se.submit()
-        se_name = se.name
-        izoh = _("Partiyadan −{0} kg, omborga +{0} kg {1} (farsh); upakovka "
-                 "farqi rasxodga tushdi").format(flt(kg, 1), norma)
-        rejim = "partiya"
-    else:
-        norma = _zapas_norma(item_code) or ""
-        # ombordagi qoldiq allaqachon ГП (norma) — farsh qaytishi uchun
-        # harakat kerak emas; upakovkani rasxod qilamiz
-        upak = frappe.db.sql(
-            """
-            SELECT pbi.item_code, pbi.qty
-            FROM `tabProduct Bundle` pb
-            JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
-            JOIN `tabItem` i ON i.name = pbi.item_code
-            WHERE pb.new_item_code = %s AND i.item_group != %s
-            """,
-            (item_code, GP_GROUP), as_dict=True,
-        )
-        rows = []
-        for u in upak:
-            miqdor = flt(flt(u.qty) * kg, 3)
-            if miqdor < 0.001:
-                continue
-            rows.append({
-                "item_code": u.item_code,
-                "qty": miqdor,
-                "s_warehouse": wh,
-                "uom": frappe.get_cached_value("Item", u.item_code, "stock_uom"),
-                "conversion_factor": 1,
-            })
-        if rows:
-            se = frappe.get_doc({
-                "doctype": "Stock Entry",
-                "stock_entry_type": "Material Issue",
-                "company": frappe.db.get_single_value(
-                    "Global Defaults", "default_company"),
-                "items": rows,
-                "remarks": _("Brak vozvrat upakovka rasxodi: {0}, {1} kg")
-                            .format(item_code, flt(kg, 1)),
-            })
-            se.flags.ignore_permissions = True
-            se.insert()
-            se.submit()
-            se_name = se.name
-            izoh = _("Farsh {0} (ГП) hisobida qoldi; {1} ta upakovka qatori "
-                     "rasxod qilindi").format(norma or item_code, len(rows))
-        else:
-            izoh = _("Farsh {0} (ГП) hisobida qoldi; upakovka qatori topilmadi")\
-                .format(norma or item_code)
-        rejim = "oddiy"
+    hisob = _brak_hisob()
+    se = frappe.get_doc({
+        "doctype": "Stock Entry",
+        "stock_entry_type": "Material Issue",
+        "company": frappe.db.get_single_value("Global Defaults", "default_company"),
+        "items": [{
+            "item_code": item_code,
+            "qty": kg,
+            "s_warehouse": wh,
+            "expense_account": hisob,
+            "uom": frappe.get_cached_value("Item", item_code, "stock_uom"),
+            "conversion_factor": 1,
+        }],
+        "remarks": _("Brak rasxodi: {0}, {1} kg → {2} (skladga hech narsa "
+                     "qaytmaydi)").format(item_code, flt(kg, 1), hisob),
+    })
+    se.flags.ignore_permissions = True
+    se.insert()
+    se.submit()
+    se_name = se.name
+    norma = _zapas_norma(item_code) or ""
+    izoh = _("Ombordan −{0} kg, to'liq tannarxi «{1}» rasxodiga tushdi")\
+        .format(flt(kg, 1), hisob)
+    rejim = "rasxod"
 
     bv = frappe.get_doc({
         "doctype": "Brak Vozvrat",
@@ -1923,10 +1924,12 @@ def jonatildi(sales_order):
     doc = frappe.get_doc("Sales Order", sales_order)
     if doc.docstatus != 1:
         frappe.throw(_("Zakaz tasdiqlanmagan"))
-    ochiq = [d for d in doc.items if (d.custom_holat or "Kutilmoqda") == "Kutilmoqda"]
+    ochiq = [d for d in doc.items
+             if (d.custom_holat or "Kutilmoqda") in ("Kutilmoqda", "Ishlab chiqarildi")]
     if ochiq:
-        frappe.throw(_("Hali chiqarilmagan qatorlar bor ({0} ta) — avval ishlab "
-                       "chiqarish tasdiqlashi kerak").format(len(ochiq)))
+        frappe.throw(_("Hali tarozidan o'tmagan qatorlar bor ({0} ta) — avval "
+                       "ishlab chiqarish belgilab, tarozi tortib tasdiqlashi "
+                       "kerak").format(len(ochiq)))
     for d in doc.items:
         if d.custom_holat != "Jonatildi":
             frappe.db.set_value("Sales Order Item", d.name,

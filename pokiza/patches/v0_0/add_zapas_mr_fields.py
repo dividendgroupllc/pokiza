@@ -44,7 +44,7 @@ def execute():
                 "fieldname": "custom_holat",
                 "label": "Holat",
                 "fieldtype": "Select",
-                "options": "Kutilmoqda\nChiqarildi",
+                "options": "Kutilmoqda\nIshlab chiqarildi\nChiqarildi",
                 "default": "Kutilmoqda",
                 "read_only": 1,
                 "insert_after": "qty",
