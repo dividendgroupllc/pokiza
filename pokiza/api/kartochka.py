@@ -230,9 +230,15 @@ def norma_map(mijoz):
 
 @frappe.whitelist()
 def aktiv_itemlar(mijoz):
-    """Zakaz/schyot formalari uchun: mijozning Aktiv kartochka SKU'lari."""
+    """Zakaz/schyot formalari uchun: mijozning Aktiv kartochka SKU'lari.
+
+    Huquq bo'lmasa XATO BERMAYDI (2026-10-08): bu forma qulayligi, har
+    mijoz tanlanganda chaqiriladi — huquqsiz foydalanuvchiga «Huquq yo'q»
+    oynasini qayta-qayta ko'rsatish o'rniga bo'sh ro'yxat qaytariladi
+    (narxlar qo'lda kiritiladi).
+    """
     if not frappe.has_permission("Mijoz Kartochkasi", "read"):
-        frappe.throw(_("Huquq yo'q"))
+        return []
     return sorted(
         aktiv_map(mijoz).values(),
         key=lambda r: (r.sku_nomi or r.sku or "").lower(),

@@ -12,6 +12,64 @@ from frappe.utils import flt
 NARX_GURUHI = "Сотув махсулотлари"
 
 
+def _return_tannarx_tekshir(doc) -> None:
+    """QAYTARISH (возврат) bloklanishining sababini tushunarli qilish
+    (2026-10-08): qaytgan tovar omborga KIRADI, ERPNext esa uning
+    tannarxini bilishi shart. Tannarx manbai — shu mahsulotning o'sha
+    ombordagi oldingi harakati (SLE). Hech qachon omborda bo'lmagan
+    mahsulotda ERPNext «Valuation Rate Missing» (ruscha «курс оценки»)
+    degan tushunarsiz xato beradi — uning o'rniga nima qilish kerakligini
+    aniq yozamiz.
+
+    Asl schyotdan qilingan qaytarishda (return_against) tannarx o'sha
+    sotuvdan olinadi — bu yo'l doim ishlaydi va to'g'ri hisob beradi.
+    """
+    if not doc.get("is_return") or not doc.get("update_stock"):
+        return
+
+    muammo = []
+    for row in doc.get("items") or []:
+        if not row.item_code:
+            continue
+        if not frappe.get_cached_value("Item", row.item_code, "is_stock_item"):
+            continue
+        if not row.warehouse:
+            continue
+        # tannarx manbai: shu (mahsulot, ombor) bo'yicha bekor qilinmagan
+        # istalgan ombor harakati
+        if frappe.db.exists("Stock Ledger Entry", {
+            "item_code": row.item_code,
+            "warehouse": row.warehouse,
+            "is_cancelled": 0,
+        }):
+            continue
+        muammo.append((row.item_name or row.item_code, row.warehouse))
+
+    if not muammo:
+        return
+
+    royxat = "".join(
+        f"<li><b>{frappe.utils.escape_html(nom)}</b> — «{frappe.utils.escape_html(wh)}»</li>"
+        for nom, wh in muammo
+    )
+    frappe.throw(
+        _("Quyidagi mahsulot(lar) shu omborda hech qachon harakat qilmagan, "
+          "shuning uchun tizim qaytayotgan tovarning TANNARXINI bilmaydi:")
+        + f"<ul>{royxat}</ul>"
+        + _("Yechim (biri):")
+        + "<ol>"
+        + "<li>" + _("Qaytarishni ASL SCHYOTDAN qiling: o'sha schyotni ochib "
+                     "«Return / Credit Note» tugmasini bosing — tannarx sotuvdan "
+                     "olinadi (eng to'g'ri yo'l).") + "</li>"
+        + "<li>" + _("Yoki bu qaytarishda «Update Stock» belgisini olib tashlang — "
+                     "faqat pul qaytadi, ombor tegilmaydi.") + "</li>"
+        + "<li>" + _("Yoki avval shu mahsulotning ombor kirimini yozing "
+                     "(ishlab chiqarish yoki boshlang'ich qoldiq), keyin qaytaring.") + "</li>"
+        + "</ol>",
+        title=_("Qaytarish: tannarx aniqlanmadi"),
+    )
+
+
 def before_validate(doc, method=None) -> None:
     """Zakaz ↔ tarozi fakt sinxroni (egasi talabi 2026-09-30).
 
@@ -23,6 +81,8 @@ def before_validate(doc, method=None) -> None:
         son bilan sotiladi. Sinxron har saqlash/tasdiqlashda ishlaydi,
         shuning uchun fakt keyin o'zgarsa ham schyot chetlab o'tolmaydi.
     """
+    _return_tannarx_tekshir(doc)
+
     if doc.get("is_return"):
         return
     detallar = [r.so_detail for r in doc.get("items") or [] if r.get("so_detail")]
