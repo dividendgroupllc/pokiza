@@ -10,7 +10,6 @@ frappe.ui.form.on("Sales Invoice", {
             frm.set_value("posting_time", "15:00:00");
             gpSkladDefault(frm);
         }
-        kartaFiltrYuklash(frm);
     },
 
     refresh(frm) {
@@ -19,7 +18,6 @@ frappe.ui.form.on("Sales Invoice", {
 
     customer(frm) {
         if (!frm.doc.customer) return;
-        kartaFiltrYuklash(frm);
         odatiyItemlarniYuklash(frm);
     },
 
@@ -44,22 +42,6 @@ function gpSkladDefault(frm) {
             if (ombor && frm.is_new() && !frm.doc.set_warehouse) {
                 frm.set_value("set_warehouse", ombor);
             }
-        });
-}
-
-// Mijoz kartochkasi bo'lsa item tanlash FAQAT undagi Aktiv SKU'lar bilan
-// cheklanadi (Disabled qatorlar chiqmaydi); kartochkasiz mijozda eski
-// umumiy filtr (butun sotuv guruhi) ishlayveradi.
-function kartaFiltrYuklash(frm) {
-    const mijoz = frm.doc.customer;
-    frm.__karta_skular = null;
-    if (!mijoz) return;
-    frappe
-        .call({ method: "pokiza.api.kartochka.aktiv_itemlar", args: { mijoz } })
-        .then((r) => {
-            if (frm.doc.customer !== mijoz) return;
-            const itemlar = r.message || [];
-            frm.__karta_skular = itemlar.length ? itemlar.map((it) => it.sku) : null;
         });
 }
 
@@ -135,17 +117,15 @@ function nolQatorlarniTozalash(frm) {
 }
 
 function setSalesItemQuery(frm) {
-    frm.set_query("item_code", "items", () => {
-        // Kartochkali mijoz: faqat kartochkadagi Aktiv SKU'lar
-        if (frm.__karta_skular && frm.__karta_skular.length) {
-            return { filters: { name: ["in", frm.__karta_skular] } };
-        }
-        return {
-            filters: {
-                disabled: 0,
-                is_sales_item: 1,
-                item_group: "Сотув махсулотлари",
-            },
-        };
-    });
+    // Egasi qarori 2026-10-12: kartochkali mijozga ham BUTUN sotuv guruhi
+    // ochiq — kartada yo'q mahsulotni ham sotish mumkin (eski "faqat karta
+    // Aktiv SKU'lari" filtri olib tashlandi; kartadagilar baribir avto
+    // to'ldirishda karta narxi bilan tushadi).
+    frm.set_query("item_code", "items", () => ({
+        filters: {
+            disabled: 0,
+            is_sales_item: 1,
+            item_group: "Сотув махсулотлари",
+        },
+    }));
 }
