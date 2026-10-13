@@ -26,8 +26,11 @@
 {%- set customer_row = frappe.db.get_value(
 	"Customer", doc.customer, ["tax_id", "contact_number", "mobile_no"], as_dict=True
 ) or {} if doc.customer else {} -%}
-{%- set customer_phone = doc.contact_mobile or doc.contact_phone
-	or customer_row.contact_number or customer_row.mobile_no or "" -%}
+{#- Telefon: avval schyotda qo'lda yozilgan raqam (custom_mijoz_tel),
+    bo'lmasa kontakt/mijoz kartochkasidagi raqam -#}
+{%- set customer_phone = doc.get("custom_mijoz_tel") or doc.contact_mobile
+	or doc.contact_phone or customer_row.contact_number
+	or customer_row.mobile_no or "" -%}
 {%- set customer_city = frappe.db.get_value("Address", doc.customer_address, "city")
 	or doc.territory or "" if doc.customer_address else (doc.territory or "") -%}
 {%- set customer_inn = doc.tax_id or customer_row.tax_id or "" -%}
@@ -37,7 +40,9 @@
 	{%- set ns.total_qty = ns.total_qty + (item.qty or 0)|float -%}
 {%- endfor -%}
 {%- set total_amount = doc.rounded_total or doc.grand_total or doc.total or 0 -%}
-{%- set items_per_page = 14 -%}
+{#- Qatorlar soni: maket endi A4 ni to'liq o'lchamda egallaydi
+    (pdf_zoom), shuning uchun bir varaqqa 12 qator sig'adi -#}
+{%- set items_per_page = 12 -%}
 {%- set page_count = ((doc.items|length + items_per_page - 1) // items_per_page) or 1 -%}
 
 {%- macro num(value, decimals=0) -%}
@@ -49,10 +54,25 @@
 	{%- if v == v|round(0, "floor") -%}{{ num(v) }}{%- else -%}{{ num(v, 1) }}{%- endif -%}
 {%- endmacro -%}
 
+{#- wkhtmltopdf ning «unpatched» qurilishi mm/px ni ~0.77 ga siqib chizadi
+    (varaq chapga siqilib, o'ng/past tomonda bo'sh joy qoladi) — pdf_zoom()
+    shuni qaytarib, maket A4 ni to'liq egallashini ta'minlaydi. Patched
+    qurilishda qiymat 1 bo'ladi, ya'ni hech narsa o'zgarmaydi. -#}
+{%- set pdf_zoom_k = pdf_zoom() -%}
+
 <style>
+	/* wkhtmltopdf sahifa chekkasini o'zi qo'yadi (5mm) — brauzer/Frappe
+	   qo'shadigan body chekkasi ustiga qo'shilib, maketni o'ngga surib
+	   yuboradi va o'ng nusxani qirqadi. Shuning uchun nolga tushiramiz. */
+	html, body {
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
 	.print-format {
 		orientation: Landscape;
 		page-size: A4;
+		zoom: {{ pdf_zoom_k }};
 		margin-top: 5mm;
 		margin-bottom: 5mm;
 		margin-left: 5mm;
@@ -66,14 +86,27 @@
 		line-height: 1.25;
 	}
 
+	/* Yuqoridagi margin-* larni wkhtmltopdf SAHIFA chekkasi deb o'qiydi,
+	   lekin brauzer ularni ELEMENT chekkasi sifatida ham qo'llaydi — chekka
+	   ikki marta tushib, maket o'ngga/pastga suriladi va oxirgi ustun
+	   («Всего» sonlari) qirqiladi. Element chekkasini nolga tushiramiz;
+	   bu selektor «sof .print-format» emas, shuning uchun Frappe uni PDF
+	   optsiyasi deb o'qimaydi (optsiyalar yuqoridagi qoidadan olinadi). */
+	.print-format-gutter > .print-format,
+	body > .print-format {
+		margin: 0 !important;
+	}
+
 	.print-format * {
 		box-sizing: border-box;
 	}
 
 	/* A4 landshaft 297mm − 2×5mm chekka = 287mm: varaq to'liq band,
-	   50/50 kataklar chegarasi aynan qog'oz o'rtasiga (148.5mm) tushadi */
+	   50/50 kataklar chegarasi aynan qog'oz o'rtasiga (148.5mm) tushadi.
+	   Kenglik 100% — chop maydoni qancha bo'lsa, shuncha (qat'iy mm yozilsa
+	   renderer siqqanda yoki yaxlitlashda chetga chiqib ketishi mumkin). */
 	.sheet-page {
-		width: 287mm;
+		width: 100%;
 		position: relative;
 	}
 
@@ -105,7 +138,7 @@
 
 	.copy-inner {
 		position: relative;
-		min-height: 196mm;
+		min-height: 193mm;
 		padding-bottom: 16mm;
 	}
 

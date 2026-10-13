@@ -167,6 +167,12 @@ function soQogozHtml(d, qaysi) {
     const bosh = `${soEsc(d.mijoz)} · ${soEsc(d.so)} · ${soEsc(d.sana)}` +
         (d.ombordan_kg ? ` · ${__("ombordan")}: ${fmt(d.ombordan_kg)} kg` : "");
 
+    // Zakazdagi izoh har uch qog'ozda ko'rinadi (egasi talabi 2026-10-13):
+    // sotuvchi yozgan izohni sex, shpritschi va tarozichi o'qiydi
+    const izohHtml = d.izoh
+        ? `<div class="izoh"><b>${__("Izoh")} / КОММЕНТ:</b> ${soEsc(d.izoh)}</div>`
+        : "";
+
     let sarlavha, jadval;
     if (qaysi === "farsh") {
         sarlavha = "1-QOG'OZ · FARSH ISHLAB CHIQARISH REJASI (texnolog)";
@@ -210,9 +216,12 @@ function soQogozHtml(d, qaysi) {
             .indent { width: 20px; border-right: none; }
             .norma-row td { background: #f5f5f5; }
             .imzo { margin: 14px 0 0; font-size: 12px; }
+            .izoh { border: 1px solid #000; background: #fffbe6; padding: 6px 8px;
+                    margin: 0 0 8px; font-size: 13px; }
         </style></head><body>
         <h2>${sarlavha}</h2>
         <div class="sub">${bosh} · jami ${fmt(d.jami_kg)} kg</div>
+        ${izohHtml}
         ${jadval}
         </body></html>`;
 }

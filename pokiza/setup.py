@@ -118,6 +118,19 @@ def get_custom_fields():
                 "no_copy": 1,
             },
         ],
+        # Schyotda mijozning telefon raqami (2026-10-13, egasi talabi):
+        # kassir shu yerga yozadi, Накладная PDF'dagi "тел:" katagiga
+        # shu raqam chiqadi (bo'sh bo'lsa — mijoz kartochkasidagi raqam)
+        "Sales Invoice": [
+            {
+                "fieldname": "custom_mijoz_tel",
+                "label": "Mijoz telefon raqami",
+                "fieldtype": "Data",
+                "options": "Phone",
+                "insert_after": "customer_name",
+                "in_list_view": 0,
+            },
+        ],
         # Schyotda zakaz soni ko'rinadi; qator soni (qty) esa tarozi fakti
         # bilan sinxronlanadi — mijozga fakt bo'yicha sotiladi (2026-09-30)
         "Sales Invoice Item": [

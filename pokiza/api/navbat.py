@@ -210,6 +210,44 @@ def _kun_band_kg(sana, exclude_so=None):
     return flt(r[0][0]) if r else 0.0
 
 
+def _reja_bosh_kun(kelgan_vaqt, boshlanish_kun=None):
+    """Zakaz rejasi QAYSI kundan qarala boshlanadi (yakshanba sakrashidan
+    oldingi xom kandidat): kesim vaqtigacha kelgan -> shu kun, keyin ->
+    ertaga; o'tmishga reja yozilmaydi; oldindan so'ralgan kun bundan
+    erta bo'lolmaydi."""
+    s = _sozlamalar()
+    kelgan = get_datetime(kelgan_vaqt or frappe.utils.now_datetime())
+
+    kandidat = getdate(kelgan)
+    if get_time(kelgan.time().strftime("%H:%M:%S")) > get_time(s.kesim):
+        kandidat = getdate(add_days(kandidat, 1))
+    # o'tmishga reja yozilmaydi (eski sana bilan kiritilgan zakaz)
+    if kandidat < getdate(today()):
+        kandidat = getdate(today())
+    # oldindan zakaz: so'ralgan kundan boshlanadi
+    if boshlanish_kun and getdate(boshlanish_kun) > kandidat:
+        kandidat = getdate(boshlanish_kun)
+    return kandidat
+
+
+def _ish_kuni(sana):
+    """Berilgan kun dam bo'lsa — keyingi ish kuniga suriladi."""
+    s = _sozlamalar()
+    kun = getdate(sana)
+    for _i in range(14):
+        if _yakshanbami(kun) and not s.yakshanba:
+            kun = getdate(add_days(kun, 1))
+            continue
+        return kun
+    return kun
+
+
+def _kun_bosh_joy(sana, exclude_so=None):
+    """Kunda yana qancha kg sig'adi (manfiy bo'lmaydi)."""
+    s = _sozlamalar()
+    return flt(max(s.quvvat - _kun_band_kg(sana, exclude_so=exclude_so), 0.0), 1)
+
+
 def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
     """Zakaz kg'ini kunlarga taqsimlaydi: [{"sana": date, "kg": float}, ...].
     Kesim vaqtigacha kelgan -> bugundan, keyin -> ertadan boshlanadi.
@@ -223,17 +261,7 @@ def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
     «sig'imdan ortiqcha» ogohlantirishi chiqadi (menejer hal qiladi).
     Kg noma'lum (0) zakaz birinchi to'lmagan ish kuniga tushadi."""
     s = _sozlamalar()
-    kelgan = get_datetime(kelgan_vaqt or frappe.utils.now_datetime())
-
-    kandidat = getdate(kelgan)
-    if get_time(kelgan.time().strftime("%H:%M:%S")) > get_time(s.kesim):
-        kandidat = getdate(add_days(kandidat, 1))
-    # o'tmishga reja yozilmaydi (eski sana bilan kiritilgan zakaz)
-    if kandidat < getdate(today()):
-        kandidat = getdate(today())
-    # oldindan zakaz: so'ralgan kundan boshlanadi
-    if boshlanish_kun and getdate(boshlanish_kun) > kandidat:
-        kandidat = getdate(boshlanish_kun)
+    kandidat = _reja_bosh_kun(kelgan_vaqt, boshlanish_kun)
 
     qoldi = flt(jami_kg)
     for _i in range(730):
@@ -347,17 +375,63 @@ def so_before_submit(doc, method=None):
     ishlab_kg = max(
         flt(doc.custom_jami_kg) - flt(doc.custom_ombordan_jami), 0.0
     )
+    # So'ralgan kun: custom_kerak_kun (zakaz sahifasi yozadi), SO formada
+    # esa maydon yashirilgan (egasi 2026-10-13) — delivery_date ishlatiladi
+    # (faqat kelajakdagi sana; o'tgan sana e'tiborga olinmaydi)
+    kerak_kun = doc.get("custom_kerak_kun")
+    if not kerak_kun and doc.get("delivery_date") and \
+            getdate(doc.delivery_date) > getdate(today()):
+        kerak_kun = doc.delivery_date
     if flt(doc.custom_ombordan_jami) > EPS and ishlab_kg <= EPS:
         # to'liq ombordan qoplangan — ishlab chiqarish yo'q, joy olmaydi,
         # kutilgan kunning o'ziga tushadi (faqat jo'natish qoladi)
         taqsimot = [{
-            "sana": _kutilgan_kun(doc.custom_kelgan_vaqt, doc.get("custom_kerak_kun")),
+            "sana": _kutilgan_kun(doc.custom_kelgan_vaqt, kerak_kun),
             "kg": 0.0,
         }]
     else:
+        # Birdan zakaz kelib qolsa (egasi talabi 2026-10-13): reja boshlanadigan
+        # kunga joy yetmasa, AVVAL o'sha kunga oldinga tortilgan zakazlar o'z
+        # kuniga qaytariladi — yangi zakaz o'z kunida qoladi, tortilgani esa
+        # joyiga. Ishlab chiqarish boshlangan zakaz qaytarilmaydi.
+        bosh_kun = _ish_kuni(_reja_bosh_kun(doc.custom_kelgan_vaqt, kerak_kun))
+        q = _tortilganlarni_qaytar(bosh_kun, ishlab_kg, exclude_so=doc.name)
+        if q["qaytdi"]:
+            frappe.msgprint(
+                _("Joy bo'shatildi: oldinga tortilgan {0} zakaz o'z kuniga "
+                  "qaytarildi — {1}").format(
+                    len(q["qaytdi"]),
+                    ", ".join(
+                        "{0} → {1}".format(
+                            z["so"], frappe.utils.formatdate(z["kun"], "dd.MM")
+                        )
+                        for z in q["qaytdi"]
+                    ),
+                ),
+                indicator="orange",
+                alert=True,
+            )
+        elif q["bloklangan"] and q["kerak"] > q["bosh"] + EPS:
+            # joy yetmadi, tortilgan zakaz(lar) bor — lekin ularni qaytarib
+            # bo'lmaydi (tortilgan/omborga kirgan). Jim qolmaymiz: menejer
+            # nega zakaz keyingi kunga ketganini bilishi kerak.
+            frappe.msgprint(
+                _("{0} kuniga joy yetmadi ({1} kg bo'sh, zakaz {2} kg). Shu "
+                  "kunga oldinga tortilgan zakaz bor, lekin qaytarib bo'lmadi: "
+                  "{3}. Zakaz keyingi bo'sh kunga yozildi — kerak bo'lsa "
+                  "navbat sahifasidan qo'lda suring.").format(
+                    frappe.utils.formatdate(bosh_kun, "dd.MM"),
+                    flt(q["bosh"], 1), flt(ishlab_kg, 1),
+                    ", ".join(
+                        "{0} ({1} kg — {2})".format(t["so"], t["kg"], t["blok_sabab"])
+                        for t in q["bloklangan"]
+                    ),
+                ),
+                indicator="orange",
+            )
         taqsimot = kun_taqsimla(
             doc.custom_kelgan_vaqt, ishlab_kg, exclude_so=doc.name,
-            boshlanish_kun=doc.get("custom_kerak_kun"),
+            boshlanish_kun=kerak_kun,
         )
     doc.set("custom_kun_taqsimot", [])
     for t in taqsimot:
@@ -589,12 +663,21 @@ def kun_qogozlari(sana=None):
     kesim, shprits, tarozi = _kun_kesim(d["guruhlar"])
     s = _sozlamalar()
     farsh, shprits_rows, tarozi_rows = _qogoz_format(kesim, shprits, tarozi, s.zames)
+    # zakazdagi izoh har uch qog'ozda ko'rinadi (egasi talabi 2026-10-13):
+    # sex, shprits va tarozi odamlari sotuvchining izohini o'qiydi
+    izohlar = [
+        {"so": z["name"], "mijoz": g["mijoz"], "izoh": z["izoh"]}
+        for g in d["guruhlar"]
+        for z in g["zakazlar"]
+        if (z.get("izoh") or "").strip()
+    ]
     return {
         "sana": d["sana"],
         "jami_kg": d["jami_kg"],
         "farsh": farsh,
         "shprits": shprits_rows,
         "tarozi": tarozi_rows,
+        "izohlar": izohlar,
     }
 
 
@@ -642,6 +725,7 @@ def so_qogozlari(sales_order):
         "taqsimot": [{"sana": str(t["sana"]), "kg": t["kg"]} for t in taqsimot],
         "jami_kg": jami,
         "ombordan_kg": flt(so.custom_ombordan_jami, 1),
+        "izoh": (so.get("custom_izoh") or "").strip(),
         "farsh": farsh,
         "shprits": shprits_rows,
         "tarozi": tarozi_rows,
@@ -679,7 +763,7 @@ def get_navbat(sana=None, gorizont_boshi=None):
                 "name", "customer", "customer_name", "custom_jami_kg",
                 "custom_ombordan_jami", "custom_kelgan_vaqt",
                 "custom_mashina_vaqti", "custom_mashina_izoh", "custom_izoh",
-                "custom_kg_nomalum", "delivery_date",
+                "custom_kg_nomalum", "delivery_date", "custom_tortilgan_asl_kun",
             ],
         )
         if kun_ulush
@@ -764,6 +848,7 @@ def get_navbat(sana=None, gorizont_boshi=None):
             "izoh": so.custom_izoh or "",
             "kg_nomalum": so.custom_kg_nomalum or "",
             "delivery_date": str(so.delivery_date or ""),
+            "tortilgan_asl_kun": str(so.custom_tortilgan_asl_kun or ""),
             "progress": _zakaz_progress(so_items),
             "items": so_items,
         })
@@ -873,6 +958,17 @@ def get_navbat(sana=None, gorizont_boshi=None):
             tavsiyalar.append({"so": z["name"], "kg": z["kun_kg"]})
             qoldi -= z["kun_kg"]
 
+    # kun to'lmagan bo'lsa: keyingi kunlardan sig'adigan zakazlar taklifi
+    # (egasi talabi 2026-10-13 — tanlash odamning ishi, avtomatik ko'chmaydi)
+    bosh_joy = flt(max(s.quvvat - jami, 0), 1)
+    tortish = (
+        tortish_nomzodlari(sana)
+        if bosh_joy > EPS and getdate(sana) >= getdate(today())
+        else {"sana": str(sana), "bosh_joy": bosh_joy, "quvvat": s.quvvat,
+              "nomzodlar": []}
+    )
+    tortish["tortilganlar"] = _tortilganlar(sana)
+
     # mahsulot (norma) kesimi + zames — faqat ISHLAB CHIQARILADIGAN qism
     kesim, _shprits, _tarozi = _kun_kesim(tartiblangan)
     kesim_rows = sorted(
@@ -955,6 +1051,8 @@ def get_navbat(sana=None, gorizont_boshi=None):
         "jami_kg": jami,
         "ortiqcha": ortiqcha,
         "tavsiyalar": tavsiyalar,
+        "bosh_joy": bosh_joy,
+        "tortish": tortish,
         "guruhlar": tartiblangan,
         "kesim": kesim_rows,
         "gorizont": gorizont,
@@ -1985,7 +2083,12 @@ def surish(sales_order, yangi_kun, sabab=None):
 
     # qo'lda surish = MAJBURIY: zakaz butunligicha tanlangan kunga
     # (bo'laklar yig'ilib bitta kunga o'tadi; kun to'lib ketsa ogohlantiriladi)
-    _taqsimot_yoz(doc.name, [{"sana": yangi, "kg": flt(doc.custom_jami_kg)}])
+    # Kun bandligiga faqat ISHLAB CHIQARILADIGAN kg yoziladi — ombordan band
+    # qilingan qism ishlab chiqarilmaydi (submit mantig'i bilan bir xil,
+    # 2026-10-13 tuzatildi: avval to'liq jami_kg yozilib, kun haqiqatdan
+    # ko'proq band ko'rinardi).
+    ishlab_kg = max(flt(doc.custom_jami_kg) - flt(doc.custom_ombordan_jami), 0.0)
+    _taqsimot_yoz(doc.name, [{"sana": yangi, "kg": flt(ishlab_kg, 2)}])
     doc.db_set("custom_ishlab_chiqarish_kuni", yangi, update_modified=False)
     _jurnal_yoz(doc, eski_kun=eski, yangi_kun=yangi, sabab=sabab)
     _notify()
@@ -1998,6 +2101,266 @@ def surish(sales_order, yangi_kun, sabab=None):
         "quvvat": s.quvvat,
         "toldi": band > s.quvvat + EPS,
     }
+
+
+# ---------------------------------------------------------------------------
+#  OLDINGA TORTISH — bo'sh joyni keyingi kun zakazlari bilan to'ldirish
+#  (egasi talabi 2026-10-13)
+#
+#  MANTIQ:
+#   - Kun rejasi sig'imgacha to'lmagan bo'lsa, sahifa KEYINGI kunlardagi
+#     zakazlardan bo'sh joyga SIG'ADIGANLARINI taklif qiladi (atomar qoida:
+#     zakaz bo'linmaydi, butunligicha ko'chadi). Tanlash — odamning ishi,
+#     tizim o'zi ko'chirmaydi.
+#   - Tortilgan zakazda `custom_tortilgan_asl_kun` saqlanadi — bu uning
+#     "o'z joyi". Shu kunga birdan yangi zakaz kelib qolsa va joy
+#     yetmasa, tizim AVVAL tortilganlarni o'z kuniga qaytaradi, keyin
+#     yangi zakazni bugunga yozadi (`_tortilganlarni_qaytar`).
+#   - Ishlab chiqarish BOSHLANGAN (bitta qatori ham chiqarilgan yoki
+#     ombor kirimi bor) zakaz qaytarilmaydi — u shu kunda qoladi.
+# ---------------------------------------------------------------------------
+def _qaytarish_mumkin(so_name):
+    """Oldinga tortilgan zakazni o'z kuniga qaytarsa bo'ladimi — (ha/yo'q, sabab).
+
+    FAQAT ortga qaytib bo'lmaydigan ish bloklaydi (egasi 2026-10-13):
+      - qator tortilgan/jo'natilgan (holat «Chiqarildi»/«Jonatildi») yoki
+        fakt kg yozilgan, yoki aktiv tarozi bo'lagi bor;
+      - ombor kirimi TASDIQLANGAN (mahsulot omborga kirgan).
+    «Ishlab chiqarildi» belgisi va QORALAMA PE bloklamaydi: hali hech narsa
+    tortilmagan va omborga kirmagan — reja kuni bemalol ko'chadi.
+    """
+    qatorlar = frappe.get_all(
+        "Sales Order Item", filters={"parent": so_name},
+        fields=["name", "custom_holat", "custom_fakt_kg"],
+    )
+    for q in qatorlar:
+        if (q.custom_holat or "Kutilmoqda") in ("Chiqarildi", "Jonatildi"):
+            return False, _("qator tortilgan/jo'natilgan")
+        if flt(q.custom_fakt_kg) > EPS:
+            return False, _("tarozi fakti yozilgan")
+        if _tortishlar(q.name):
+            return False, _("tarozida bo'lak tortilgan")
+    if frappe.db.exists("Production Entry",
+                        {"sales_order": so_name, "docstatus": 1}):
+        return False, _("ombor kirimi tasdiqlangan")
+    return True, ""
+
+
+def _zakaz_boshlanmagan(so_name):
+    """Qisqa ko'rinish: zakazni qaytarsa bo'ladimi (sahifa uchun)."""
+    return _qaytarish_mumkin(so_name)[0]
+
+
+def _tortilganlar(sana, exclude_so=None):
+    """Shu kunga BOSHQA kundan tortib kelingan zakazlar ro'yxati."""
+    rows = frappe.db.sql(
+        """
+        SELECT so.name, so.customer_name, so.customer, kt.kg,
+               so.custom_tortilgan_asl_kun AS asl_kun
+        FROM `tabKun Taqsimot Qatori` kt
+        JOIN `tabSales Order` so ON so.name = kt.parent
+        WHERE kt.parenttype = 'Sales Order'
+          AND so.docstatus = 1
+          AND kt.sana = %(sana)s
+          AND so.custom_tortilgan_asl_kun IS NOT NULL
+        """,
+        {"sana": getdate(sana)},
+        as_dict=True,
+    )
+    return [
+        {
+            "so": r.name,
+            "mijoz": r.customer_name or r.customer or "",
+            "kg": flt(r.kg, 1),
+            "asl_kun": str(r.asl_kun),
+            "boshlanmagan": _qaytarish_mumkin(r.name)[0],
+            "blok_sabab": _qaytarish_mumkin(r.name)[1],
+        }
+        for r in rows
+        if not exclude_so or r.name != exclude_so
+    ]
+
+
+def _joyiga_qaytar(so_name, asl_kun, sabab):
+    """Tortilgan zakazni o'z kuniga qaytaradi (majburiy, surish bilan bir xil)."""
+    doc = frappe.get_doc("Sales Order", so_name)
+    kun = _ish_kuni(asl_kun)
+    # o'tib ketgan kunga qaytarib bo'lmaydi — keyingi ish kuniga
+    if kun < getdate(today()):
+        kun = _ish_kuni(today())
+    eski = doc.custom_ishlab_chiqarish_kuni
+    kg = max(flt(doc.custom_jami_kg) - flt(doc.custom_ombordan_jami), 0.0)
+    _taqsimot_yoz(doc.name, [{"sana": kun, "kg": kg}])
+    doc.db_set("custom_ishlab_chiqarish_kuni", kun, update_modified=False)
+    doc.db_set("custom_tortilgan_asl_kun", None, update_modified=False)
+    _jurnal_yoz(doc, eski_kun=eski, yangi_kun=kun, sabab=sabab)
+    return {"so": doc.name, "kun": str(kun), "kg": flt(kg, 1)}
+
+
+def _tortilganlarni_qaytar(sana, kerak_kg, exclude_so=None):
+    """`sana` kuniga `kerak_kg` sig'ishi uchun oldinga tortilgan zakazlarni
+    o'z kuniga qaytaradi.
+
+    Qaytaradi: {"qaytdi": [...], "bloklangan": [...], "bosh": kg, "kerak": kg}.
+    Zakazlar FAQAT muammoni haqiqatan hal qilsa ko'chiriladi — hammasini
+    qaytarib ham joy yetmasa, hech narsa tegilmaydi (bekorga ko'chirish yo'q,
+    yangi zakaz baribir keyingi kunga tushadi)."""
+    sana = getdate(sana)
+    bosh = _kun_bosh_joy(sana, exclude_so=exclude_so)
+    natija = {"qaytdi": [], "bloklangan": [], "bosh": bosh,
+              "kerak": flt(kerak_kg)}
+    if bosh + EPS >= flt(kerak_kg):
+        return natija
+
+    kerak = flt(kerak_kg) - bosh
+    hammasi = _tortilganlar(sana, exclude_so)
+    natija["bloklangan"] = [t for t in hammasi if not t["boshlanmagan"]]
+    nomzodlar = [t for t in hammasi if t["boshlanmagan"]]
+    if not nomzodlar or sum(t["kg"] for t in nomzodlar) + EPS < kerak:
+        return natija
+
+    # eng kam joy bo'shatib muammoni hal qiladigani: bittasi yetsa — shu,
+    # aks holda kattadan boshlab yetguncha
+    yetarli = sorted((t for t in nomzodlar if t["kg"] + EPS >= kerak),
+                     key=lambda t: t["kg"])
+    tanlangan = ([yetarli[0]] if yetarli
+                 else sorted(nomzodlar, key=lambda t: -t["kg"]))
+
+    bosh_qoldi = kerak
+    sabab = _("Bu kunga yangi zakaz keldi — oldinga tortilgan zakaz o'z kuniga qaytarildi")
+    for t in tanlangan:
+        if bosh_qoldi <= EPS:
+            break
+        natija["qaytdi"].append(_joyiga_qaytar(t["so"], t["asl_kun"], sabab))
+        bosh_qoldi -= t["kg"]
+    return natija
+
+
+@frappe.whitelist()
+def tortish_nomzodlari(sana=None, limit=10):
+    """`sana` kunidagi bo'sh joyga KEYINGI kunlardan sig'adigan zakazlar.
+    Yaqin kun avval, ichida esa bo'sh joyni ko'proq to'ldiradigani avval."""
+    sana = getdate(sana or nowdate())
+    s = _sozlamalar()
+    bosh = _kun_bosh_joy(sana)
+    out = {"sana": str(sana), "bosh_joy": bosh, "quvvat": s.quvvat, "nomzodlar": []}
+    if bosh <= EPS or sana < getdate(today()):
+        return out
+
+    rows = frappe.db.sql(
+        """
+        SELECT so.name, so.customer_name, so.customer, kt.sana, kt.kg,
+               so.custom_jami_kg, so.custom_ombordan_jami, so.delivery_date
+        FROM `tabKun Taqsimot Qatori` kt
+        JOIN `tabSales Order` so ON so.name = kt.parent
+        WHERE kt.parenttype = 'Sales Order'
+          AND so.docstatus = 1
+          AND kt.sana > %(sana)s
+        ORDER BY kt.sana ASC
+        """,
+        {"sana": sana},
+        as_dict=True,
+    )
+    # atomar qoida: bo'lingan zakaz tortilmaydi (butunligicha ko'chmaydi)
+    taqsimotlar = _so_taqsimot([r.name for r in rows])
+    nomzodlar = []
+    for r in rows:
+        if len(taqsimotlar.get(r.name) or []) > 1:
+            continue
+        kg = flt(r.kg, 1)
+        if kg <= EPS or kg > bosh + EPS:
+            continue
+        nomzodlar.append({
+            "so": r.name,
+            "mijoz": r.customer_name or r.customer or "",
+            "kun": str(r.sana),
+            "kg": kg,
+            "ombordan": flt(r.custom_ombordan_jami, 1),
+            "delivery_date": str(r.delivery_date or ""),
+        })
+    nomzodlar.sort(key=lambda z: (z["kun"], -z["kg"]))
+    out["nomzodlar"] = nomzodlar[: cint(limit) or 10]
+    return out
+
+
+@frappe.whitelist()
+def oldinga_tort(sales_order, sana, sabab=None):
+    """Keyingi kundagi zakazni tanlangan (to'lmagan) kunga tortib keladi.
+    Asl kuni eslab qolinadi — shu kunga yangi zakaz kelsa, zakaz
+    avtomatik o'z joyiga qaytadi."""
+    doc = frappe.get_doc("Sales Order", sales_order)
+    if doc.docstatus != 1:
+        frappe.throw(_("Faqat tasdiqlangan zakazni tortish mumkin"))
+    if not doc.has_permission("write"):
+        frappe.throw(_("Sizda bu zakazni o'zgartirish huquqi yo'q"),
+                     frappe.PermissionError)
+
+    s = _sozlamalar()
+    yangi = getdate(sana)
+    if yangi < getdate(today()):
+        frappe.throw(_("O'tgan kunga tortib bo'lmaydi"))
+    if _yakshanbami(yangi) and not s.yakshanba:
+        frappe.throw(_("Yakshanba — dam olish kuni"))
+
+    taqsimot = _so_taqsimot([doc.name]).get(doc.name) or []
+    if len(taqsimot) > 1:
+        frappe.throw(_("Bu zakaz kunlarga bo'lingan — avval «surish» bilan "
+                       "bitta kunga yig'ing"))
+    eski = getdate(taqsimot[0]["sana"]) if taqsimot else getdate(
+        doc.custom_ishlab_chiqarish_kuni)
+    if eski <= yangi:
+        frappe.throw(_("Bu zakaz allaqachon {0} kuni yoki undan oldin rejada").format(
+            frappe.utils.formatdate(eski, "dd.MM.yyyy")))
+
+    kg = max(flt(doc.custom_jami_kg) - flt(doc.custom_ombordan_jami), 0.0)
+    bosh = _kun_bosh_joy(yangi, exclude_so=doc.name)
+    if kg > bosh + EPS:
+        frappe.throw(_("Sig'maydi: {0} kuni {1} kg bo'sh joy bor, zakaz {2} kg. "
+                       "Zakaz bo'linmaydi.").format(
+            frappe.utils.formatdate(yangi, "dd.MM.yyyy"), flt(bosh, 1), flt(kg, 1)))
+
+    _taqsimot_yoz(doc.name, [{"sana": yangi, "kg": kg}])
+    doc.db_set("custom_ishlab_chiqarish_kuni", yangi, update_modified=False)
+    # asl kun bir marta yoziladi: ikki marta tortilsa ham "o'z joyi" o'zgarmaydi
+    if not doc.get("custom_tortilgan_asl_kun"):
+        doc.db_set("custom_tortilgan_asl_kun", eski, update_modified=False)
+    _jurnal_yoz(
+        doc, eski_kun=eski, yangi_kun=yangi,
+        sabab=sabab or _("Bo'sh joyni to'ldirish uchun oldinga tortildi"),
+    )
+    _notify()
+    return {
+        "ok": True,
+        "so": doc.name,
+        "kun": str(yangi),
+        "kg": flt(kg, 1),
+        "asl_kun": str(doc.get("custom_tortilgan_asl_kun") or eski),
+        "bosh_joy": _kun_bosh_joy(yangi),
+    }
+
+
+@frappe.whitelist()
+def tortilganni_qaytar(sales_order, sabab=None):
+    """Oldinga tortilgan zakazni qo'lda o'z kuniga qaytarish."""
+    doc = frappe.get_doc("Sales Order", sales_order)
+    if doc.docstatus != 1:
+        frappe.throw(_("Faqat tasdiqlangan zakaz"))
+    if not doc.has_permission("write"):
+        frappe.throw(_("Sizda bu zakazni o'zgartirish huquqi yo'q"),
+                     frappe.PermissionError)
+    asl = doc.get("custom_tortilgan_asl_kun")
+    if not asl:
+        frappe.throw(_("Bu zakaz oldinga tortilmagan — qaytaradigan kuni yo'q"))
+    mumkin, sabab = _qaytarish_mumkin(doc.name)
+    if not mumkin:
+        frappe.throw(_("Bu zakazni qaytarib bo'lmaydi ({0}) — kerak bo'lsa "
+                       "«surish» bilan ko'chiring").format(sabab))
+    natija = _joyiga_qaytar(
+        doc.name, asl,
+        sabab or _("Oldinga tortilgan zakaz qo'lda o'z kuniga qaytarildi"),
+    )
+    _notify()
+    return {"ok": True, **natija}
 
 
 # ---------------------------------------------------------------------------

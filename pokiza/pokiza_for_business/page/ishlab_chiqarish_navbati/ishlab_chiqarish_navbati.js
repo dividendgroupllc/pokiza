@@ -208,6 +208,36 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 			});
 		}
 
+		// --- bo'sh joy + keyingi kundan tortish taklifi (egasi 2026-10-13)
+		// Kun to'lmagan bo'lsa tizim KEYINGI kunlardan sig'adigan zakazlarni
+		// taklif qiladi; tanlash — menejerning ishi, o'zi ko'chirmaydi.
+		const tt = d.tortish || {};
+		// tortilgan zakazlar: qaysi birini qaytarib bo'lmasligi va nega
+		const tortMap = {};
+		(tt.tortilganlar || []).forEach((t) => (tortMap[t.so] = t));
+		if (d.ortiqcha <= 0 && d.bosh_joy > 0) {
+			const nomzodlar = tt.nomzodlar || [];
+			const $tz = $(`
+				<div class="nv-card nv-tortish">
+					<div class="nv-tz-title">🧩 ${__("Kunda")} <b>${fmt(d.bosh_joy)} kg</b> ${__("bo'sh joy bor")}</div>
+					<div class="nv-tz-sub">${
+						nomzodlar.length
+							? __("Keyingi kun zakazlaridan shu bo'sh joyga sig'adiganlari — bugun ishlab chiqaramizmi?")
+							: __("Bo'sh joyga sig'adigan (bo'linmagan) zakaz keyingi kunlarda yo'q")
+					}</div>
+					<div class="nv-tz-list"></div>
+				</div>`).appendTo($body);
+			const $tl = $tz.find(".nv-tz-list");
+			nomzodlar.forEach((n) => {
+				$(`<button class="btn btn-xs btn-default nv-tz-btn">
+					${qisqaSana(n.kun)} · ${frappe.utils.escape_html(n.mijoz)} · ${fmt(n.kg)} kg
+					→ ${__("bugunga tortish")}
+				</button>`)
+					.on("click", () => tortishDialog(n, d.sana))
+					.appendTo($tl);
+			});
+		}
+
 		// --- gorizont (kelgusi kunlar chizig'i)
 		const $gz = $('<div class="nv-gorizont"></div>').appendTo($body);
 		(d.gorizont || []).forEach((g) => {
@@ -262,7 +292,17 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 									? `<button class="btn btn-xs btn-primary nv-jonat">📦 ${__("Jo'natildi")}</button>`
 									: ""
 							}
+							${
+								z.tortilgan_asl_kun
+									? `<span class="nv-badge nv-badge-sariq">⤴ ${__("tortilgan")} (${qisqaSana(z.tortilgan_asl_kun)})</span>`
+									: ""
+							}
 							${z.zapas ? "" : `<button class="btn btn-xs btn-default nv-sur">→ ${__("surish")}</button>`}
+							${
+								z.tortilgan_asl_kun && z.progress === "kutilmoqda"
+									? `<button class="btn btn-xs btn-default nv-qaytar">⤶ ${__("joyiga qaytar")}</button>`
+									: ""
+							}
 						</div>
 						${
 							z.bolingan
@@ -276,6 +316,11 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 								? `<div class="nv-mini nv-kok">📦 ${__("Ombordan band qilingan")}: <b>${fmt(z.ombordan)} kg</b> · ${__("ishlab chiqariladi")}: ${fmt(z.kg - z.ombordan)} kg</div>`
 								: ""
 						}
+						${
+							tortMap[z.name] && !tortMap[z.name].boshlanmagan
+								? `<div class="nv-mini nv-warn">⤴ ${__("Oldinga tortilgan, lekin o'z kuniga qaytarib bo'lmaydi")} (${frappe.utils.escape_html(tortMap[z.name].blok_sabab)}) — ${__("yangi zakaz kelsa joy bo'shamaydi")}</div>`
+								: ""
+						}
 						${z.izoh ? `<div class="nv-mini text-muted">💬 ${frappe.utils.escape_html(z.izoh)}</div>` : ""}
 						${
 							z.kg_nomalum
@@ -284,6 +329,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 						}
 					</div>`);
 				$z.find(".nv-sur").on("click", () => surishDialog(z.name, d.sana));
+				$z.find(".nv-qaytar").on("click", () => qaytarish(z.name, z.tortilgan_asl_kun));
 				$z.find(".nv-jonat").on("click", () => jonatish(z.name));
 				const $tbl = $('<div class="nv-item-rows"></div>').appendTo($z);
 				z.items.forEach((it) => $tbl.append(itemRow(it)));
@@ -608,6 +654,73 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 		dlg.show();
 	}
 
+	// Keyingi kundagi zakazni bugungi bo'sh joyga tortib kelish. Zakaz
+	// bo'linmaydi — butunligicha ko'chadi, asl kuni esda saqlanadi.
+	function tortishDialog(n, sana) {
+		const dlg = new frappe.ui.Dialog({
+			title: __("Oldinga tortish") + " — " + n.so,
+			fields: [
+				{
+					fieldtype: "HTML",
+					options: `<div class="text-muted" style="margin-bottom:6px">
+						${frappe.utils.escape_html(n.mijoz)} · <b>${fmt(n.kg)} kg</b><br>
+						${__("Reja kuni")}: <b>${sanaLabel(n.kun)}</b> →
+						${__("yangi kun")}: <b>${sanaLabel(sana)}</b><br>
+						${__("Shu kunga yangi zakaz kelib joy yetmasa, bu zakaz avtomatik o'z kuniga qaytadi.")}
+					</div>`,
+				},
+				{
+					fieldname: "sabab",
+					label: __("Sabab (jurnalga yoziladi)"),
+					fieldtype: "Small Text",
+					default: __("Bo'sh joyni to'ldirish uchun oldinga tortildi"),
+				},
+			],
+			primary_action_label: __("Tortish"),
+			primary_action(v) {
+				frappe
+					.call({
+						method: "pokiza.api.navbat.oldinga_tort",
+						args: { sales_order: n.so, sana: sana, sabab: v.sabab },
+					})
+					.then((r) => {
+						dlg.hide();
+						const m = r.message || {};
+						frappe.show_alert({
+							message: __("{0} bugunga tortildi · qolgan bo'sh joy: {1} kg", [
+								m.so,
+								fmt(m.bosh_joy),
+							]),
+							indicator: "green",
+						});
+						yukla();
+					});
+			},
+		});
+		dlg.show();
+	}
+
+	function qaytarish(so, aslKun) {
+		frappe.confirm(
+			__("{0} zakazi o'z kuniga ({1}) qaytarilsinmi?", [so, sanaLabel(aslKun)]),
+			() => {
+				frappe
+					.call({
+						method: "pokiza.api.navbat.tortilganni_qaytar",
+						args: { sales_order: so },
+					})
+					.then((r) => {
+						const m = r.message || {};
+						frappe.show_alert({
+							message: __("{0} → {1} kuniga qaytarildi", [m.so, sanaLabel(m.kun)]),
+							indicator: "blue",
+						});
+						yukla();
+					});
+			}
+		);
+	}
+
 	// ======================================================== ZAKAZ URISH TAB
 	// ------------------------------------------------- 3 QOG'OZ (print)
 	// 1-Farsh rejasi (texnolog) · 2-Shprits rejasi · 3-Tarozi varaqasi.
@@ -640,6 +753,13 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 
 	function qogozHtml(d) {
 		const sana = sanaLabel(d.sana);
+		// Zakazlardagi izohlar har uch qog'ozda takrorlanadi (egasi talabi
+		// 2026-10-13): sex, shpritschi va tarozichi sotuvchi izohini o'qiydi
+		const izohlar = (d.izohlar || []).length
+			? `<div class="izoh"><b>${__("IZOH")} / КОММЕНТ:</b><ul>${d.izohlar
+					.map((i) => `<li><b>${esc(i.mijoz)}</b> (${esc(i.so)}): ${esc(i.izoh)}</li>`)
+					.join("")}</ul></div>`
+			: "";
 		const kesimga = (rows) => rows.map((f) => `
 			<tr><td>${esc(f.norma)}</td>
 				<td class="num">${fmt(f.kg)}</td>
@@ -672,11 +792,15 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 			.imzo { margin: 14px 0 0; font-size: 12px; }
 			.page { page-break-after: always; }
 			.page:last-child { page-break-after: auto; }
+			.izoh { border: 1px solid #000; background: #fffbe6; padding: 6px 8px;
+					margin: 0 0 8px; font-size: 12px; }
+			.izoh ul { margin: 4px 0 0; padding-left: 18px; }
 		</style></head><body>
 
 		<div class="page">
 			<h2>1-QOG'OZ · FARSH ISHLAB CHIQARISH REJASI</h2>
 			<div class="sub">${sana} · jami ${fmt(d.jami_kg)} kg · (texnolog uchun)</div>
+			${izohlar}
 			<table><tr><th>Norma / retsept</th><th class="num">Kg</th><th class="num">Zames</th></tr>
 			${kesimga(d.farsh)}</table>
 			<div class="imzo">Texnolog: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
@@ -685,6 +809,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 		<div class="page">
 			<h2>2-QOG'OZ · SHPRITS REJASI</h2>
 			<div class="sub">${sana} · qaysi farsh qaysi mahsulotga urilishi</div>
+			${izohlar}
 			<table><tr><th colspan="2">Norma → SKU</th><th class="num">Kg</th></tr>
 			${shpritsga(d.shprits)}</table>
 			<div class="imzo">Shpritschi: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
@@ -693,6 +818,7 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 		<div class="page">
 			<h2>3-QOG'OZ · TAROZI VARAQASI</h2>
 			<div class="sub">${sana} · pishirishdan keyin fakt og'irlik yoziladi</div>
+			${izohlar}
 			<table><tr><th>Mahsulot (SKU)</th><th>Norma</th><th class="num">Reja kg</th><th>Fakt kg</th><th>Izoh</th></tr>
 			${tarozga(d.tarozi)}</table>
 			<div class="imzo">Tarozichi: ________________ &nbsp;&nbsp; Imzo: ________ &nbsp;&nbsp; Vaqt: ________</div>
@@ -950,6 +1076,10 @@ frappe.pages["ishlab-chiqarish-navbati"].on_page_load = function (wrapper) {
 			.nv-of-title { font-size: 13px; color: #dc3545; }
 			.nv-of-sub { font-size: 11.5px; color: var(--text-muted); margin: 5px 0; }
 			.nv-of-list { display: flex; flex-wrap: wrap; gap: 6px; }
+			.nv-tortish { border-color: #0d6efd; background: rgba(13,110,253,.05); }
+			.nv-tz-title { font-size: 13px; color: #0d6efd; }
+			.nv-tz-sub { font-size: 11.5px; color: var(--text-muted); margin: 5px 0; }
+			.nv-tz-list { display: flex; flex-wrap: wrap; gap: 6px; }
 			.nv-gorizont { display: flex; gap: 6px; margin-bottom: 12px; }
 			.nv-gz-kun { flex: 1; text-align: center; cursor: pointer; background: var(--card-bg);
 				border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 2px; }

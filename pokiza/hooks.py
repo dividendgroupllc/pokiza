@@ -87,10 +87,11 @@ doctype_list_js = {
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "pokiza.utils.jinja_methods",
-# 	"filters": "pokiza.utils.jinja_filters"
-# }
+# pdf_zoom — print format'larda ishlatiladi (wkhtmltopdf siqib qo'yadigan
+# qurilishida sahifani A4 ga to'ldirish uchun zoom koeffitsienti)
+jinja = {
+	"methods": ["pokiza.utils.pdf_zoom"],
+}
 
 # Installation
 # ------------

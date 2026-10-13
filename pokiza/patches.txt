@@ -27,3 +27,6 @@ pokiza.patches.v0_0.add_stock_balance_roles
 pokiza.patches.v0_0.add_brak_holat_setup
 pokiza.patches.v0_0.fix_sotuv_si_korinish
 pokiza.patches.v0_0.add_sotuv_contact_perm
+pokiza.patches.v0_0.set_pi_stock_defaults
+pokiza.patches.v0_0.hide_so_extra_fields
+pokiza.patches.v0_0.add_oldinga_tortish_field

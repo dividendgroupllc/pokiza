@@ -19,12 +19,29 @@ frappe.ui.form.on("Sales Invoice", {
     customer(frm) {
         if (!frm.doc.customer) return;
         odatiyItemlarniYuklash(frm);
+        mijozTelYuklash(frm);
     },
 
     validate(frm) {
         nolQatorlarniTozalash(frm);
     },
 });
+
+// Mijoz telefon raqami (2026-10-13): kartochkadagi raqam schyotga tushadi,
+// kassir kerak bo'lsa qo'lda o'zgartiradi. Накладная PDF'dagi "тел:" katagi
+// shu maydondan oladi. Qo'lda yozilgan raqam ustiga yozilmaydi.
+function mijozTelYuklash(frm) {
+    if (frm.doc.docstatus !== 0 || frm.doc.custom_mijoz_tel) return;
+    const mijoz = frm.doc.customer;
+    frappe.db
+        .get_value("Customer", mijoz, ["contact_number", "mobile_no"])
+        .then((r) => {
+            const v = r && r.message;
+            if (!v || frm.doc.customer !== mijoz || frm.doc.custom_mijoz_tel) return;
+            const tel = v.contact_number || v.mobile_no;
+            if (tel) frm.set_value("custom_mijoz_tel", tel);
+        });
+}
 
 // Yangi schyotda ombor defaulti — tayyor mahsulot (ГП) skladi: Stock
 // Settings'dagi umumiy default сырьё, sotuvga mos emas. Operator xohlasa
