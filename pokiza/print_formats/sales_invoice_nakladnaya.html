@@ -40,10 +40,17 @@
 	{%- set ns.total_qty = ns.total_qty + (item.qty or 0)|float -%}
 {%- endfor -%}
 {%- set total_amount = doc.rounded_total or doc.grand_total or doc.total or 0 -%}
-{#- Qatorlar soni: maket endi A4 ni to'liq o'lchamda egallaydi
-    (pdf_zoom), shuning uchun bir varaqqa 12 qator sig'adi -#}
-{%- set items_per_page = 12 -%}
-{%- set page_count = ((doc.items|length + items_per_page - 1) // items_per_page) or 1 -%}
+{#- BITTA НАКЛАДНАЯ — DOIM BITTA VARAQ (egasi talabi 2026-10-13):
+    qatorlar ko'p bo'lsa jadval kichrayadi, lekin ikkinchi varaqqa
+    o'tmaydi. `fit` — jadval zichligi koeffitsienti: shuncha qatorgacha
+    odatiy o'lcham, undan ortig'ida shrift/balandlik proportsional
+    kichrayadi (eng kichigi 0.38 — 45 qatorgacha sinab ko'rilgan). -#}
+{%- set item_count = doc.items|length -%}
+{%- set items_per_page = [item_count, 1]|max -%}
+{%- set page_count = 1 -%}
+{%- set fit_limit = 18 -%}
+{%- set fit = 1.0 if item_count <= fit_limit
+	else [fit_limit / item_count, 0.38]|max -%}
 
 {%- macro num(value, decimals=0) -%}
 	{{- "{:,.{}f}".format((value or 0)|float, decimals).replace(",", " ").replace(".", ",") -}}
@@ -95,6 +102,15 @@
 	.print-format-gutter > .print-format,
 	body > .print-format {
 		margin: 0 !important;
+	}
+
+	/* Brauzerdan chop etilganda (Chrome/Firefox) mm aynan to'g'ri chiziladi
+	   — u yerda zoom KERAK EMAS. Eski WebKit (wkhtmltopdf) @supports ni
+	   umuman tushunmaydi, shuning uchun bu qoida faqat brauzerga tegadi. */
+	@supports (display: grid) {
+		.print-format {
+			zoom: 1;
+		}
 	}
 
 	.print-format * {
@@ -249,22 +265,25 @@
 	.items-table col.c-rate { width: 13%; }
 	.items-table col.c-amount { width: 17%; }
 
+	/* DIQQAT: Frappe'ning umumiy `.print-format td, th { padding: 10px
+	   !important }` qoidasi bor — `!important` bo'lmasa qator balandligi
+	   ikki barobar bo'lib, varaqqa kam qator sig'adi. */
 	.items-table th {
-		padding: 3px 3px;
+		padding: {{ (3 * fit)|round(1) }}px 3px !important;
 		border: 1px solid #1a1a1a;
 		background: #fff;
 		color: #1a1a1a;
 		text-align: center;
-		font-size: 10.5px;
+		font-size: {{ (10.5 * fit)|round(1) }}px;
 		font-weight: 700;
 	}
 
 	.items-table td {
-		height: 17px;
-		padding: 1px 4px;
+		height: {{ (17 * fit)|round(1) }}px;
+		padding: {{ (1 * fit)|round(2) }}px 4px !important;
 		border: 1px solid #8f9ba6;
 		vertical-align: middle;
-		font-size: 10px;
+		font-size: {{ (10 * fit)|round(1) }}px;
 	}
 
 	.items-table tbody tr:nth-child(odd) td {
