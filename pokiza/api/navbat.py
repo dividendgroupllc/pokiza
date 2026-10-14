@@ -549,6 +549,18 @@ def so_on_cancel(doc, method=None):
     _notify()
 
 
+def so_on_trash(doc, method=None):
+    """Zakaz butunlay o'chirilayotganda unga tegishli reja jurnali ham
+    o'chadi (2026-10-14). Aks holda Frappe «Reja Ozgarish Jurnali bilan
+    bog'langan» deb o'chirishni bloklaydi — jurnal esa zakazsiz o'zi
+    ma'nosiz (yetim) yozuv bo'lib qoladi. Jurnalda tarix SAQLANADI, chunki
+    bekor qilingan (cancel) zakaz o'chirilmaguncha unga tegilmaydi."""
+    for nom in frappe.get_all("Reja Ozgarish Jurnali",
+                              filters={"sales_order": doc.name}, pluck="name"):
+        frappe.delete_doc("Reja Ozgarish Jurnali", nom,
+                          ignore_permissions=True, force=True)
+
+
 def _jurnal_yoz(doc, eski_kun, yangi_kun, sabab):
     frappe.get_doc({
         "doctype": "Reja Ozgarish Jurnali",

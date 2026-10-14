@@ -173,6 +173,7 @@ doc_events = {
 		],
 		"before_cancel": "pokiza.api.navbat.so_before_cancel",
 		"on_cancel": "pokiza.api.navbat.so_on_cancel",
+		"on_trash": "pokiza.api.navbat.so_on_trash",
 	},
 	"Sales Invoice": {
 		"before_validate": "pokiza.events.sales_invoice.before_validate",

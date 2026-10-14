@@ -30,3 +30,5 @@ pokiza.patches.v0_0.add_sotuv_contact_perm
 pokiza.patches.v0_0.set_pi_stock_defaults
 pokiza.patches.v0_0.hide_so_extra_fields
 pokiza.patches.v0_0.add_oldinga_tortish_field
+pokiza.patches.v0_0.add_kassa_sales_order_perm
+pokiza.patches.v0_0.add_kassa_sales_invoice_perm
