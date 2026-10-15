@@ -2,6 +2,7 @@
 
 import frappe
 from frappe import _
+from frappe.utils import getdate
 
 from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
@@ -27,6 +28,16 @@ def on_submit(doc, method=None) -> None:
         si = make_sales_invoice(doc.name, ignore_permissions=True)
         if not si.get("items"):
             return
+
+        # SANALAR MODELI (egasi 2026-10-15): schyot sanasi = Delivery Date
+        # (zakaz sanasi esa ishlab chiqarish kuni). set_posting_time=1 —
+        # keyingi saqlashlarda sana bugunga surilib ketmasin.
+        if doc.get("delivery_date"):
+            si.set_posting_time = 1
+            si.posting_date = doc.delivery_date
+            si.posting_time = "15:00:00"
+            if not si.get("due_date") or getdate(si.due_date) < getdate(doc.delivery_date):
+                si.due_date = doc.delivery_date
 
         si.flags.ignore_permissions = True
         si.insert(ignore_permissions=True)

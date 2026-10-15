@@ -154,7 +154,10 @@ class ProductionEntry(Document):
         # standart hisoblanadi. SKU rejimda SE'ga bom yozilmaydi
         # (tayyor mahsulot BOM itemidan farq qiladi).
         se.stock_entry_type = "Manufacture"
-        se.posting_date = self.posting_date
+        # PE sanasi = reja kuni (egasi 2026-10-15); reja kundan OLDIN submit
+        # qilinsa kelajak sana bilan stock yurmaydi — bugungi sana olinadi
+        from frappe.utils import getdate, nowdate
+        se.posting_date = min(getdate(self.posting_date), getdate(nowdate()))
         se.posting_time = self.posting_time
         se.set_posting_time = 1
         se.company = self.company

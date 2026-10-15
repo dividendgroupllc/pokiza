@@ -375,13 +375,14 @@ def so_before_submit(doc, method=None):
     ishlab_kg = max(
         flt(doc.custom_jami_kg) - flt(doc.custom_ombordan_jami), 0.0
     )
-    # So'ralgan kun: custom_kerak_kun (zakaz sahifasi yozadi), SO formada
-    # esa maydon yashirilgan (egasi 2026-10-13) — delivery_date ishlatiladi
-    # (faqat kelajakdagi sana; o'tgan sana e'tiborga olinmaydi)
+    # SANALAR MODELI (egasi 2026-10-15): zakaz sanasi (transaction_date) =
+    # ISHLAB CHIQARISH kuni (reja/PE/tarozi shu kunda), delivery_date =
+    # SCHYOT kuni (draft SI shu sana bilan ochiladi, events/sales_order.py).
+    # custom_kerak_kun (zakaz sahifasi yozadi) ustuvor qoladi.
     kerak_kun = doc.get("custom_kerak_kun")
-    if not kerak_kun and doc.get("delivery_date") and \
-            getdate(doc.delivery_date) > getdate(today()):
-        kerak_kun = doc.delivery_date
+    if not kerak_kun and doc.get("transaction_date") and \
+            getdate(doc.transaction_date) > getdate(today()):
+        kerak_kun = doc.transaction_date
     if flt(doc.custom_ombordan_jami) > EPS and ishlab_kg <= EPS:
         # to'liq ombordan qoplangan — ishlab chiqarish yo'q, joy olmaydi,
         # kutilgan kunning o'ziga tushadi (faqat jo'natish qoladi)
@@ -1413,7 +1414,11 @@ def _pe_qoralama_yarat(qator, fakt_kg, brak_kg=0):
         pe = frappe.get_doc({
             "doctype": "Production Entry",
             "naming_series": "PE-.YYYY.-",
-            "posting_date": nowdate(),
+            # PE sanasi = ishlab chiqarish REJA kuni (egasi 2026-10-15:
+            # zakaz 14-ga bo'lsa PE/stock ham 14-sana bilan)
+            "posting_date": frappe.db.get_value(
+                "Sales Order", qator.parent, "custom_ishlab_chiqarish_kuni"
+            ) or nowdate(),
             "posting_time": frappe.utils.nowtime(),
             "company": company,
             "item_to_manufacture": g["gp"],
@@ -1509,7 +1514,10 @@ def _pe_zapas_yarat(qator, fakt_kg, brak_kg=0):
     pe = frappe.get_doc({
         "doctype": "Production Entry",
         "naming_series": "PE-.YYYY.-",
-        "posting_date": nowdate(),
+        # PE sanasi = zapasning ishlab chiqarish REJA kuni (egasi 2026-10-15)
+        "posting_date": frappe.db.get_value(
+            "Material Request", qator.parent, "custom_ishlab_chiqarish_kuni"
+        ) or nowdate(),
         "posting_time": frappe.utils.nowtime(),
         "company": frappe.db.get_single_value("Global Defaults", "default_company"),
         "item_to_manufacture": norma,
