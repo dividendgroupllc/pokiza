@@ -32,3 +32,4 @@ pokiza.patches.v0_0.hide_so_extra_fields
 pokiza.patches.v0_0.add_oldinga_tortish_field
 pokiza.patches.v0_0.add_kassa_sales_order_perm
 pokiza.patches.v0_0.add_kassa_sales_invoice_perm
+pokiza.patches.v0_0.hide_kelgan_vaqt

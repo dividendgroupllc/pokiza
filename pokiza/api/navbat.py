@@ -210,24 +210,13 @@ def _kun_band_kg(sana, exclude_so=None):
     return flt(r[0][0]) if r else 0.0
 
 
-def _reja_bosh_kun(kelgan_vaqt, boshlanish_kun=None):
+def _reja_bosh_kun(sana=None, boshlanish_kun=None):
     """Zakaz rejasi QAYSI kundan qarala boshlanadi (yakshanba sakrashidan
-    oldingi xom kandidat): kesim vaqtigacha kelgan -> shu kun, keyin ->
-    ertaga; o'tmishga reja yozilmaydi; oldindan so'ralgan kun bundan
-    erta bo'lolmaydi."""
-    s = _sozlamalar()
-    kelgan = get_datetime(kelgan_vaqt or frappe.utils.now_datetime())
-
-    kandidat = getdate(kelgan)
-    if get_time(kelgan.time().strftime("%H:%M:%S")) > get_time(s.kesim):
-        kandidat = getdate(add_days(kandidat, 1))
-    # o'tmishga reja yozilmaydi (eski sana bilan kiritilgan zakaz)
-    if kandidat < getdate(today()):
-        kandidat = getdate(today())
-    # oldindan zakaz: so'ralgan kundan boshlanadi
-    if boshlanish_kun and getdate(boshlanish_kun) > kandidat:
-        kandidat = getdate(boshlanish_kun)
-    return kandidat
+    oldingi xom kandidat). KESIM (13:00) QOIDASI BEKOR, «kelgan vaqt»
+    ISHLATILMAYDI (egasi 2026-10-15): faqat SANA — so'ralgan kun yoki zakaz
+    sanasi qaysi bo'lsa reja o'sha kundan; o'tmish sana bugunga qisadi."""
+    kandidat = getdate(boshlanish_kun or sana or today())
+    return max(kandidat, getdate(today()))
 
 
 def _ish_kuni(sana):
@@ -248,11 +237,10 @@ def _kun_bosh_joy(sana, exclude_so=None):
     return flt(max(s.quvvat - _kun_band_kg(sana, exclude_so=exclude_so), 0.0), 1)
 
 
-def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
+def kun_taqsimla(sana, jami_kg, exclude_so=None, boshlanish_kun=None):
     """Zakaz kg'ini kunlarga taqsimlaydi: [{"sana": date, "kg": float}, ...].
-    Kesim vaqtigacha kelgan -> bugundan, keyin -> ertadan boshlanadi.
-    boshlanish_kun berilsa (oldindan zakaz) — reja o'sha kundan boshlanadi
-    (lekin kesim qoidasidan ERTAROQ bo'lolmaydi).
+    Reja zakaz SANASIDAN boshlanadi (kesim 13:00 qoidasi bekor — egasi
+    2026-10-15); boshlanish_kun berilsa (so'ralgan kun) — o'sha kundan.
     ATOMAR QOIDA (egasi 2026-09-25, 2026-09-28 qat'iylashtirildi): zakaz
     HECH QACHON kunlar orasida bo'linmaydi. Zakaz qilingan kunga sig'sa —
     o'sha kunga, sig'masa — BUTUNLIGICHA keyingi bo'sh ish kuniga o'tadi
@@ -261,7 +249,7 @@ def kun_taqsimla(kelgan_vaqt, jami_kg, exclude_so=None, boshlanish_kun=None):
     «sig'imdan ortiqcha» ogohlantirishi chiqadi (menejer hal qiladi).
     Kg noma'lum (0) zakaz birinchi to'lmagan ish kuniga tushadi."""
     s = _sozlamalar()
-    kandidat = _reja_bosh_kun(kelgan_vaqt, boshlanish_kun)
+    kandidat = _reja_bosh_kun(sana, boshlanish_kun)
 
     qoldi = flt(jami_kg)
     for _i in range(730):
@@ -354,8 +342,8 @@ def so_validate(doc, method=None):
         sum(flt(d.get("custom_ombordan_kg")) for d in doc.get("items") or []), 2
     )
     doc.custom_kg_nomalum = "\n".join(nomalum) if nomalum else None
-    if not doc.custom_kelgan_vaqt:
-        doc.custom_kelgan_vaqt = frappe.utils.now_datetime()
+    # «kelgan vaqt» endi yozilmaydi ham, ishlatilmaydi ham (egasi
+    # 2026-10-15) — hamma hisob zakaz SANASI (transaction_date) bilan
     if nomalum and not doc.flags.in_insert:
         frappe.msgprint(
             _("Diqqat: {0} ta qatorning og'irligi (kg) aniqlanmadi — ular kunlik "
@@ -379,15 +367,15 @@ def so_before_submit(doc, method=None):
     # ISHLAB CHIQARISH kuni (reja/PE/tarozi shu kunda), delivery_date =
     # SCHYOT kuni (draft SI shu sana bilan ochiladi, events/sales_order.py).
     # custom_kerak_kun (zakaz sahifasi yozadi) ustuvor qoladi.
-    kerak_kun = doc.get("custom_kerak_kun")
-    if not kerak_kun and doc.get("transaction_date") and \
-            getdate(doc.transaction_date) > getdate(today()):
-        kerak_kun = doc.transaction_date
+    # transaction_date DOIM boshlanish kuni bo'ladi — bugungi sana ham
+    # (kesim 13:00 dan keyin kiritilsa ham ertaga surilmaydi, egasi
+    # 2026-10-15); o'tmish sana _reja_bosh_kun'da bugunga qisadi
+    kerak_kun = doc.get("custom_kerak_kun") or doc.get("transaction_date")
     if flt(doc.custom_ombordan_jami) > EPS and ishlab_kg <= EPS:
         # to'liq ombordan qoplangan — ishlab chiqarish yo'q, joy olmaydi,
         # kutilgan kunning o'ziga tushadi (faqat jo'natish qoladi)
         taqsimot = [{
-            "sana": _kutilgan_kun(doc.custom_kelgan_vaqt, kerak_kun),
+            "sana": _kutilgan_kun(doc.transaction_date, kerak_kun),
             "kg": 0.0,
         }]
     else:
@@ -395,7 +383,7 @@ def so_before_submit(doc, method=None):
         # kunga joy yetmasa, AVVAL o'sha kunga oldinga tortilgan zakazlar o'z
         # kuniga qaytariladi — yangi zakaz o'z kunida qoladi, tortilgani esa
         # joyiga. Ishlab chiqarish boshlangan zakaz qaytarilmaydi.
-        bosh_kun = _ish_kuni(_reja_bosh_kun(doc.custom_kelgan_vaqt, kerak_kun))
+        bosh_kun = _ish_kuni(_reja_bosh_kun(doc.transaction_date, kerak_kun))
         q = _tortilganlarni_qaytar(bosh_kun, ishlab_kg, exclude_so=doc.name)
         if q["qaytdi"]:
             frappe.msgprint(
@@ -431,7 +419,7 @@ def so_before_submit(doc, method=None):
                 indicator="orange",
             )
         taqsimot = kun_taqsimla(
-            doc.custom_kelgan_vaqt, ishlab_kg, exclude_so=doc.name,
+            doc.transaction_date, ishlab_kg, exclude_so=doc.name,
             boshlanish_kun=kerak_kun,
         )
     doc.set("custom_kun_taqsimot", [])
@@ -774,7 +762,7 @@ def get_navbat(sana=None, gorizont_boshi=None):
             filters={"name": ("in", list(kun_ulush))},
             fields=[
                 "name", "customer", "customer_name", "custom_jami_kg",
-                "custom_ombordan_jami", "custom_kelgan_vaqt",
+                "custom_ombordan_jami", "transaction_date",
                 "custom_mashina_vaqti", "custom_mashina_izoh", "custom_izoh",
                 "custom_kg_nomalum", "delivery_date", "custom_tortilgan_asl_kun",
             ],
@@ -841,14 +829,14 @@ def get_navbat(sana=None, gorizont_boshi=None):
             "mijoz": so.customer_name or so.customer or _("Noma'lum"),
             "slot": so.custom_mashina_vaqti or "Boshqa vaqt",
             "slot_izoh": so.custom_mashina_izoh or "",
-            "kelgan": so.custom_kelgan_vaqt,
+            "kelgan": so.transaction_date,
             "jami_kg": 0.0,
             "zakazlar": [],
         })
         kun_kg = flt(kun_ulush.get(so.name), 1)
         g["jami_kg"] += kun_kg
-        if so.custom_kelgan_vaqt and (not g["kelgan"] or so.custom_kelgan_vaqt < g["kelgan"]):
-            g["kelgan"] = so.custom_kelgan_vaqt
+        if so.transaction_date and (not g["kelgan"] or so.transaction_date < g["kelgan"]):
+            g["kelgan"] = so.transaction_date
         so_items = items_by_so.get(so.name, [])
         taqsimot = taqsimotlar.get(so.name, [])
         g["zakazlar"].append({
@@ -2491,18 +2479,12 @@ def get_ombor():
 # ---------------------------------------------------------------------------
 #  ZAKAZ URISH (sahifadan Sales Order yaratish)
 # ---------------------------------------------------------------------------
-def _kutilgan_kun(kelgan_vaqt=None, kerak_kun=None):
-    """Kesim vaqti bo'yicha zakaz 'tushishi kutilgan' birinchi ish kuni.
-    kerak_kun berilsa (oldindan zakaz) — o'sha kundan erta bo'lmaydi."""
+def _kutilgan_kun(sana=None, kerak_kun=None):
+    """Zakaz 'tushishi kutilgan' birinchi ish kuni — zakaz sanasi yoki
+    so'ralgan kun (kesim 13:00 qoidasi bekor — egasi 2026-10-15); faqat
+    yakshanba sakraladi, o'tmish sana bugunga qisadi."""
     s = _sozlamalar()
-    kelgan = get_datetime(kelgan_vaqt or frappe.utils.now_datetime())
-    kandidat = getdate(kelgan)
-    if get_time(kelgan.time().strftime("%H:%M:%S")) > get_time(s.kesim):
-        kandidat = getdate(add_days(kandidat, 1))
-    if kandidat < getdate(today()):
-        kandidat = getdate(today())
-    if kerak_kun and getdate(kerak_kun) > kandidat:
-        kandidat = getdate(kerak_kun)
+    kandidat = max(getdate(kerak_kun or sana or today()), getdate(today()))
     while _yakshanbami(kandidat) and not s.yakshanba:
         kandidat = getdate(add_days(kandidat, 1))
     return kandidat
@@ -2666,7 +2648,7 @@ def zakaz_yarat(mijoz, items, mashina_vaqti=None, mashina_izoh=None,
         "customer": mijoz,
         "order_type": "Sales",
         "delivery_date": yetkazish,
-        "custom_kelgan_vaqt": frappe.utils.now_datetime(),
+        "transaction_date": kerak_kun or nowdate(),
         "custom_kerak_kun": kerak_kun or None,
         "custom_mashina_vaqti": mashina_vaqti or None,
         "custom_mashina_izoh": mashina_izoh or None,
@@ -2725,10 +2707,10 @@ def zakaz_royxat(limit=200):
         filters={"docstatus": 1},
         fields=[
             "name", "customer", "customer_name", "custom_jami_kg",
-            "custom_kg_nomalum", "custom_kelgan_vaqt",
+            "custom_kg_nomalum", "transaction_date",
             "custom_ishlab_chiqarish_kuni",
         ],
-        order_by="custom_kelgan_vaqt desc, creation desc",
+        order_by="transaction_date desc, creation desc",
         limit_page_length=cint(limit) or 200,
     )
     items_by_so = {}
@@ -2756,7 +2738,7 @@ def zakaz_royxat(limit=200):
         "rows": [
             {
                 "mijoz": so.customer_name or so.customer or _("Noma'lum"),
-                "kelgan": str(so.custom_kelgan_vaqt or ""),
+                "kelgan": str(so.transaction_date or ""),
                 "jami_kg": flt(so.custom_jami_kg, 1),
                 "kg_nomalum": cint(so.custom_kg_nomalum),
                 "qachonga": str(so.custom_ishlab_chiqarish_kuni or ""),
