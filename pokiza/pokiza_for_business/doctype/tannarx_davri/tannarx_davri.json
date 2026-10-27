@@ -1,0 +1,115 @@
+{
+ "actions": [],
+ "autoname": "field:davr_nomi",
+ "creation": "2026-10-28 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "davr_nomi",
+  "davr_boshi",
+  "davr_oxiri",
+  "column_break_1",
+  "holat",
+  "hisoblangan",
+  "hisoblagan",
+  "section_qatorlar",
+  "qatorlar",
+  "izoh"
+ ],
+ "fields": [
+  {
+   "fieldname": "davr_nomi",
+   "fieldtype": "Data",
+   "label": "Davr",
+   "read_only": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Avto: YYYY-MM"
+  },
+  {
+   "fieldname": "davr_boshi",
+   "fieldtype": "Date",
+   "label": "Davr boshi",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "davr_oxiri",
+   "fieldtype": "Date",
+   "label": "Davr oxiri",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "holat",
+   "fieldtype": "Select",
+   "options": "Qoralama\nTasdiqlangan",
+   "default": "Qoralama",
+   "label": "Holat",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Faqat «Tasdiqlangan» davr kartochka va sotuvda ishlatiladi"
+  },
+  {
+   "fieldname": "hisoblangan",
+   "fieldtype": "Datetime",
+   "label": "Hisoblangan vaqt",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hisoblagan",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Hisoblagan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_qatorlar",
+   "fieldtype": "Section Break",
+   "label": "Normativ tannarxlar (SKU kesimida)"
+  },
+  {
+   "fieldname": "qatorlar",
+   "fieldtype": "Table",
+   "options": "Tannarx Davri Qatori",
+   "label": "SKU tannarxlari"
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Tannarx Davri",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1, "write": 1, "create": 1, "delete": 1, "export": 1,
+   "import": 1, "print": 1, "email": 1, "share": 1, "report": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1, "write": 1, "create": 1, "export": 1, "print": 1, "report": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1, "write": 1, "create": 1, "export": 1, "print": 1, "report": 1,
+   "role": "kassa"
+  },
+  {"read": 1, "report": 1, "role": "Sales Manager"},
+  {"read": 1, "report": 1, "role": "investor"}
+ ],
+ "search_fields": "davr_boshi,holat",
+ "sort_field": "davr_boshi",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

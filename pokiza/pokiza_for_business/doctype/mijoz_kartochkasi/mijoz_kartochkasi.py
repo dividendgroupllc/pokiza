@@ -70,13 +70,23 @@ class MijozKartochkasi(Document):
             aktiv.add(q.sku)
 
     def hisobla(self):
-        from pokiza.api.kartochka import tannarx_hisobla
+        """Tannarx MUZLATILGAN DAVRDAN o'qiladi, bu yerda hisoblanMAYDI.
 
+        Avval har saqlashda tannarx_hisobla() qayta chaqirilar va natija
+        shu kartochkaga yozilardi. Shuning uchun bitta SKU 58 kartochkada
+        58 xil vaqtda hisoblanib, bir vaqtda bir nechta xil tannarx bilan
+        turardi (126 SKU'dan 66 tasi, «Рулет Burxanov»da farq 117%).
+        Endi manba bitta: pokiza.api.tannarx (Tannarx Davri).
+        """
+        from pokiza.api.tannarx import davr_map, joriy_tannarx
+
+        karta = davr_map()
         for q in self.qatorlar:
             if q.sku:
-                t = tannarx_hisobla(q.sku, q.norma)
+                t = karta.get(q.sku) or joriy_tannarx(q.sku, norma=q.norma)
                 q.tannarx = t["tannarx"]
-                q.tannarx_tafsilot = t["izoh"]
+                q.tannarx_tafsilot = "%s — %s" % (
+                    t.get("manba") or "?", t.get("izoh") or "")
             q.bonus_keyin_narx = flt(q.sotuv_narxi) * (1 - flt(q.bonus_foiz) / 100)
             q.marja_som = flt(q.bonus_keyin_narx) - flt(q.tannarx)
             q.marja_foiz = (

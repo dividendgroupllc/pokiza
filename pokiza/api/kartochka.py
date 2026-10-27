@@ -52,10 +52,57 @@ def _norma_farsh_narxi(norma):
 
 
 def _item_narxi(item_code):
-    """Upakovka/syryo itemining 1 birlik narxi (valuation → Item → Buying)."""
-    narx = frappe.db.get_value(
-        "Bin", {"item_code": item_code, "valuation_rate": [">", 0]}, "valuation_rate"
+    """Upakovka/syryo itemining 1 birlik narxi.
+
+    MANBA NAVBATI (2026-10-27 tuzatish):
+      1. QOLDIQ BOR omborlar bo'yicha og'irlangan o'rtacha:
+         Σ stock_value / Σ actual_qty;
+      2. qoldiq hech qayerda yo'q bo'lsa — OXIRGI XARID narxi
+         (Purchase Invoice: base_net_amount / stock_qty);
+      3. Item.valuation_rate;
+      4. Standard Buying prays-listi.
+
+    Avval shunchaki «valuation_rate > 0 bo'lgan birinchi Bin» olinardi.
+    Ikki muammo bor edi: (a) ERPNext tovar tugaganda ham Bin'da oxirgi
+    valuation_rate'ni saqlab qoladi, kod esa qoldiqqa qaramay o'sha
+    qotib qolgan narxni olardi (186 xomashyodan 16 tasi shunday — ayrimlari
+    2.5 oy oldingi narxda); (b) order_by yo'qligi sabab bir item ikki
+    omborda bo'lsa narx tasodifiy tanlanardi. Og'irlangan o'rtacha ikkala
+    muammoni ham yopadi va ombor hisobidagi qiymatga mos keladi.
+    """
+    kesh = getattr(frappe.local, "pokiza_item_narx_keshi", None)
+    if kesh is None:
+        kesh = frappe.local.pokiza_item_narx_keshi = {}
+    if item_code in kesh:
+        return kesh[item_code]
+
+    # 1. qoldiq bor omborlar bo'yicha og'irlangan o'rtacha
+    narx = frappe.db.sql(
+        """
+        SELECT SUM(stock_value) / SUM(actual_qty)
+        FROM `tabBin`
+        WHERE item_code = %s AND actual_qty > 0 AND stock_value > 0
+        """,
+        item_code,
     )
+    narx = flt(narx[0][0]) if narx and narx[0][0] else 0
+
+    # 2. qoldiq yo'q — oxirgi xarid narxi (Bin'dagi qotgan narx emas)
+    if not narx:
+        oxirgi = frappe.db.sql(
+            """
+            SELECT pii.base_net_amount / pii.stock_qty
+            FROM `tabPurchase Invoice Item` pii
+            JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+            WHERE pii.item_code = %s AND pi.docstatus = 1
+              AND IFNULL(pi.is_return, 0) = 0 AND pii.stock_qty > 0
+            ORDER BY pi.posting_date DESC, pi.creation DESC
+            LIMIT 1
+            """,
+            item_code,
+        )
+        narx = flt(oxirgi[0][0]) if oxirgi else 0
+
     if not narx:
         narx = frappe.db.get_value("Item", item_code, "valuation_rate")
     if not narx:
@@ -64,6 +111,7 @@ def _item_narxi(item_code):
             {"item_code": item_code, "price_list": "Standard Buying"},
             "price_list_rate",
         )
+    kesh[item_code] = flt(narx)
     return flt(narx)
 
 

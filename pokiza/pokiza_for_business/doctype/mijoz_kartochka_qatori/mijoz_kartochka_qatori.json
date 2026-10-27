@@ -46,10 +46,11 @@
   {
    "fieldname": "tannarx",
    "fieldtype": "Currency",
-   "label": "Tannarx so'm/kg",
+   "label": "Tannarx (normativ, davrdan)",
    "read_only": 1,
    "in_list_view": 1,
-   "columns": 1
+   "columns": 1,
+   "description": "Muzlatilgan «Tannarx Davri»dan o'qiladi — barcha kartochkada bir xil. Dashboarddagi «Себестоимость» esa FAKTIK ombor bahosi, ikkisi teng bo'lishi shart emas."
   },
   {
    "fieldname": "sotuv_narxi",

@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "creation": "2026-10-28 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sku",
+  "sku_nomi",
+  "norma",
+  "tannarx",
+  "farsh",
+  "upakovka",
+  "bom",
+  "izoh"
+ ],
+ "fields": [
+  {
+   "fieldname": "sku",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "SKU",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "sku_nomi",
+   "fieldtype": "Data",
+   "label": "Nomi",
+   "fetch_from": "sku.item_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "norma",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Norma (farsh)",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "tannarx",
+   "fieldtype": "Currency",
+   "label": "Normativ tannarx (so'm/birlik)",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "farsh",
+   "fieldtype": "Currency",
+   "label": "shundan farsh",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "upakovka",
+   "fieldtype": "Currency",
+   "label": "shundan upakovka",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "options": "BOM",
+   "label": "Hisoblangan BOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Data",
+   "label": "Izoh",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Tannarx Davri Qatori",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "idx",
+ "sort_order": "ASC",
+ "states": []
+}

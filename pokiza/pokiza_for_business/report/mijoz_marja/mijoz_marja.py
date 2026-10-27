@@ -11,6 +11,10 @@ Snapshot'i yo'q qatorlar (kartochka joriy etilishidan avvalgi sotuvlar)
 «Tannarxsiz savdo» ustunida alohida ko'rinadi — chalg'itmaydi.
 
 Mijoz filtri berilsa — o'sha mijoz SKU kesimida ochiladi.
+
+MUHIM: «Tannarx so'm/kg» ustuni «Kg (tannarxli)» ga bo'lib chiqariladi,
+«Kg (jami)» ga EMAS — snapshot'siz qatorlar maxrajni buzadi. Tannarxni
+qo'lda «Tannarx ÷ Kg (jami)» qilib hisoblash xato natija beradi.
 """
 
 import frappe
@@ -55,7 +59,9 @@ def _hisob_sql(guruh_ustun, alias, shart):
                      ELSE 0 END) AS hisobli_bonus,
             SUM(CASE WHEN IFNULL(sii.custom_tannarx_kg, 0) = 0
                      THEN sii.base_amount ELSE 0 END) AS tannarxsiz_savdo,
-            SUM(sii.stock_qty) AS kg
+            SUM(sii.stock_qty) AS kg,
+            SUM(CASE WHEN IFNULL(sii.custom_tannarx_kg, 0) > 0
+                     THEN sii.stock_qty ELSE 0 END) AS hisobli_kg
         FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         WHERE {shart}
@@ -69,21 +75,30 @@ def _qator_tayyorla(rows):
     for r in rows:
         sof = flt(r.hisobli_savdo) - flt(r.hisobli_bonus)
         foyda = sof - flt(r.tannarx)
+        # TANNARX / KG ni hisobot o'zi chiqaradi (2026-10-27).
+        # Avval buni odam qo'lda «Tannarx ÷ Kg» qilib hisoblardi va xato
+        # chiqardi: «Tannarx» faqat snapshot'i BOR qatorlardan yig'iladi,
+        # «Kg» esa BARCHA qatorlardan — snapshot'siz eski sotuvlari bor
+        # mijozda maxraj bir necha barobar katta bo'lib, tannarx/kg
+        # haqiqiydan ancha past chiqardi. To'g'ri maxraj — hisobli_kg.
         data.append({
             **r,
             "sof_savdo": flt(r.savdo) - flt(r.bonus),
             "foyda": foyda,
             "marja_foiz": (foyda / sof * 100) if sof else 0,
+            "tannarx_kg": (flt(r.tannarx) / flt(r.hisobli_kg)) if flt(r.hisobli_kg) else None,
         })
     return data
 
 
 UMUMIY_USTUNLAR = [
-    {"fieldname": "kg", "label": _("Kg"), "fieldtype": "Float", "precision": 1, "width": 90},
+    {"fieldname": "kg", "label": _("Kg (jami)"), "fieldtype": "Float", "precision": 1, "width": 95},
+    {"fieldname": "hisobli_kg", "label": _("Kg (tannarxli)"), "fieldtype": "Float", "precision": 1, "width": 110},
     {"fieldname": "savdo", "label": _("Savdo"), "fieldtype": "Currency", "width": 140},
     {"fieldname": "bonus", "label": _("Bonus"), "fieldtype": "Currency", "width": 120},
     {"fieldname": "sof_savdo", "label": _("Sof savdo (bonusdan keyin)"), "fieldtype": "Currency", "width": 140},
     {"fieldname": "tannarx", "label": _("Tannarx (muzlatilgan)"), "fieldtype": "Currency", "width": 140},
+    {"fieldname": "tannarx_kg", "label": _("Tannarx so'm/kg"), "fieldtype": "Currency", "width": 130},
     {"fieldname": "foyda", "label": _("Yalpi foyda"), "fieldtype": "Currency", "width": 140},
     {"fieldname": "marja_foiz", "label": _("Marja %"), "fieldtype": "Percent", "precision": 1, "width": 90},
     {"fieldname": "tannarxsiz_savdo", "label": _("Tannarxsiz savdo (eski)"), "fieldtype": "Currency", "width": 140},

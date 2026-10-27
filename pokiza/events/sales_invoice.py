@@ -159,6 +159,7 @@ def _kartochka_muzlat_va_stop(doc) -> None:
     «ko'z aldansa ham dastur aldanmaydi»).
     """
     from pokiza.api.kartochka import aktiv_map
+    from pokiza.api.tannarx import davr_map, joriy_tannarx
     from pokiza.api.partiya import (
         asosiy_ombor, norma_qoldiqlar, partiya_ol, partiya_qoldiq,
         partiya_rejimda, stock_rejimda,
@@ -179,6 +180,8 @@ def _kartochka_muzlat_va_stop(doc) -> None:
     if not karta:
         return
 
+    davr = davr_map(doc.posting_date)
+
     talab = {}      # batch -> jami so'ralgan kg (bir SKU 2 qatorda bo'lsa)
     xatolar = []
 
@@ -187,16 +190,14 @@ def _kartochka_muzlat_va_stop(doc) -> None:
         if k:
             # --- muzlatish (marja hisoboti uchun)
             row.custom_norma = k.norma
-            tannarx = flt(k.tannarx)
-            if not tannarx:
-                # karta qatorida tannarx saqlanmagan (qo'lda kiritilgan
-                # qator) — jonli hisobdan olinadi
-                from pokiza.api.kartochka import tannarx_hisobla
-                try:
-                    tannarx = flt(tannarx_hisobla(row.item_code, k.norma)["tannarx"])
-                except Exception:
-                    tannarx = 0
-            row.custom_tannarx_kg = tannarx
+            # TANNARX MANBAI (2026-10-28): kartochkadagi nusxa EMAS, balki
+            # schyot sanasiga tegishli muzlatilgan davr (Tannarx Davri).
+            # Kartochkadagi nusxa har saqlashda boshqa vaqtda hisoblanib
+            # qolar edi — shuning uchun bir SKU bir nechta xil tannarx
+            # bilan sotilib ketardi. Endi sotuv kuni qaysi davr amal
+            # qilsa, hamma mijozga aynan o'sha raqam muzlatiladi.
+            row.custom_tannarx_kg = flt(davr.get(row.item_code, {}).get("tannarx")) \
+                or flt(joriy_tannarx(row.item_code, doc.posting_date, k.norma)["tannarx"])
             row.custom_bonus_foiz_qator = flt(
                 k.bonus_foiz if flt(k.bonus_foiz) else k.umumiy_bonus
             )
