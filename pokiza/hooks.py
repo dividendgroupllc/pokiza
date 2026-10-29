@@ -161,6 +161,12 @@ doc_events = {
 	"BOM": {
 		"validate": "pokiza.events.bom.validate",
 	},
+	# Kartochka narxi -> mijoz kesimidagi Item Price (pokiza/api/narx.py):
+	# shundan keyin kartochka narxini ERPNext'ning o'zi ustun qo'yadi va
+	# apply_price_list uni prays-list narxiga almashtirib yubormaydi
+	"Mijoz Kartochkasi": {
+		"on_update": "pokiza.api.narx.kartochka_on_update",
+	},
 	"Kassa": {
 		"on_submit": "pokiza.events.kassa.on_submit",
 	},

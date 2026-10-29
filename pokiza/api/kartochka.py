@@ -23,10 +23,33 @@ NORMA_GURUH = "Готовый продукт"
 KUNLAR = 90  # qoralama uchun sotuv tarixi oynasi
 
 
+def _kesh(nom):
+    """So'rov (request) doirasidagi kesh.
+
+    Tannarx hisobi bir xil ma'lumotni qayta-qayta so'raydi: 171 SKU'ning
+    hammasi 20-30 ta normaga tayanadi, bundle va BOM esa bitta so'rov
+    ichida o'zgarmaydi. Kesh frappe.local'da — har HTTP so'rovi / fon
+    ishi oxirida o'zi yo'qoladi, ya'ni eskirgan narx qotib qolmaydi.
+    """
+    kesh = getattr(frappe.local, nom, None)
+    if kesh is None:
+        kesh = {}
+        setattr(frappe.local, nom, kesh)
+    return kesh
+
+
 def _norma_farsh_narxi(norma):
     """1 kg farsh tannarxi: BOM retsepti × HOZIRGI sklad narxlari."""
     if not norma:
         return 0.0
+    kesh = _kesh("pokiza_farsh_narx_keshi")
+    if norma in kesh:
+        return kesh[norma]
+    kesh[norma] = _norma_farsh_narxi_hisobla(norma)
+    return kesh[norma]
+
+
+def _norma_farsh_narxi_hisobla(norma):
     bom = frappe.db.get_value(
         "BOM",
         {"item": norma, "is_active": 1, "is_default": 1, "docstatus": 1},
@@ -115,21 +138,62 @@ def _item_narxi(item_code):
     return flt(narx)
 
 
-def _upakovka_narxi(sku):
-    """SKU bundle'idagi ГП bo'lmagan qatorlar — 1 kg uchun upakovka narxi."""
-    qatorlar = frappe.db.sql(
+def _bundle_qatorlari(sku):
+    """SKU bundle'ining BARCHA qatorlari — bitta so'rovda, keshlanadi.
+
+    Avval bundle ikki marta o'qilardi: _upakovka_narxi() ГП bo'lmagan
+    qatorlar uchun, bundle_normasi() esa ГП qatori uchun — ikkisi ham
+    har SKU'da alohida SQL yuborardi. Endi bitta so'rov ikkisiga ham
+    xizmat qiladi (171 SKU'da 342 so'rov → 171).
+
+    DISABLED bundle ham manba: flip'da bundlelar ataylab o'chirilgan,
+    tarixiy retsept ma'lumoti o'sha yerda qoladi.
+    """
+    kesh = _kesh("pokiza_bundle_keshi")
+    if sku not in kesh:
+        kesh[sku] = frappe.db.sql(
+            """
+            SELECT pbi.item_code, pbi.qty, i.item_group
+            FROM `tabProduct Bundle` pb
+            JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
+            JOIN `tabItem` i ON i.name = pbi.item_code
+            WHERE pb.new_item_code = %s
+            """,
+            sku,
+            as_dict=True,
+        )
+    return kesh[sku]
+
+
+def bundle_oldindan(skular):
+    """Ko'p SKU bundle qatorlarini BITTA so'rovda keshga yig'adi."""
+    kesh = _kesh("pokiza_bundle_keshi")
+    yetishmagan = [s for s in skular if s and s not in kesh]
+    if not yetishmagan:
+        return kesh
+
+    for r in frappe.db.sql(
         """
-        SELECT pbi.item_code, pbi.qty, i.item_group
+        SELECT pb.new_item_code AS sku, pbi.item_code, pbi.qty, i.item_group
         FROM `tabProduct Bundle` pb
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` i ON i.name = pbi.item_code
-        WHERE pb.new_item_code = %s
+        WHERE pb.new_item_code IN %(skular)s
         """,
-        sku,
+        {"skular": tuple(yetishmagan)},
         as_dict=True,
-    )
+    ):
+        kesh.setdefault(r.sku, []).append(r)
+
+    for s in yetishmagan:
+        kesh.setdefault(s, [])
+    return kesh
+
+
+def _upakovka_narxi(sku):
+    """SKU bundle'idagi ГП bo'lmagan qatorlar — 1 kg uchun upakovka narxi."""
     jami = 0.0
-    for q in qatorlar:
+    for q in _bundle_qatorlari(sku):
         if q.item_group == NORMA_GURUH:
             continue
         jami += flt(q.qty) * _item_narxi(q.item_code)
@@ -142,23 +206,19 @@ def bundle_normasi(sku):
     Bitta bo'lsa (143 tadan 137 tasi shunday) o'shani qaytaradi,
     aksiya-to'plamlarda (2-3 norma) None: normani odam tanlaydi.
     """
-    # DISABLED bundle ham manba: flip'da bundlelar ataylab o'chirilgan,
-    # tarixiy retsept ma'lumoti o'sha yerda qoladi
-    normalar = frappe.db.sql(
-        """
-        SELECT DISTINCT pbi.item_code
-        FROM `tabProduct Bundle` pb
-        JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
-        JOIN `tabItem` i ON i.name = pbi.item_code
-        WHERE pb.new_item_code = %s AND i.item_group = %s
-        """,
-        (sku, NORMA_GURUH),
-    )
+    kesh = _kesh("pokiza_bundle_norma_keshi")
+    if sku in kesh:
+        return kesh[sku]
+
+    normalar = {q.item_code for q in _bundle_qatorlari(sku)
+                if q.item_group == NORMA_GURUH}
     if len(normalar) == 1:
-        return normalar[0][0]
-    # bundle'siz (yangi) mahsulot: SKU BOM'idagi yagona ГП qatori
-    from pokiza.api.partiya import bom_yagona_gp
-    return bom_yagona_gp(sku)
+        kesh[sku] = normalar.pop()
+    else:
+        # bundle'siz (yangi) mahsulot: SKU BOM'idagi yagona ГП qatori
+        from pokiza.api.partiya import bom_yagona_gp
+        kesh[sku] = bom_yagona_gp(sku)
+    return kesh[sku]
 
 
 @frappe.whitelist()
@@ -256,6 +316,10 @@ def aktiv_map(mijoz):
     Bo'sh dict = kartochka yo'q yoki Aktiv qatori yo'q — chaqiruvchi eski
     xatti-harakatga qaytadi (kartochkasiz mijozlar ishlashda davom etadi).
     """
+    kesh = _kesh("pokiza_aktiv_karta_keshi")
+    if mijoz in kesh:
+        return kesh[mijoz]
+
     rows = frappe.db.sql(
         """
         SELECT q.sku, q.sku_nomi, q.norma, q.tannarx, q.sotuv_narxi,
@@ -267,7 +331,8 @@ def aktiv_map(mijoz):
         mijoz,
         as_dict=True,
     )
-    return {r.sku: r for r in rows}
+    kesh[mijoz] = {r.sku: r for r in rows}
+    return kesh[mijoz]
 
 
 def norma_map(mijoz):
@@ -293,29 +358,52 @@ def aktiv_itemlar(mijoz):
     )
 
 
-def _mijoz_qatorlari(mijoz):
-    """Mijozning 90 kunlik tarixidan kartochka qatorlari (har SKU oxirgi narxi)."""
+def _tarix_qatorlari(mijozlar):
+    """{mijoz: {sku: oxirgi narx qatori}} — BARCHA mijoz uchun bitta so'rov.
+
+    Avval har mijozga alohida so'rov yuborilardi (58 mijoz = 58 so'rov,
+    har biri `tabSales Invoice` × `Item` join'i bilan). SQL o'zi
+    guruhlashi arzonroq: bitta indeksli skan, dedupe Python'da.
+    """
+    if not mijozlar:
+        return {}
+
     tarix = frappe.db.sql(
         """
-        SELECT sii.item_code, sii.rate, si.posting_date
-        FROM `tabSales Invoice Item` sii
-        JOIN `tabSales Invoice` si ON si.name = sii.parent
+        SELECT si.customer, sii.item_code, sii.item_name, sii.qty, sii.rate,
+               si.posting_date
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         JOIN `tabItem` it ON it.name = sii.item_code
         WHERE si.docstatus = 1 AND si.is_return = 0
-          AND si.customer = %(mijoz)s
+          AND si.customer IN %(mijozlar)s
           AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL %(kunlar)s DAY)
           AND it.item_group = %(guruh)s AND it.disabled = 0
           AND sii.qty > 0
         ORDER BY si.posting_date DESC, si.creation DESC
         """,
-        {"mijoz": mijoz, "kunlar": KUNLAR, "guruh": SOTUV_GURUH},
+        {"mijozlar": tuple(mijozlar), "kunlar": KUNLAR, "guruh": SOTUV_GURUH},
         as_dict=True,
     )
-    oxirgi = {}
+
+    natija = {}
     for t in tarix:
-        if t.item_code not in oxirgi:
-            oxirgi[t.item_code] = t
-    return oxirgi
+        # ORDER BY tufayli birinchi uchragani eng oxirgi xaridi
+        natija.setdefault(t.customer, {}).setdefault(t.item_code, t)
+    return natija
+
+
+def _mijoz_qatorlari(mijoz):
+    """Bitta mijozning 90 kunlik tarixi (har SKU oxirgi narxi).
+
+    `customer` ustuni faqat bulk so'rovni guruhlash uchun kerak —
+    bitta mijoz kesimida uni qaytarmaymiz, chunki natija to'g'ridan-
+    to'g'ri schyot formasiga (odatiy_itemlar) ketadi.
+    """
+    return {
+        sku: frappe._dict({k: v for k, v in q.items() if k != "customer"})
+        for sku, q in _tarix_qatorlari([mijoz]).get(mijoz, {}).items()
+    }
 
 
 @frappe.whitelist()
@@ -325,6 +413,17 @@ def qoralama_toldir(mijoz=None):
     mijoz berilsa — faqat o'sha mijozga (mavjud kartochkaga yetishmagan
     SKU qatorlarini qo'shadi), berilmasa — 90 kunda xarid qilgan barcha
     mijozlarga kartochkasi yo'q bo'lsa yaratadi.
+
+    TEZLIK (2026-10-29): avval har mijoz uchun alohida sotuv tarixi
+    so'rovi + Customer bonusi + mavjud kartochka tekshiruvi ketardi va
+    har SKU uchun bundle normasi qayta so'ralardi — 58 mijozda mingdan
+    oshiq so'rov. Endi uch bulk so'rov tsikl boshida bir marta
+    bajariladi, bundle normalar ham oldindan keshga yig'iladi.
+
+    BARDOSHLILIK: bitta mijozning kartochkasi saqlanmasa (masalan
+    ichidagi SKU boshqa guruhga ko'chirilgan bo'lsa) butun jarayon
+    to'xtab qolmaydi — o'sha mijoz `xatolar`ga yoziladi, qolganlari
+    to'ldiriladi.
     """
     rollar = set(frappe.get_roles())
     if not rollar & {"System Manager", "Sales Manager", "kassa", "investor"}:
@@ -342,16 +441,42 @@ def qoralama_toldir(mijoz=None):
             KUNLAR,
         )]
 
-    natija = {"yaratildi": 0, "qator_qoshildi": 0, "otkazildi": 0, "normasiz": []}
+    natija = {"yaratildi": 0, "qator_qoshildi": 0, "otkazildi": 0,
+              "normasiz": [], "xatolar": []}
+    if not mijozlar:
+        return natija
+
+    # --- uchta bulk so'rov: tarix, bonuslar, mavjud kartochkalar
+    tarixlar = _tarix_qatorlari(mijozlar)
+    if not tarixlar:
+        natija["otkazildi"] = len(mijozlar)
+        return natija
+
+    bonuslar = dict(frappe.db.sql(
+        """
+        SELECT name, IFNULL(custom_bonus_foiz, 0) FROM `tabCustomer`
+        WHERE name IN %(mijozlar)s
+        """,
+        {"mijozlar": tuple(mijozlar)},
+    ))
+    mavjudlar = dict(frappe.db.sql(
+        """
+        SELECT mijoz, name FROM `tabMijoz Kartochkasi` WHERE mijoz IN %(mijozlar)s
+        """,
+        {"mijozlar": tuple(mijozlar)},
+    ))
+
+    # tsiklda bundle normasi so'ralmasin — barcha SKU bir marta keshga
+    bundle_oldindan({sku for t in tarixlar.values() for sku in t})
 
     for m in mijozlar:
-        tarix = _mijoz_qatorlari(m)
+        tarix = tarixlar.get(m)
         if not tarix:
             natija["otkazildi"] += 1
             continue
 
-        bonus = flt(frappe.db.get_value("Customer", m, "custom_bonus_foiz"))
-        mavjud_nom = frappe.db.get_value("Mijoz Kartochkasi", {"mijoz": m})
+        bonus = flt(bonuslar.get(m))
+        mavjud_nom = mavjudlar.get(m)
 
         if mavjud_nom:
             doc = frappe.get_doc("Mijoz Kartochkasi", mavjud_nom)
@@ -390,7 +515,19 @@ def qoralama_toldir(mijoz=None):
             natija["otkazildi"] += 1
             continue
 
-        doc.save(ignore_permissions=True)
+        # SAVEPOINT: xato bo'lgan mijozni YAKKA o'zini qaytaradi.
+        # Oddiy frappe.db.rollback() butun tranzaksiyani — ya'ni shu
+        # tsiklda allaqachon muvaffaqiyatli saqlangan kartochkalarni ham —
+        # bekor qilib yuborardi.
+        sp = "qoralama_%d" % id(doc)
+        frappe.db.savepoint(sp)
+        try:
+            doc.save(ignore_permissions=True)
+        except Exception as e:
+            frappe.db.rollback(save_point=sp)
+            natija["xatolar"].append("%s: %s" % (m, str(e)[:200]))
+            continue
+
         if mavjud_nom:
             natija["qator_qoshildi"] += qoshildi
         else:

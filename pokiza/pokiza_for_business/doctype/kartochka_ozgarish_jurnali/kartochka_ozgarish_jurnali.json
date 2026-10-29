@@ -19,7 +19,8 @@
    "fieldtype": "Link",
    "options": "Customer",
    "label": "Mijoz",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "search_index": 1
   },
   {
    "fieldname": "sku",

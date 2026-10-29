@@ -49,7 +49,56 @@ def stock_rejimda(item_code):
 
 def sku_bom(sku):
     """SKU'ning o'z BOM'i (bundle o'rnini bosuvchi retsept, UI'da
-    to'ldiriladi): aktiv+default → aktiv → istalgan submitted."""
+    to'ldiriladi): aktiv+default → aktiv → istalgan submitted.
+
+    So'rov doirasida keshlanadi (2026-10-29): bitta SKU uchun bu
+    funksiya tannarx_hisobla() ichida ham, Tannarx Davri qatoridagi
+    `bom` maydoni uchun ham chaqiriladi, bom_yagona_gp() esa yana bir
+    marta — har biri eng yomon holatda 3 ta get_value. Davrni qayta
+    hisoblashda bu 171 SKU × 9 so'rovga aylanardi.
+    """
+    from pokiza.api.kartochka import _kesh
+
+    kesh = _kesh("pokiza_sku_bom_keshi")
+    if sku not in kesh:
+        kesh[sku] = _sku_bom_topish(sku)
+    return kesh[sku]
+
+
+def sku_bom_oldindan(skular):
+    """Ko'p SKU uchun BOM'ni BITTA so'rovda keshga yig'adi.
+
+    sku_bom() har SKU'ga ketma-ket 3 ta get_value yuborishi mumkin
+    (aktiv+default → aktiv → istalgan). Davrni qayta hisoblashda bu
+    171 × 3 ≈ 500 so'rov. Bu yerda ustuvorlik SQL'ning o'zida
+    saralanadi: avval is_default, keyin is_active, keyin modified.
+    """
+    from pokiza.api.kartochka import _kesh
+
+    kesh = _kesh("pokiza_sku_bom_keshi")
+    yetishmagan = [s for s in skular if s and s not in kesh]
+    if not yetishmagan:
+        return kesh
+
+    for r in frappe.db.sql(
+        """
+        SELECT item, name, quantity
+        FROM `tabBOM`
+        WHERE docstatus = 1 AND item IN %(skular)s
+        ORDER BY item, is_active DESC, is_default DESC, modified DESC
+        """,
+        {"skular": tuple(yetishmagan)},
+        as_dict=True,
+    ):
+        # ORDER BY tufayli har item uchun BIRINCHI qator eng ustuvori
+        kesh.setdefault(r.item, frappe._dict(name=r.name, quantity=r.quantity))
+
+    for s in yetishmagan:
+        kesh.setdefault(s, None)
+    return kesh
+
+
+def _sku_bom_topish(sku):
     return frappe.db.get_value(
         "BOM", {"item": sku, "docstatus": 1, "is_active": 1, "is_default": 1},
         ["name", "quantity"], as_dict=True,

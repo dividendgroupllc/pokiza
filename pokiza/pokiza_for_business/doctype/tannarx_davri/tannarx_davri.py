@@ -69,7 +69,7 @@ class TannarxDavri(Document):
         qachon qilgani yozilib qoladi va o'zgarish Version'da ko'rinadi.
         """
         from pokiza.api.kartochka import bundle_normasi, tannarx_hisobla
-        from pokiza.api.partiya import sku_bom
+        from pokiza.api.partiya import sku_bom, sku_bom_oldindan
 
         if not frappe.has_permission(self.doctype, "write", self):
             frappe.throw(_("Huquq yo'q"))
@@ -80,6 +80,11 @@ class TannarxDavri(Document):
             pluck="name",
             order_by="name",
         )
+
+        # 171 SKU'ning BOM'ini bitta so'rovda keshga olib qo'yamiz —
+        # quyidagi tsiklda sku_bom() va tannarx_hisobla() shu keshdan
+        # o'qiydi (SKU boshiga 3-6 so'rov tejaladi)
+        sku_bom_oldindan(skular)
 
         self.set("qatorlar", [])
         hisoblanmadi = 0
@@ -111,6 +116,10 @@ class TannarxDavri(Document):
         self.hisoblangan = now_datetime()
         self.hisoblagan = frappe.session.user
         self.save()
+
+        # davr o'zgardi — tannarx.davr_map() keshi endi eskirgan
+        from pokiza.api.tannarx import davr_keshni_tozala
+        davr_keshni_tozala()
 
         frappe.msgprint(
             _("{0} SKU hisoblandi ({1} tasida normativ chiqmadi).").format(

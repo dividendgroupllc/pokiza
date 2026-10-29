@@ -44,16 +44,31 @@ def davr_map(sana=None):
 
     Kartochka saqlashda 30-40 qator bo'ladi, har biriga alohida so'rov
     yubormaslik uchun shu funksiya ishlatiladi.
+
+    SO'ROV ICHIDA KESHLANADI (2026-10-29): joriy_tannarx() davrda yo'q
+    har SKU uchun davr_map()ni QAYTA chaqirardi — schyotda 20 ta yangi
+    SKU bo'lsa 20 marta butun Tannarx Davri Qatori o'qilardi. Davr
+    «muzlatilgan» (Tasdiqlangan) ma'lumot, bitta so'rov ichida
+    o'zgarmaydi — shuning uchun sana bo'yicha keshlash xavfsiz.
+    Qayta hisoblashdan keyin kesh davr_keshni_tozala() bilan tozalanadi.
     """
+    kesh = getattr(frappe.local, "pokiza_davr_keshi", None)
+    if kesh is None:
+        kesh = frappe.local.pokiza_davr_keshi = {}
+    kalit = str(getdate(sana or nowdate()))
+    if kalit in kesh:
+        return kesh[kalit]
+
     nomi = _davr_nomi(sana)
     if not nomi:
-        return {}
+        kesh[kalit] = {}
+        return kesh[kalit]
     rows = frappe.get_all(
         "Tannarx Davri Qatori",
         filters={"parent": nomi, "parenttype": "Tannarx Davri"},
         fields=["sku", "norma", "tannarx", "farsh", "upakovka"],
     )
-    return {
+    kesh[kalit] = {
         r.sku: {
             "tannarx": flt(r.tannarx),
             "farsh": flt(r.farsh),
@@ -64,6 +79,12 @@ def davr_map(sana=None):
         }
         for r in rows
     }
+    return kesh[kalit]
+
+
+def davr_keshni_tozala():
+    """Davrni o'zgartirgan kod (qayta_hisobla / tasdiqlash) chaqiradi."""
+    frappe.local.pokiza_davr_keshi = {}
 
 
 @frappe.whitelist()

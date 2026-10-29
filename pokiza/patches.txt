@@ -33,3 +33,5 @@ pokiza.patches.v0_0.add_oldinga_tortish_field
 pokiza.patches.v0_0.add_kassa_sales_order_perm
 pokiza.patches.v0_0.add_kassa_sales_invoice_perm
 pokiza.patches.v0_0.hide_kelgan_vaqt
+pokiza.patches.v0_0.add_kartochka_indexes
+pokiza.patches.v0_0.sync_kartochka_item_price
