@@ -13,12 +13,9 @@ KUNLAR = 90
 NARX_GURUHI = "Сотув махсулотлари"
 
 # Schyotga oldindan tushadigan qator chegarasi (egasi qarori 2026-10-29).
-# «ЧП Хаёт»da 72 Aktiv SKU bor, sotuvchi esa odatda 5-10 tasini sotadi.
-# 72 qator jadvalni og'irlashtiradi va har son tahririda ERPNext butun
-# hujjatni serverga yuboradi (~58 KB) — shuning uchun eng ko'p sotiladigan
-# CHEK tasi tushadi, qolganini sotuvchi «Add Row» bilan qo'shadi
-# (qo'lda qo'shilgan qatorga narx mijoz kesimidagi Item Price'dan keladi,
-# ya'ni baribir kartochka narxi — qarang pokiza.api.narx).
+# Kartochkada 72 SKU bo'lishi mumkin, sotuvchi esa 5-10 tasini sotadi;
+# qolganini «Add Row» bilan qo'shadi (narx mijoz kesimidagi Item Price'dan
+# keladi — qarang pokiza.api.narx).
 CHEK = 10
 
 
@@ -51,9 +48,8 @@ def odatiy_itemlar(customer):
             key=lambda q: (q["item_name"] or "").lower(),
         )
 
-    # Tarix so'rovi kartochka moduli bilan BIR XIL bo'lsin (2026-10-29):
-    # avval shu yerda va kartochka.py'da deyarli bir xil ikki SQL turardi
-    # — biri tuzatilsa ikkinchisi eskirib qolardi. Endi manba bitta.
+    # Tarix so'rovining manbasi bitta bo'lsin: avval shu yerda va
+    # kartochka.py'da deyarli bir xil ikki SQL turardi.
     from pokiza.api.kartochka import _mijoz_qatorlari
 
     oxirgi = _mijoz_qatorlari(customer)
@@ -106,30 +102,26 @@ def _eng_kop_sotiladigan(customer, asos, chek):
 @frappe.whitelist()
 def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None,
                      posting_date=None):
-    """Mijoz tanlanganda schyot jadvaliga TAYYOR qatorlar — BITTA so'rovda.
+    """Mijoz tanlanganda schyot jadvaliga TAYYOR qatorlar — bitta so'rovda.
 
-    NIMA UCHUN KERAK (2026-10-29, sotuvchi shikoyati: «schyot uzoq yuklanadi»):
-    avval brauzer har SKU uchun alohida `frappe.model.set_value("item_code")`
-    qilardi, bu esa ERPNext'ning `get_item_details` server chaqiruvini
-    QATOR BOSHIGA bir marta ishga tushirardi — va har chaqiruvga butun
-    schyot hujjati yuk sifatida biriktirilardi. «ЧП Хаёт» kartochkasida
-    72 Aktiv SKU bor: 72 ketma-ket HTTP so'rov (faqat server tomonidagi
-    SQL 1 498 so'rov / 1.8 s), har biri o'sib borayotgan hujjat bilan —
-    ya'ni traffik qatorlar soniga KVADRAT bog'liq. Natijada sotuvchi
-    mijozni tanlagandan keyin o'n sekundlarcha kutib turardi.
+    Avval brauzer har SKU uchun `frappe.model.set_value("item_code", ...)`
+    qilardi, bu esa ERPNext'ning `get_item_details` server chaqiruvini QATOR
+    BOSHIGA bir marta uchirardi — 72 SKU = 72 ketma-ket so'rov, har biriga
+    butun hujjat yuk sifatida biriktirilgan. Bu yerda o'sha ma'lumot bir
+    necha bulk so'rovda yig'iladi, brauzer esa qatorlarni handler
+    uchirmasdan joylaydi (`frm.add_child`).
 
-    Bu yerda o'sha ma'lumot 5 ta bulk so'rovda yig'iladi va brauzer
-    qatorlarni handler ishga tushirmasdan (frm.add_child) joylaydi.
+    Xavfsizlik sharti: pokizada soliq jadvali, Pricing Rule va sales_uom
+    yo'q, bitta kompaniya va bitta valyuta (UZS, kurs 1), bitta sotuv
+    prays-listi — ya'ni get_item_details'ning universal mantig'i bu yerda
+    qo'shimcha hech narsa bermaydi. Natija 72 SKU'da ERPNext bilan
+    taqqoslangan: uom, stock_uom, conversion_factor va price_list_rate
+    aynan bir xil.
 
-    NIMA UCHUN XAVFSIZ: pokizada soliq jadvali yo'q (0 qator), Pricing
-    Rule yo'q, bitta kompaniya, bitta valyuta (UZS, kurs 1), bitta sotuv
-    prays-listi (Standard Selling), hech bir sotuv SKU'sida sales_uom
-    va partiya (has_batch_no) yo'q. Ya'ni get_item_details ning
-    universal mashinasi bu yerda faqat bo'sh ish qiladi. Hisob
-    (income_account, cost_center va h.k.) baribir SAQLASHDA ERPNext'ning
-    o'zi `set_missing_values` bilan to'ldiradi — biz uni oldinga
-    ko'chirmaymiz, shunchaki ekranga chiqarish uchun kerakli maydonlarni
-    beramiz.
+    MAJBURIY MAYDONLAR: Frappe ularni brauzerda, serverga yubormasdan
+    oldin tekshiradi — shuning uchun hammasi shu javobda bo'lishi kerak:
+    item_name, uom, conversion_factor, rate, amount, base_rate,
+    base_amount, income_account, cost_center.
     """
     if not customer or not frappe.has_permission("Sales Invoice", "create"):
         return {"qatorlar": [], "tel": None}
@@ -169,31 +161,53 @@ def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None
         )
     }
 
-    # 2) Item Default (ombor) — kompaniya kesimida
-    omborlar = dict(frappe.db.sql(
-        """
-        SELECT parent, default_warehouse FROM `tabItem Default`
-        WHERE company = %(company)s AND parent IN %(skular)s
-          AND IFNULL(default_warehouse, '') <> ''
-        """,
-        {"company": company, "skular": tuple(skular)},
-    ))
+    # 2) Item Default — ombor VA hisoblar, kompaniya kesimida
+    #
+    # HISOBLAR (2026-10-30). `income_account` — `reqd = 1` va defaulti YO'Q,
+    # shuning uchun u to'ldirilmasa forma brauzerda «обязательное поле ...
+    # счет доходов» deb saqlanmaydi (server tomonida ERPNext uni
+    # `set_missing_values`da o'zi to'ldiradi, lekin gap u yergacha
+    # yetib bormaydi). `cost_center` ham `reqd = 1`, lekin uning
+    # `default = ":Company"` qiymati bor va `frm.add_child` uni o'zi
+    # qo'yadi — bloklamaydi; shunga qaramay beramiz, chunki `:Company`
+    # har doim kompaniya markazini qo'yadi, ERPNext esa avval
+    # `Item Default.selling_cost_center`ga qaraydi — ikki yo'l bir xil
+    # natija bersin. Navbat get_item_details.py dagidek; Item Group /
+    # Brand darajasi pokizada ishlatilmaydi.
+    defaultlar = {
+        r.parent: r
+        for r in frappe.db.sql(
+            """
+            SELECT parent, default_warehouse, income_account, selling_cost_center
+            FROM `tabItem Default`
+            WHERE company = %(company)s AND parent IN %(skular)s
+            """,
+            {"company": company, "skular": tuple(skular)},
+            as_dict=True,
+        )
+    }
+    kompaniya_hisob = frappe.db.get_value(
+        "Company", company, ["default_income_account", "cost_center"], as_dict=True
+    ) or frappe._dict()
 
-    # 3) Prays-list narxi — kartochkasiz mijozga (kartochkalisiga narx
-    #    kartochkadan keladi). Har SKU uchun amal qiladigan ENG YANGI
-    #    qator: ORDER BY tufayli birinchi uchragani kerakligi.
+    # 3) Prays-list narxi. Navbat ERPNext'ning `get_price_list_rate_for`
+    #    dagidek: avval MIJOZ kesimidagi Item Price, bo'lmasa umumiy.
+    #    (Kartochka narxlari mijoz kesimidagi Item Price'ga ko'chiriladi —
+    #    qarang pokiza.api.narx.) Har SKU uchun amal qiladigan eng yangi
+    #    qator kerak: ORDER BY tufayli birinchi uchragani o'sha.
     praysdan = {}
     for r in frappe.db.sql(
         """
-        SELECT item_code, uom, price_list_rate
+        SELECT item_code, uom, price_list_rate, IFNULL(customer, '') <> '' AS mijozniki
         FROM `tabItem Price`
         WHERE price_list = %(price_list)s AND item_code IN %(skular)s
-          AND IFNULL(customer, '') = ''
+          AND IFNULL(customer, '') IN ('', %(customer)s)
           AND (valid_from IS NULL OR valid_from <= %(sana)s)
           AND (valid_upto IS NULL OR valid_upto >= %(sana)s)
-        ORDER BY valid_from DESC, modified DESC
+        ORDER BY mijozniki DESC, valid_from DESC, modified DESC
         """,
-        {"price_list": price_list, "skular": tuple(skular), "sana": sana},
+        {"price_list": price_list, "skular": tuple(skular),
+         "customer": customer, "sana": sana},
         as_dict=True,
     ):
         praysdan.setdefault((r.item_code, r.uom or ""), flt(r.price_list_rate))
@@ -215,10 +229,11 @@ def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None
         it = itemlar.get(a["item_code"])
         if not it:
             continue
+        d = defaultlar.get(it.name)
         uom = it.sotuv_uom or it.stock_uom
         cf = 1.0 if uom == it.stock_uom else konversiya.get((it.name, uom), 1.0)
-        narx = flt(a.get("rate")) if a.get("kartochkadan") else 0.0
         prays = praysdan.get((it.name, uom)) or praysdan.get((it.name, ""), 0.0)
+        narx = flt(a.get("rate")) if a.get("kartochkadan") else 0.0
         if not narx:
             narx = prays
 
@@ -233,14 +248,51 @@ def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None
             "qty": 0,
             "stock_qty": 0,
             "rate": narx,
-            "price_list_rate": prays,
+            # price_list_rate = rate (2026-10-30). Avval bu yerda UMUMIY
+            # prays-list narxi turardi, `rate` esa kartochkadan kelardi —
+            # ERPNext ikkisining farqini soxta `discount_amount` (yoki
+            # teskarisida `margin_type=Amount`) qilib yozib qo'yardi
+            # (8 SKU'dan 7 tasida: prays 44 730 vs kartochka 40 530 ->
+            # 4 200 "chegirma"). Mijoz uchun amal qiladigan narx —
+            # kartochka narxi, demak uning prays-list narxi ham o'shanikidir
+            # (narx.py uni mijoz kesimidagi Item Price'ga ham yozadi).
+            "price_list_rate": narx,
+            "base_price_list_rate": narx,
             "amount": 0,
             "base_rate": narx,
             "base_amount": 0,
-            "warehouse": set_warehouse or omborlar.get(it.name),
+            "warehouse": set_warehouse or (d.default_warehouse if d else None),
+            "income_account": (d.income_account if d else None)
+            or kompaniya_hisob.get("default_income_account"),
+            "cost_center": (d.selling_cost_center if d else None)
+            or kompaniya_hisob.get("cost_center"),
             # `is_stock_item` SI Item maydoni EMAS — yubormaymiz.
             "use_serial_batch_fields": 1 if it.has_batch_no else 0,
             "kartochkadan": a.get("kartochkadan") or 0,
         })
 
+    _majburiy_qoriqchi(qatorlar)
     return {"qatorlar": qatorlar, "tel": tel, "jami_mavjud": jami_mavjud}
+
+
+def _majburiy_qoriqchi(qatorlar):
+    """Majburiy maydon bo'sh qolsa Error Log'ga yozadi (formani to'xtatmaydi).
+
+    2026-10-30 da aynan shu jim sindirdi: `income_account` to'ldirilmagan
+    edi va forma faqat BRAUZERDA saqlanmasdi — server tomonidagi sinovlar
+    o'tib ketardi. Kelgusida SI Item'ga yangi majburiy maydon qo'shilsa,
+    shu yerda darhol ko'rinadi.
+    """
+    if not qatorlar:
+        return
+    try:
+        majburiy = [f.fieldname for f in frappe.get_meta("Sales Invoice Item").fields if f.reqd]
+        kam = sorted({f for r in qatorlar for f in majburiy if r.get(f) in (None, "")})
+        if kam:
+            frappe.log_error(
+                "Sales Invoice Item majburiy maydonlari to'ldirilmagan "
+                "(forma saqlanmaydi): %s" % ", ".join(kam),
+                "pokiza.api.mijoz.schyot_qatorlari",
+            )
+    except Exception:
+        pass
