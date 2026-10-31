@@ -127,14 +127,10 @@ function mijozMalumotiniYuklash(frm) {
                 frm.cscript.calculate_taxes_and_totals();
             }
 
-            const jami = javob.jami_mavjud || qatorlar.length;
-            const qoldi = jami - qatorlar.length;
             frappe.show_alert({
-                message: qoldi
-                    ? __("Eng ko'p sotiladigan {0} ta mahsulot yuklandi ({1} ta mijoz ro'yxatida bor) — sonini kiriting, qolganini «Add Row» bilan qo'shing", [qatorlar.length, jami])
-                    : (kartochkadan
-                        ? __("Mijoz kartochkasidan {0} ta Aktiv SKU yuklandi — sonini kiriting (0 = qator o'chadi)", [qatorlar.length])
-                        : __("{0} ta odatiy item yuklandi — sotiladigan sonini kiriting (0 = qator o'chadi)", [qatorlar.length])),
+                message: kartochkadan
+                    ? __("Mijoz kartochkasidan {0} ta Aktiv SKU yuklandi — sonini kiriting (0 = qator o'chadi)", [qatorlar.length])
+                    : __("{0} ta odatiy item yuklandi — sotiladigan sonini kiriting (0 = qator o'chadi)", [qatorlar.length]),
                 indicator: "green",
             });
         });

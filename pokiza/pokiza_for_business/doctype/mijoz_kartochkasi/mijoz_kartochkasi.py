@@ -31,8 +31,21 @@ class MijozKartochkasi(Document):
         self.bonus_defaultla()
         self.validate_guruhlar()
         self.validate_takror()
+        self.tartibga_keltir()
         self.hisobla()
         self.jurnalga_yoz()
+
+    def tartibga_keltir(self):
+        """Qatorlarni «Mahsulot Tartibi» ro'yxatiga qarab joylashtiradi.
+
+        Накладная ketma-ketligi butun tizimda bitta joyda yuritiladi
+        (egasi qarori 2026-10-31); kartochka esa undan o'qiydi, shuning
+        uchun qatorlar qanday kiritilganidan qat'i nazar doim bir xil
+        tartibda turadi. Ro'yxatda yo'q mahsulot oxirida, nom bo'yicha.
+        """
+        from pokiza.pokiza_for_business.doctype.mahsulot_tartibi.mahsulot_tartibi import saralangan
+
+        self.qatorlar = saralangan(self.qatorlar)
 
     def on_update(self):
         # aktiv_map() so'rov doirasida keshlanadi — kartochka shu so'rov

@@ -320,6 +320,13 @@ def aktiv_map(mijoz):
     if mijoz in kesh:
         return kesh[mijoz]
 
+    # ORDER BY q.idx — kartochkadagi QATOR TARTIBI (2026-10-31, egasi qarori).
+    # Kartochka jadvalida qatorlarni sichqoncha bilan tortib tartiblash
+    # mumkin; o'sha tartib накладная ketma-ketligi hisoblanadi va shu
+    # yerdan Sales Order, Sales Invoice va PDF ga tarqaladi. Avval bu
+    # ro'yxat chaqiruvchi tomonda ALIFBO bo'yicha saralanardi — shuning
+    # uchun kartochkadagi tartib hech qayerda ko'rinmasdi.
+    # Natija dict'i ham shu tartibni saqlaydi (Python dict insertion order).
     rows = frappe.db.sql(
         """
         SELECT q.sku, q.sku_nomi, q.norma, q.tannarx, q.sotuv_narxi,
@@ -327,6 +334,7 @@ def aktiv_map(mijoz):
         FROM `tabMijoz Kartochka Qatori` q
         JOIN `tabMijoz Kartochkasi` k ON k.name = q.parent
         WHERE k.mijoz = %s AND q.status = 'Aktiv'
+        ORDER BY q.idx
         """,
         mijoz,
         as_dict=True,
@@ -352,10 +360,8 @@ def aktiv_itemlar(mijoz):
     """
     if not frappe.has_permission("Mijoz Kartochkasi", "read"):
         return []
-    return sorted(
-        aktiv_map(mijoz).values(),
-        key=lambda r: (r.sku_nomi or r.sku or "").lower(),
-    )
+    # Saralamaymiz: kartochkadagi qator tartibi aynan saqlanadi
+    return list(aktiv_map(mijoz).values())
 
 
 def _tarix_qatorlari(mijozlar):

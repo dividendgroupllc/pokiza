@@ -12,11 +12,6 @@ from frappe.utils import flt
 KUNLAR = 90
 NARX_GURUHI = "Сотув махсулотлари"
 
-# Schyotga oldindan tushadigan qator chegarasi (egasi qarori 2026-10-29).
-# Kartochkada 72 SKU bo'lishi mumkin, sotuvchi esa 5-10 tasini sotadi;
-# qolganini «Add Row» bilan qo'shadi (narx mijoz kesimidagi Item Price'dan
-# keladi — qarang pokiza.api.narx).
-CHEK = 10
 
 
 @frappe.whitelist()
@@ -34,75 +29,37 @@ def odatiy_itemlar(customer):
 
     karta = aktiv_map(customer)
     if karta:
-        return sorted(
-            (
-                {
-                    "item_code": r.sku,
-                    "item_name": r.sku_nomi or r.sku,
-                    "qty": 0,
-                    "rate": r.sotuv_narxi,
-                    "kartochkadan": 1,
-                }
-                for r in karta.values()
-            ),
-            key=lambda q: (q["item_name"] or "").lower(),
-        )
+        # Kartochkadagi qator tartibi saqlanadi (2026-10-31): avval bu
+        # yerda alifbo bo'yicha saralanardi, shuning uchun kartochkada
+        # tortib qo'yilgan tartib schyotga yetib bormasdi.
+        return [
+            {
+                "item_code": r.sku,
+                "item_name": r.sku_nomi or r.sku,
+                "qty": 0,
+                "rate": r.sotuv_narxi,
+                "kartochkadan": 1,
+            }
+            for r in karta.values()
+        ]
 
     # Tarix so'rovining manbasi bitta bo'lsin: avval shu yerda va
     # kartochka.py'da deyarli bir xil ikki SQL turardi.
     from pokiza.api.kartochka import _mijoz_qatorlari
 
-    oxirgi = _mijoz_qatorlari(customer)
-    return sorted(oxirgi.values(), key=lambda q: (q.item_name or q.item_code).lower())
-
-
-def _eng_kop_sotiladigan(customer, asos, chek):
-    """Ro'yxatni mijozning HAQIQIY xaridiga qarab tartiblab, `chek` tasini oladi.
-
-    Tartib: shu mijoz so'nggi KUNLAR ichida necha MARTA olgani (eng
-    ishonchli belgi — doimiy assortiment), keyin oxirgi xarid sanasi,
-    keyin og'irligi. Tarixda uchramagan SKU'lar oxirida, alifbo bo'yicha.
-    """
-    if len(asos) <= chek:
-        return asos
-
-    tarix = {
-        r.item_code: r
-        for r in frappe.db.sql(
-            """
-            SELECT sii.item_code, COUNT(*) AS marta,
-                   MAX(si.posting_date) AS oxirgi, SUM(sii.stock_qty) AS kg
-            FROM `tabSales Invoice` si
-            JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-            WHERE si.docstatus = 1 AND si.is_return = 0
-              AND si.customer = %(customer)s
-              AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL %(kunlar)s DAY)
-              AND sii.qty > 0
-            GROUP BY sii.item_code
-            """,
-            {"customer": customer, "kunlar": KUNLAR},
-            as_dict=True,
-        )
-    }
-
-    bugun = frappe.utils.getdate()
-
-    def kalit(q):
-        """Kichik kalit = oldinda. Tarixsiz SKU oxirida, alifbo bo'yicha."""
-        t = tarix.get(q["item_code"])
-        nom = (q.get("item_name") or q["item_code"]).lower()
-        if not t:
-            return (1, 0, 0, 0.0, nom)
-        kun_oldin = (bugun - frappe.utils.getdate(t.oxirgi)).days if t.oxirgi else 10 ** 6
-        return (0, -int(t.marta), kun_oldin, -flt(t.kg), nom)
-
-    return sorted(asos, key=kalit)[:chek]
+    # Kartochkasiz mijoz: tartib manbasi yo'q, nom bo'yicha
+    return sorted(_mijoz_qatorlari(customer).values(),
+                  key=lambda q: (q.item_name or q.item_code).lower())
 
 
 @frappe.whitelist()
 def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None,
                      posting_date=None):
     """Mijoz tanlanganda schyot jadvaliga TAYYOR qatorlar — bitta so'rovda.
+
+    Kartochkadagi BARCHA Aktiv qator tushadi (egasi qarori 2026-10-31:
+    avvalgi 10 qator chegarasi olib tashlandi) va aynan kartochkadagi
+    tartibda — kartochka jadvalida qatorlar tortib tartiblanadi.
 
     Avval brauzer har SKU uchun `frappe.model.set_value("item_code", ...)`
     qilardi, bu esa ERPNext'ning `get_item_details` server chaqiruvini QATOR
@@ -139,7 +96,6 @@ def schyot_qatorlari(customer, company=None, price_list=None, set_warehouse=None
         return {"qatorlar": [], "tel": tel}
 
     jami_mavjud = len(asos)
-    asos = _eng_kop_sotiladigan(customer, asos, CHEK)
 
     skular = [r["item_code"] for r in asos]
     company = company or frappe.defaults.get_user_default("Company")

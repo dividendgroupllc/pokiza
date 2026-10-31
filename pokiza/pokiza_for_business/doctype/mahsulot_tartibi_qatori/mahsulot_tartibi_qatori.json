@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["mahsulot", "mahsulot_nomi", "birlik", "guruh"],
+ "fields": [
+  {
+   "fieldname": "mahsulot",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Mahsulot",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "columns": 4
+  },
+  {
+   "fieldname": "mahsulot_nomi",
+   "fieldtype": "Data",
+   "label": "Nomi",
+   "fetch_from": "mahsulot.item_name",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 4
+  },
+  {
+   "fieldname": "birlik",
+   "fieldtype": "Link",
+   "options": "UOM",
+   "label": "Birlik",
+   "fetch_from": "mahsulot.stock_uom",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "guruh",
+   "fieldtype": "Data",
+   "label": "Guruh",
+   "in_list_view": 1,
+   "columns": 2,
+   "description": "Faqat ko'rish uchun, masalan «СОСИСКИ». Tartibga ta'sir qilmaydi."
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Mahsulot Tartibi Qatori",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

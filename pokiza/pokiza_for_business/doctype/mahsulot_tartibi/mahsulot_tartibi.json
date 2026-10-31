@@ -1,0 +1,39 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "issingle": 1,
+ "field_order": ["tushuntirish", "qatorlar"],
+ "fields": [
+  {
+   "fieldname": "tushuntirish",
+   "fieldtype": "HTML",
+   "options": "<p><b>Накладная dagi mahsulot ketma-ketligi.</b> Qatorni chap chetidagi belgidan <b>tortib</b> joyini o'zgartirasiz va <b>Saqlash</b> bosasiz — shundan keyin mijoz kartochkalari, Sales Order va Sales Invoice shu tartibda chiqadi.</p><p>Excel'dagi tayyor ro'yxatni <b>«Ro'yxatni joylash»</b> tugmasi bilan bir marta kiritib olish mumkin (har satrda bitta mahsulot nomi). Bu ro'yxatda yo'q mahsulot doim oxirida, nom bo'yicha turadi.</p>"
+  },
+  {
+   "fieldname": "qatorlar",
+   "fieldtype": "Table",
+   "options": "Mahsulot Tartibi Qatori",
+   "label": "Mahsulotlar — tortib tartiblang"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Mahsulot Tartibi",
+ "owner": "Administrator",
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "export": 1, "print": 1, "email": 1, "share": 1, "report": 1},
+  {"role": "Sales Manager", "read": 1, "write": 1, "create": 1, "report": 1},
+  {"role": "kassa", "read": 1, "write": 1, "report": 1},
+  {"role": "Sales User", "read": 1, "report": 1},
+  {"role": "Sotuv", "read": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
