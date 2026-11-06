@@ -1077,7 +1077,15 @@ class PokizaAI {
 
 	// ---------- markdown (xavfsiz) ----------
 	md(text) {
-		return this.sanitize(frappe.markdown(text || ""));
+		// Frappe versiyasiga bog'liq bo'lmasin: ba'zi v15 relizlarida showdown "tables"siz yaratiladi
+		if (!frappe.md2html) frappe.markdown("");
+		if (frappe.md2html && frappe.md2html.setOption) {
+			frappe.md2html.setOption("tables", true);
+			frappe.md2html.setOption("strikethrough", true);
+		}
+		// jadval oldidan bo'sh qator bo'lmasa, ba'zi showdown versiyalari uni oddiy matn deb o'qiydi
+		const prepared = (text || "").replace(/\r\n/g, "\n").replace(/([^\n|][^\n]*)\n(\s*\|[^\n]*\|\s*\n\s*\|[\s:|-]+\|)/g, "$1\n\n$2");
+		return this.sanitize(frappe.markdown(prepared));
 	}
 
 	sanitize(html) {
