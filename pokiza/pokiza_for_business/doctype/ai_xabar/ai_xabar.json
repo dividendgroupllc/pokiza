@@ -1,0 +1,147 @@
+{
+ "autoname": "hash",
+ "creation": "2026-11-05 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "suhbat",
+  "role",
+  "status",
+  "text",
+  "content_json",
+  "api_messages_json",
+  "tool_calls_json",
+  "files_json",
+  "dashboards_json",
+  "section_usage",
+  "model",
+  "stop_reason",
+  "input_tokens",
+  "output_tokens",
+  "cache_read_tokens",
+  "cache_write_tokens",
+  "cost_usd",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "suhbat",
+   "fieldtype": "Link",
+   "label": "Suhbat",
+   "options": "AI Suhbat",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "label": "Role",
+   "options": "user\nassistant",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Holat",
+   "options": "Tayyor\nIshlayapti\nXato\nTo'xtatildi",
+   "default": "Tayyor"
+  },
+  {
+   "fieldname": "text",
+   "fieldtype": "Long Text",
+   "label": "Matn"
+  },
+  {
+   "fieldname": "content_json",
+   "fieldtype": "Long Text",
+   "label": "User content (API)"
+  },
+  {
+   "fieldname": "api_messages_json",
+   "fieldtype": "Long Text",
+   "label": "Assistant/tool xabarlari (API)"
+  },
+  {
+   "fieldname": "tool_calls_json",
+   "fieldtype": "Long Text",
+   "label": "Tool chaqiruvlari (audit)"
+  },
+  {
+   "fieldname": "files_json",
+   "fieldtype": "Long Text",
+   "label": "Fayllar (JSON)",
+   "read_only": 1,
+   "description": "Biriktirilgan yoki AI yaratgan fayllar"
+  },
+  {
+   "fieldname": "dashboards_json",
+   "fieldtype": "Long Text",
+   "label": "Dashboardlar (JSON)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_usage",
+   "fieldtype": "Section Break",
+   "label": "Usage"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "stop_reason",
+   "fieldtype": "Data",
+   "label": "Stop reason"
+  },
+  {
+   "fieldname": "input_tokens",
+   "fieldtype": "Int",
+   "label": "Input tokens"
+  },
+  {
+   "fieldname": "output_tokens",
+   "fieldtype": "Int",
+   "label": "Output tokens"
+  },
+  {
+   "fieldname": "cache_read_tokens",
+   "fieldtype": "Int",
+   "label": "Cache read tokens"
+  },
+  {
+   "fieldname": "cache_write_tokens",
+   "fieldtype": "Int",
+   "label": "Cache write tokens"
+  },
+  {
+   "fieldname": "cost_usd",
+   "fieldtype": "Float",
+   "label": "Narx ($)",
+   "precision": "4"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Xato"
+  }
+ ],
+ "modified": "2026-11-05 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "AI Xabar",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "track_changes": 0
+}

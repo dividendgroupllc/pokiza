@@ -1,0 +1,22 @@
+{
+ "content": null,
+ "creation": "2026-11-05 00:00:00",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-11-05 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "pokiza-ai",
+ "owner": "Administrator",
+ "page_name": "pokiza-ai",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "AI Foydalanuvchi"}
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Pokiza AI"
+}

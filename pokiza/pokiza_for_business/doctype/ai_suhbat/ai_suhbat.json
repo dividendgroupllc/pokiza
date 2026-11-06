@@ -1,0 +1,26 @@
+{
+ "autoname": "hash",
+ "creation": "2026-11-05 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["title", "user", "status", "last_message_at", "total_cost_usd"],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "label": "Sarlavha", "in_list_view": 1},
+  {"fieldname": "user", "fieldtype": "Link", "label": "User", "options": "User", "in_list_view": 1, "in_standard_filter": 1, "read_only": 1, "search_index": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Holat", "options": "Tayyor\nIshlayapti\nXato", "default": "Tayyor", "read_only": 1},
+  {"fieldname": "last_message_at", "fieldtype": "Datetime", "label": "Oxirgi xabar", "read_only": 1},
+  {"fieldname": "total_cost_usd", "fieldtype": "Float", "label": "Jami narx ($)", "read_only": 1, "precision": "4"}
+ ],
+ "modified": "2026-11-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "AI Suhbat",
+ "owner": "Administrator",
+ "permissions": [
+  {"read": 1, "delete": 1, "role": "System Manager", "write": 1, "report": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "title",
+ "track_changes": 0
+}

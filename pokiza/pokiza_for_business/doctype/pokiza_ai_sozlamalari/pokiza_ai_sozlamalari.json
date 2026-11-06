@@ -1,0 +1,123 @@
+{
+ "allow_rename": 0,
+ "creation": "2026-11-05 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "api_key",
+  "model",
+  "effort",
+  "column_break_1",
+  "max_steps",
+  "monthly_limit_usd",
+  "section_sql",
+  "sql_enabled",
+  "db_ro_user",
+  "db_ro_password",
+  "section_voice",
+  "gemini_api_key",
+  "gemini_model"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "AI yoqilgan",
+   "default": "1"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "Anthropic API Key"
+  },
+  {
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "default": "claude-opus-5-5"
+  },
+  {
+   "fieldname": "effort",
+   "fieldtype": "Select",
+   "label": "Effort",
+   "options": "low\nmedium\nhigh\nxhigh\nmax",
+   "default": "medium"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_steps",
+   "fieldtype": "Int",
+   "label": "Bir savolga max tool qadami",
+   "default": "15"
+  },
+  {
+   "fieldname": "monthly_limit_usd",
+   "fieldtype": "Float",
+   "label": "Oylik limit ($)",
+   "default": "200",
+   "description": "0 = cheklovsiz"
+  },
+  {
+   "fieldname": "section_sql",
+   "fieldtype": "Section Break",
+   "label": "Faqat-o'qish SQL"
+  },
+  {
+   "fieldname": "sql_enabled",
+   "fieldtype": "Check",
+   "label": "SQL tool yoqilgan",
+   "default": "1"
+  },
+  {
+   "fieldname": "db_ro_user",
+   "fieldtype": "Data",
+   "label": "Read-only DB user",
+   "default": "pokiza_ai_ro"
+  },
+  {
+   "fieldname": "db_ro_password",
+   "fieldtype": "Password",
+   "label": "Read-only DB parol"
+  },
+  {
+   "fieldname": "section_voice",
+   "fieldtype": "Section Break",
+   "label": "Ovozli xabarlar (Google Gemini)",
+   "description": "Ovozli xabar Gemini orqali matnga o'giriladi, keyin Claude javob beradi. Key bo'lmasa ovozli xabar tugmasi xato beradi."
+  },
+  {
+   "fieldname": "gemini_api_key",
+   "fieldtype": "Password",
+   "label": "Gemini API Key"
+  },
+  {
+   "fieldname": "gemini_model",
+   "fieldtype": "Data",
+   "label": "Gemini model",
+   "default": "gemini-3.5-flash",
+   "description": "Band bo'lsa avtomatik gemini-3.5-flash → 3.6-flash → 2.5-flash ga o'tadi"
+  }
+ ],
+ "issingle": 1,
+ "modified": "2026-11-06 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Pokiza AI Sozlamalari",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
