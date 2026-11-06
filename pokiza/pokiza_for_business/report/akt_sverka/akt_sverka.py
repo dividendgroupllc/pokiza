@@ -5,17 +5,44 @@ import os
 import frappe
 from frappe.utils import flt
 
+VIEW_DAILY = "Ежедневный"
+
+
 def execute(filters=None):
+    """Hisobotning ikkita ko'rinishi bor, «Кўриниш» filtri bilan tanlanadi.
+
+    «Подробный»  (сукут) — hujjat-hujjat lenta, shu faylda;
+    «Ежедневный»         — kunlik kalendar lenta, akt_sverka_kunlik.py da.
+
+    Har safar faqat BITTA shox ishga tushadi — ikkinchisi hisoblanmaydi.
+    """
     if not filters:
         return [], []
 
+    if filters.get("view") == VIEW_DAILY:
+        return execute_daily(filters)
+
     columns = get_columns()
     data = get_data(filters)
-    
+
     # Summary HTML table yaratish
     summary_html = get_summary_html(data, filters)
-    
+
     return columns, data, summary_html, None, None
+
+
+def execute_daily(filters):
+    from pokiza.pokiza_for_business.report.akt_sverka import akt_sverka_kunlik as kunlik
+
+    report = kunlik.build_report(filters)
+
+    return (
+        kunlik.get_columns(report),
+        kunlik.get_ui_rows(report),
+        kunlik.get_summary_html(report),
+        None,
+        None,
+    )
 
 
 def format_balance(value):

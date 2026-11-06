@@ -1,7 +1,5 @@
-import os
-
 import frappe
-from frappe.utils import add_days, add_months, flt, getdate, today
+from frappe.utils import add_days, add_months, getdate, today
 
 from pokiza.telegram.messages import AKT_SVERKA_EMPTY, AKT_SVERKA_ERROR, AKT_SVERKA_GENERATING, PERIOD_LABELS
 from pokiza.telegram.sender import answer_callback_query, send_document, send_message
@@ -25,9 +23,19 @@ def generate_akt_sverka_pdf(
     from_date: str,
     to_date: str,
 ) -> bytes | None:
-    """Akt Sverka PDF bytes qaytaradi. Ma'lumot bo'lmasa None."""
+    """Akt Sverka PDF bytes qaytaradi. Ma'lumot bo'lmasa None.
+
+    Deskdagi «PDF юклаш» tugmasi bilan AYNAN bir xil kontekstni ishlatadi —
+    shablon `rows` va `summary` kutadi. (Ilgari bu yerda `data` va tekis
+    `opening_credit`/`kassa_*` kalitlari yuborilar, natijada PDF jadvali
+    bo'sh chiqardi.)
+    """
     from weasyprint import HTML as WeasyHTML
-    from pokiza.pokiza_for_business.report.akt_sverka.akt_sverka import execute
+    from pokiza.pokiza_for_business.report.akt_sverka.akt_sverka import (
+        _build_pdf_summary,
+        _render_pdf_html,
+        get_data,
+    )
 
     filters = {
         "party_type": party_type,
@@ -36,56 +44,19 @@ def generate_akt_sverka_pdf(
         "to_date": to_date,
     }
 
-    result = execute(filters)
-    data = result[1] if len(result) > 1 else []
+    data = get_data(filters)
 
-    if not data:
+    # Faqat boshlang'ich qoldiq qatori bo'lsa — yuboradigan narsa yo'q
+    if not data or len(data) <= 1:
         return None
-
-    # Faqat sarlavha va jami qatorlarini chiqarib, asl ma'lumotlarni olib qolish
-    data_rows = [r for r in data if not r.get("is_total")]
-    if not data_rows:
-        return None
-
-    opening_row = next((r for r in data if r.get("voucher_type") == "Opening"), None)
-    total_row = next((r for r in data if r.get("is_total")), None)
-
-    opening_balance = flt(opening_row.get("balance", 0)) if opening_row else 0
-    closing_balance = flt(total_row.get("balance", 0)) if total_row else flt(data[-1].get("balance", 0))
 
     company = (
-        frappe.defaults.get_user_default("company")
+        frappe.defaults.get_user_default("Company")
         or frappe.db.get_single_value("Global Defaults", "default_company")
         or ""
     )
 
-    context = {
-        "data": data,
-        "party": party_name,
-        "party_type": party_type,
-        "from_date": from_date,
-        "to_date": to_date,
-        "company": company,
-        "opening_credit": opening_balance if opening_balance > 0 else 0,
-        "opening_debit": abs(opening_balance) if opening_balance < 0 else 0,
-        "goods_credit":    sum(flt(r.get("credit", 0)) for r in data if r.get("voucher_type") == "Purchase Invoice"),
-        "goods_debit":     sum(flt(r.get("debit",  0)) for r in data if r.get("voucher_type") == "Sales Invoice"),
-        "money_credit":    sum(flt(r.get("credit", 0)) for r in data if r.get("voucher_type") == "Payment Entry"),
-        "money_debit":     sum(flt(r.get("debit",  0)) for r in data if r.get("voucher_type") == "Payment Entry"),
-        "kassa_credit":    sum(flt(r.get("credit", 0)) for r in data if r.get("voucher_type") == "Kassa"),
-        "kassa_debit":     sum(flt(r.get("debit",  0)) for r in data if r.get("voucher_type") == "Kassa"),
-        "accruals_credit": sum(flt(r.get("credit", 0)) for r in data if r.get("voucher_type") == "Journal Entry"),
-        "accruals_debit":  sum(flt(r.get("debit",  0)) for r in data if r.get("voucher_type") == "Journal Entry"),
-        "closing_credit":  closing_balance if closing_balance > 0 else 0,
-        "closing_debit":   abs(closing_balance) if closing_balance < 0 else 0,
-    }
-
-    template_path = os.path.join(
-        frappe.get_app_path("pokiza"),
-        "pokiza_for_business", "report", "akt_sverka", "akt_sverka_template.html",
-    )
-    with open(template_path, "r", encoding="utf-8") as f:
-        html = frappe.render_template(f.read(), context)
+    html = _render_pdf_html(data, filters, company, _build_pdf_summary(data))
 
     return WeasyHTML(string=html).write_pdf()
 

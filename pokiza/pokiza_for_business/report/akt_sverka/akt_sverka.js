@@ -1,3 +1,9 @@
+// Кунлик кўринишдаги сон устунлари (нолларни «-» қилиб кўрсатиш учун)
+const AKT_SVERKA_DAILY_FIELDS = [
+    "otgruzka", "oplachano", "vozvrat",
+    "perechisleniya", "bonus", "boshqa", "saldo"
+];
+
 frappe.query_reports["Akt Sverka"] = {
     "tree": true,
     "name_field": "row_id",
@@ -60,6 +66,33 @@ frappe.query_reports["Akt Sverka"] = {
         }
     },
 
+    "save_base64_file": function(b64, filename, mime_type) {
+        try {
+            var byteChars = atob(b64);
+            var byteNumbers = new Array(byteChars.length);
+            for (var i = 0; i < byteChars.length; i++) {
+                byteNumbers[i] = byteChars.charCodeAt(i);
+            }
+
+            var blob = new Blob([new Uint8Array(byteNumbers)], { type: mime_type });
+            var url = URL.createObjectURL(blob);
+
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            frappe.msgprint({
+                title: __("Хато"),
+                message: __("Файлни юклашда браузер хатоси: ") + e.message,
+                indicator: "red"
+            });
+        }
+    },
+
     "toggle_invoice_items": function(row_index, button) {
         var report = frappe.query_report;
         var datatable = report && report.datatable;
@@ -119,6 +152,66 @@ frappe.query_reports["Akt Sverka"] = {
                 from_date: from_date,
                 to_date: to_date,
                 party_type: party_type || ''
+            });
+        });
+
+        // Excel — кунлик (календар) кўринишда: Отгрузка / Оплачено / Возврат /
+        // Перечисления / Бонус / Сальдо. Экрандаги жадвалдан фарқ қилади.
+        report.page.add_inner_button(__("Excel юклаш"), function() {
+            var filters = frappe.query_report.get_values();
+
+            if (!filters || !filters.party) {
+                frappe.msgprint({
+                    title: __("Хато"),
+                    message: __("Контрагентни танланг"),
+                    indicator: "red"
+                });
+                return;
+            }
+
+            if (!filters.from_date || !filters.to_date) {
+                frappe.msgprint({
+                    title: __("Хато"),
+                    message: __("Санани кўрсатинг"),
+                    indicator: "red"
+                });
+                return;
+            }
+
+            frappe.dom.freeze(__("Excel тайёрланмоқда... Илтимос кутинг"));
+
+            frappe.call({
+                method: "pokiza.pokiza_for_business.report.akt_sverka.akt_sverka_kunlik.generate_akt_sverka_excel",
+                args: { filters: filters },
+                timeout: 180,
+                callback: function(r) {
+                    frappe.dom.unfreeze();
+
+                    if (!r.message) {
+                        frappe.msgprint({
+                            title: __("Хато"),
+                            message: __("Excel бўш қайтди. Error Log ни текширинг."),
+                            indicator: "red"
+                        });
+                        return;
+                    }
+
+                    frappe.query_reports["Akt Sverka"].save_base64_file(
+                        r.message,
+                        "Akt_Sverka_" + (filters.party || "")
+                            + "_" + (filters.from_date || "")
+                            + "_" + (filters.to_date || "") + ".xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    );
+                },
+                error: function() {
+                    frappe.dom.unfreeze();
+                    frappe.msgprint({
+                        title: __("Сервер хатоси"),
+                        message: __("Excel генерация қилишда хато. Error Log ни текширинг."),
+                        indicator: "red"
+                    });
+                }
             });
         });
 
@@ -239,10 +332,37 @@ frappe.query_reports["Akt Sverka"] = {
                 }
                 return party_type;
             }
+        },
+        {
+            "fieldname": "view",
+            "label": __("Кўриниш"),
+            "fieldtype": "Select",
+            "options": [
+                { "value": "Подробный", "label": __("Подробный (ҳужжатлар)") },
+                { "value": "Ежедневный", "label": __("Ежедневный (кунлик)") }
+            ],
+            "default": "Подробный",
+            "reqd": 1
         }
     ],
-    
+
     "formatter": function(value, row, column, data, default_formatter) {
+        // ── Кунлик кўриниш ────────────────────────────────────────────────
+        if (AKT_SVERKA_DAILY_FIELDS.includes(column.fieldname)) {
+            if (!(data && data[column.fieldname])) {
+                return '<span style="color:#9e9e9e;">-</span>';
+            }
+
+            value = default_formatter(value, row, column, data).replace(/\$/g, '');
+
+            if (column.fieldname === "saldo") {
+                value = '<span style="font-weight:600;">' + value + '</span>';
+            }
+
+            return value;
+        }
+
+        // ── Подробный кўриниш (эски) ──────────────────────────────────────
         // Dollar belgisini olib tashlash
         value = default_formatter(value, row, column, data);
         
