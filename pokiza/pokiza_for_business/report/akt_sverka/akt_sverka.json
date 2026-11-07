@@ -8,7 +8,7 @@
  "doctype": "Report",
  "filters": [],
  "is_standard": "Yes",
- "modified": "2026-11-06 10:00:00.000000",
+ "modified": "2026-11-07 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pokiza for business",
  "name": "Akt Sverka",
@@ -29,6 +29,9 @@
   },
   {
    "role": "investor"
+  },
+  {
+   "role": "kassa"
   }
  ]
 }

@@ -61,6 +61,12 @@ def generate_akt_sverka_excel(filters):
     if isinstance(filters, str):
         filters = json.loads(filters)
 
+    from pokiza.pokiza_for_business.report.akt_sverka.akt_sverka import (
+        check_report_permission,
+    )
+
+    check_report_permission()
+
     if not filters or not filters.get("party"):
         frappe.throw("Контрагентни танланг")
 

@@ -7,6 +7,24 @@ from frappe.utils import flt
 
 VIEW_DAILY = "Ежедневный"
 
+REPORT_NAME = "Akt Sverka"
+
+
+def check_report_permission():
+    """PDF/Excel endpointlari ham hisobotning o'z ruxsatiga bo'ysunsin.
+
+    @frappe.whitelist() usullari sukut bo'yicha tizimga kirgan HAR QANDAY
+    foydalanuvchiga ochiq — ekranda hisobotni ko'ra olmaydigan odam faylni
+    ham yuklab ololmasligi kerak.
+    """
+    if not frappe.get_doc("Report", REPORT_NAME).is_permitted():
+        frappe.throw(
+            frappe._("Сизда «{0}» ҳисоботига рухсат йўқ").format(REPORT_NAME),
+            frappe.PermissionError,
+        )
+
+    frappe.has_permission("GL Entry", "report", throw=True)
+
 
 def execute(filters=None):
     """Hisobotning ikkita ko'rinishi bor, «Кўриниш» filtri bilan tanlanadi.
@@ -699,6 +717,8 @@ def generate_akt_sverka_pdf(filters):
 
     if isinstance(filters, str):
         filters = json.loads(filters)
+
+    check_report_permission()
 
     data = get_data(filters)
 
