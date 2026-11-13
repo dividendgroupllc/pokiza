@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 14:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "chat_id",
+  "nomi",
+  "turi",
+  "column_break_1",
+  "bolim",
+  "faol",
+  "ulagan",
+  "section_1",
+  "kunlik_hisobot",
+  "haftalik_hisobot",
+  "oylik_hisobot",
+  "column_break_2",
+  "signallar",
+  "ai_yoqilgan"
+ ],
+ "fields": [
+  {
+   "fieldname": "chat_id",
+   "fieldtype": "Data",
+   "label": "Chat ID",
+   "reqd": 1,
+   "unique": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "nomi",
+   "fieldtype": "Data",
+   "label": "Nomi",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "turi",
+   "fieldtype": "Select",
+   "label": "Turi",
+   "options": "Guruh\nSuperguruh",
+   "default": "Guruh",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bolim",
+   "fieldtype": "Select",
+   "label": "Bo'lim",
+   "options": "\nRahbar\nSotuv\nIshlab chiqarish\nBuxgalteriya\nOmbor",
+   "in_list_view": 1,
+   "description": "Guruh faqat shu bo'lim ko'rsatkichlarini va AI javoblarini oladi",
+   "hidden": 1
+  },
+  {
+   "fieldname": "faol",
+   "fieldtype": "Check",
+   "label": "Faol",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ulagan",
+   "fieldtype": "Link",
+   "label": "Kim ulagan",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_1",
+   "fieldtype": "Section Break",
+   "label": "Nimalar yuboriladi"
+  },
+  {
+   "fieldname": "kunlik_hisobot",
+   "fieldtype": "Check",
+   "label": "Kunlik hisobot (08:00)",
+   "default": "1",
+   "hidden": 1
+  },
+  {
+   "fieldname": "haftalik_hisobot",
+   "fieldtype": "Check",
+   "label": "Haftalik hisobot (dushanba 08:00)",
+   "default": "1",
+   "hidden": 1
+  },
+  {
+   "fieldname": "oylik_hisobot",
+   "fieldtype": "Check",
+   "label": "Oylik hisobot (1-sana)",
+   "default": "1",
+   "hidden": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "signallar",
+   "fieldtype": "Check",
+   "label": "Signallar (jim mijozlar, tasdiqlanmagan hujjatlar)",
+   "default": "1",
+   "hidden": 1
+  },
+  {
+   "fieldname": "ai_yoqilgan",
+   "fieldtype": "Check",
+   "label": "AI savollarga javob beradi (5-bosqich)",
+   "default": "0",
+   "hidden": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-10 18:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "TG Chat",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "share": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "field:chat_id",
+ "track_changes": 1,
+ "title_field": "nomi",
+ "description": "Nazorat boti ulangan Telegram guruhi. Faqat bitta guruh faol bo'ladi: unga vazifalar va eslatmalar chiqadi."
+}

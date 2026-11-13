@@ -1,0 +1,297 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_1",
+  "oylik_quvvat_t",
+  "column_break_1",
+  "postavshik_tolov_kuni",
+  "mijoz_jimlik_kun",
+  "konsentratsiya_foiz",
+  "section_2",
+  "quvvat_yashil",
+  "quvvat_sariq",
+  "savdo_yashil",
+  "savdo_sariq",
+  "column_break_2",
+  "marja_sariq_pp",
+  "marja_qizil_pp",
+  "daromad_yashil_usd",
+  "daromad_sariq_usd",
+  "chek_ozgarmas_foiz",
+  "section_3",
+  "dividend_1_egasi",
+  "dividend_2_egasi",
+  "column_break_3",
+  "dividend_3_egasi",
+  "section_ranglar",
+  "b1_yashil",
+  "b1_sariq",
+  "b4_yashil",
+  "b4_sariq",
+  "b2_yashil",
+  "b2_sariq",
+  "b3_yashil",
+  "b3_sariq",
+  "column_break_ranglar",
+  "c3_yashil",
+  "c3_sariq",
+  "c4_yashil",
+  "c4_sariq",
+  "c5_sariq",
+  "c6_min"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_1",
+   "fieldtype": "Section Break",
+   "label": "Umumiy"
+  },
+  {
+   "fieldname": "oylik_quvvat_t",
+   "fieldtype": "Float",
+   "label": "To'liq oylik quvvat (tonna)",
+   "default": "180",
+   "reqd": 1,
+   "description": "Quvvatdan foydalanish: oylik to'liq quvvat (odatda 180 t)"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "postavshik_tolov_kuni",
+   "fieldtype": "Int",
+   "label": "Postavshik to'lov kuni",
+   "default": "10",
+   "description": "Postavshiklarga to'lov: har oy shu sanagacha o'tgan oy tovari yopiladi"
+  },
+  {
+   "fieldname": "mijoz_jimlik_kun",
+   "fieldtype": "Int",
+   "label": "Mijoz jimligi (kun)",
+   "default": "7",
+   "description": "Jim mijozlar: shuncha kun buyurtma bermasa signal"
+  },
+  {
+   "fieldname": "konsentratsiya_foiz",
+   "fieldtype": "Percent",
+   "label": "Bitta mijoz ulushi chegarasi (%)",
+   "default": "25"
+  },
+  {
+   "fieldname": "section_2",
+   "fieldtype": "Section Break",
+   "label": "Rang chegaralari"
+  },
+  {
+   "fieldname": "quvvat_yashil",
+   "fieldtype": "Percent",
+   "label": "Quvvat: yashil (% dan yuqori)",
+   "default": "90"
+  },
+  {
+   "fieldname": "quvvat_sariq",
+   "fieldtype": "Percent",
+   "label": "Quvvat: sariq (% dan yuqori)",
+   "default": "70"
+  },
+  {
+   "fieldname": "savdo_yashil",
+   "fieldtype": "Percent",
+   "label": "Savdo bajarilishi: yashil",
+   "default": "95"
+  },
+  {
+   "fieldname": "savdo_sariq",
+   "fieldtype": "Percent",
+   "label": "Savdo bajarilishi: sariq",
+   "default": "85"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "marja_sariq_pp",
+   "fieldtype": "Float",
+   "label": "Rentabellik: sariq (rejadan necha pp past)",
+   "default": "0.5",
+   "hidden": 1,
+   "description": "Ishlatilmaydi: TZ bo'yicha rejadan har qanday pastlik — sariq"
+  },
+  {
+   "fieldname": "marja_qizil_pp",
+   "fieldtype": "Float",
+   "label": "Rentabellik: qizil (rejadan necha pp past)",
+   "default": "1",
+   "description": "Rejada va yuqori — yashil; rejadan shu pp gacha past — sariq; undan past — qizil"
+  },
+  {
+   "fieldname": "daromad_yashil_usd",
+   "fieldtype": "Float",
+   "label": "Sof daromad: yashil ($ dan yuqori)",
+   "default": "50000"
+  },
+  {
+   "fieldname": "daromad_sariq_usd",
+   "fieldtype": "Float",
+   "label": "Sof daromad: sariq ($ dan yuqori)",
+   "default": "40000"
+  },
+  {
+   "fieldname": "chek_ozgarmas_foiz",
+   "fieldtype": "Percent",
+   "label": "O'rtacha chek: 'o'zgarmadi' oralig'i (±%)",
+   "default": "0.5"
+  },
+  {
+   "fieldname": "section_3",
+   "fieldtype": "Section Break",
+   "label": "Dividend egalari"
+  },
+  {
+   "fieldname": "dividend_1_egasi",
+   "fieldtype": "Data",
+   "label": "Дивиденд 1 — kim"
+  },
+  {
+   "fieldname": "dividend_2_egasi",
+   "fieldtype": "Data",
+   "label": "Дивиденд 2 — kim"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dividend_3_egasi",
+   "fieldtype": "Data",
+   "label": "Дивиденд 3 — kim"
+  },
+  {
+   "fieldname": "section_ranglar",
+   "fieldtype": "Section Break",
+   "label": "Qo'shimcha ko'rsatkichlar ranglari",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "b1_yashil",
+   "fieldtype": "Percent",
+   "label": "Mijoz rentabelligi: yashil (dan yuqori)",
+   "default": "25"
+  },
+  {
+   "fieldname": "b1_sariq",
+   "fieldtype": "Percent",
+   "label": "Mijoz rentabelligi: sariq (dan yuqori)",
+   "default": "20"
+  },
+  {
+   "fieldname": "b4_yashil",
+   "fieldtype": "Percent",
+   "label": "Kategoriyalar marjasi: yashil (dan yuqori)",
+   "default": "35"
+  },
+  {
+   "fieldname": "b4_sariq",
+   "fieldtype": "Percent",
+   "label": "Kategoriyalar marjasi: sariq (dan yuqori)",
+   "default": "30"
+  },
+  {
+   "fieldname": "b2_yashil",
+   "fieldtype": "Percent",
+   "label": "Savdosi tushgan mijozlar ulushi: yashil (gacha)",
+   "default": "30"
+  },
+  {
+   "fieldname": "b2_sariq",
+   "fieldtype": "Percent",
+   "label": "Savdosi tushgan mijozlar ulushi: sariq (gacha)",
+   "default": "50"
+  },
+  {
+   "fieldname": "b3_yashil",
+   "fieldtype": "Int",
+   "label": "Top mahsulotlar soni: yashil (kamida)",
+   "default": "8",
+   "description": "Savdoning yarmini nechta mahsulot beradi. Kam bo'lsa — daromad bir necha mahsulotga bog'liq"
+  },
+  {
+   "fieldname": "b3_sariq",
+   "fieldtype": "Int",
+   "label": "Top mahsulotlar soni: sariq (kamida)",
+   "default": "5"
+  },
+  {
+   "fieldname": "column_break_ranglar",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "c3_yashil",
+   "fieldtype": "Percent",
+   "label": "Xarajatlar (savdodan %): yashil (gacha)",
+   "default": "18"
+  },
+  {
+   "fieldname": "c3_sariq",
+   "fieldtype": "Percent",
+   "label": "Xarajatlar (savdodan %): sariq (gacha)",
+   "default": "22"
+  },
+  {
+   "fieldname": "c4_yashil",
+   "fieldtype": "Percent",
+   "label": "Brak: yashil (gacha)",
+   "default": "1"
+  },
+  {
+   "fieldname": "c4_sariq",
+   "fieldtype": "Percent",
+   "label": "Brak: sariq (gacha)",
+   "default": "2"
+  },
+  {
+   "fieldname": "c5_sariq",
+   "fieldtype": "Percent",
+   "label": "Dividend (sof foydadan %): sariq (dan yuqori)",
+   "default": "80",
+   "description": "Sof foydadan 100% dan ko'p yechilsa — qizil (aylanma pul kamayadi)"
+  },
+  {
+   "fieldname": "c6_min",
+   "fieldtype": "Percent",
+   "label": "Foyda taqsimoti: yechilgan ulush yashil (kamida)",
+   "default": "30",
+   "description": "TZ: ortiqcha pul aylanmada qoldirilmaydi. Shundan kam yechilsa — sariq; 100% dan ko'p — qizil"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-09 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Nazorat Sozlamalari",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "issingle": 1,
+ "track_changes": 1
+}

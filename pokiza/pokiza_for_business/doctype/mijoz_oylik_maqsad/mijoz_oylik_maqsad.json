@@ -1,0 +1,26 @@
+{
+ "actions": [],
+ "creation": "2026-11-10 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["yil", "oy", "maqsad_kg", "maqsad_summa", "izoh"],
+ "fields": [
+  {"fieldname": "yil", "fieldtype": "Int", "label": "Yil", "reqd": 1, "in_list_view": 1, "columns": 1},
+  {"fieldname": "oy", "fieldtype": "Select", "label": "Oy", "reqd": 1, "in_list_view": 1, "columns": 2,
+   "options": "Yanvar\nFevral\nMart\nAprel\nMay\nIyun\nIyul\nAvgust\nSentabr\nOktabr\nNoyabr\nDekabr"},
+  {"fieldname": "maqsad_kg", "fieldtype": "Float", "label": "Maqsad: savdo hajmi (kg)", "in_list_view": 1, "columns": 2, "precision": "0"},
+  {"fieldname": "maqsad_summa", "fieldtype": "Currency", "label": "Maqsad: savdo summasi (so'm)", "in_list_view": 1, "columns": 2},
+  {"fieldname": "izoh", "fieldtype": "Data", "label": "Izoh", "in_list_view": 1, "columns": 3}
+ ],
+ "istable": 1,
+ "modified": "2026-11-10 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Mijoz Oylik Maqsad",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

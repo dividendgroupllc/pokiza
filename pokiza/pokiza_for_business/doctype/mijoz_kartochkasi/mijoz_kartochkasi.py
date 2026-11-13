@@ -29,11 +29,33 @@ KUZATILADIGAN = ("norma", "sotuv_narxi", "bonus_foiz", "amal_sana", "status")
 class MijozKartochkasi(Document):
     def validate(self):
         self.bonus_defaultla()
+        self.validate_tolov_sharti()
+        self.validate_maqsadlar()
         self.validate_guruhlar()
         self.validate_takror()
         self.tartibga_keltir()
         self.hisobla()
         self.jurnalga_yoz()
+
+    def validate_tolov_sharti(self):
+        """Nazorat (TZ C2): yopiladigan qism 0..100%, to'lov kuni 0..28 (0 = naqd, shu oy ichida)."""
+        if not 0 <= (self.tolov_foiz or 0) <= 100:
+            frappe.throw(_("Har oy yopiladigan qism 0 dan 100 % gacha bo'lishi kerak"))
+        if not 0 <= (self.tolov_kuni or 0) <= 28:
+            frappe.throw(_("To'lov kuni 0 dan 28 gacha bo'lishi kerak (0 = naqd)"))
+
+    def validate_maqsadlar(self):
+        """Oylik maqsad: har oy bir marta, qiymat manfiy emas."""
+        korilgan = set()
+        for r in self.get("maqsadlar") or []:
+            kalit = (r.yil, r.oy)
+            if kalit in korilgan:
+                frappe.throw(_("Maqsadlar jadvalida {0} {1} ikki marta kiritilgan").format(r.oy, r.yil))
+            korilgan.add(kalit)
+            if not 2020 <= (r.yil or 0) <= 2100:
+                frappe.throw(_("Maqsadlar: yil noto'g'ri ({0})").format(r.yil))
+            if (r.maqsad_kg or 0) < 0 or (r.maqsad_summa or 0) < 0:
+                frappe.throw(_("Maqsad manfiy bo'lishi mumkin emas"))
 
     def tartibga_keltir(self):
         """Qatorlarni «Mahsulot Tartibi» ro'yxatiga qarab joylashtiradi.

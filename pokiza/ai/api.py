@@ -16,6 +16,26 @@ def _check():
     frappe.only_for(ROLES)
 
 
+def _web_kontekst():
+    """Web chat doirasi: administrator — cheklovsiz; boshqalar — TG Azo'dagi Nazorat Roli bo'yicha (Telegram bilan bir xil)."""
+    u = frappe.session.user
+    if u == "Administrator" or "System Manager" in frappe.get_roles(u):
+        return None
+    from pokiza.nazorat.scope import ai_tools, azo_bolimi
+
+    azo = frappe.db.get_value("TG Azo", u, ["faol", "rol", "bolim", "ai_ruxsat"], as_dict=True)
+    bolim = azo_bolimi(azo) if azo else None
+    if not bolim:
+        frappe.throw("Sizga Nazorat roli biriktirilmagan — AI ma'lumot bera olmaydi. Administratorga murojaat qiling.",
+                     frappe.PermissionError)
+    from pokiza.nazorat.himoya import web_ai_belgi_shart
+
+    if azo.rol != "Rahbar" and not azo.ai_ruxsat and web_ai_belgi_shart():
+        frappe.throw("Sizga AI bilan savol-javob ruxsati berilmagan. Administratorga murojaat qiling.",
+                     frappe.PermissionError)
+    return {"kanal": "web", "bolim": bolim, "tools": ai_tools(bolim)}
+
+
 def _own(suhbat):
     owner = frappe.db.get_value("AI Suhbat", suhbat, "user")
     if not owner:
@@ -80,6 +100,9 @@ def _create_messages(text, suhbat=None, files=None):
         {"doctype": "AI Xabar", "suhbat": suhbat, "role": "assistant", "status": "Ishlayapti"}
     ).insert(ignore_permissions=True)
     frappe.db.set_value("AI Suhbat", suhbat, {"status": "Ishlayapti", "last_message_at": now_datetime()})
+    from pokiza.nazorat.himoya import qayd
+
+    qayd("savol")  # xodim bir kunda chegaradan ko'p so'rasa — rahbarga xabar (Ma'lumot himoyasi)
     return suhbat, user_xabar.name, xabar.name
 
 
@@ -94,7 +117,7 @@ def upload():
 
 
 @frappe.whitelist(methods=["POST"])
-def send_message(text=None, suhbat=None, files=None):
+def send_message(text=None, suhbat=None, files=None, loyiha=None):
     _check()
     s = get_settings()
     if not s.enabled:
@@ -102,9 +125,17 @@ def send_message(text=None, suhbat=None, files=None):
     if s.monthly_limit_usd and month_spent_usd() >= s.monthly_limit_usd:
         frappe.throw(f"Oylik AI limiti (${s.monthly_limit_usd}) tugadi. Administratorga murojaat qiling.")
 
+    kontekst = _web_kontekst()
     if isinstance(files, str):
         files = json.loads(files or "[]")
+    if loyiha and not suhbat:
+        from pokiza.ai.loyiha import _own as loyiha_own
+
+        loyiha_own(loyiha)
+    yangi = not suhbat
     suhbat, user_xabar, xabar = _create_messages(text, suhbat, files)
+    if yangi and loyiha:
+        frappe.db.set_value("AI Suhbat", suhbat, "loyiha", loyiha)
     frappe.enqueue(
         "pokiza.ai.agent.run",
         queue="long",
@@ -112,6 +143,7 @@ def send_message(text=None, suhbat=None, files=None):
         enqueue_after_commit=True,
         suhbat=suhbat,
         xabar=xabar,
+        kontekst=kontekst,
     )
     return {"suhbat": suhbat, "user_xabar": user_xabar, "xabar": xabar}
 
@@ -130,7 +162,7 @@ def list_conversations():
     return frappe.get_all(
         "AI Suhbat",
         filters={"user": frappe.session.user},
-        fields=["name", "title", "status", "last_message_at", "modified"],
+        fields=["name", "title", "status", "last_message_at", "modified", "loyiha"],
         order_by="modified desc",
         limit_page_length=200,
     )
@@ -168,7 +200,8 @@ def get_conversation(suhbat):
         r["sources"] = _sources(r.pop("tool_calls_json"))
         r["files"] = json.loads(r.pop("files_json") or "[]")
         r["dashboards"] = json.loads(r.pop("dashboards_json") or "[]")
-    doc = frappe.db.get_value("AI Suhbat", suhbat, ["name", "title", "status", "total_cost_usd"], as_dict=True)
+    doc = frappe.db.get_value("AI Suhbat", suhbat, ["name", "title", "status", "total_cost_usd", "loyiha"], as_dict=True)
+    doc["loyiha_nomi"] = frappe.db.get_value("AI Loyiha", doc.loyiha, "nomi") if doc.loyiha else None
     return {"suhbat": doc, "messages": rows}
 
 

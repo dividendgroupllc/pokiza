@@ -48,6 +48,9 @@ app_include_css = [
 # include js in doctype views
 doctype_js = {
 	"BOM": "public/js/bom.js",
+	"User": "public/js/user_nazorat.js",
+	"Customer": "public/js/mijoz_hisobot.js",
+	"Mijoz Kartochkasi": "public/js/mijoz_hisobot.js",
 	"Payment Entry": "public/js/payment_entry.js",
 	"Purchase Invoice": "public/js/purchase_invoice.js",
 	"Sales Invoice": "public/js/sales_invoice.js",
@@ -132,6 +135,13 @@ after_migrate = ["pokiza.setup.after_migrate"]
 # -----------
 # Permissions evaluated in scripted ways
 
+permission_query_conditions = {
+	"Vazifa": "pokiza.pokiza_for_business.doctype.vazifa.vazifa.get_permission_query_conditions",
+}
+has_permission = {
+	"Vazifa": "pokiza.pokiza_for_business.doctype.vazifa.vazifa.has_permission",
+}
+
 # permission_query_conditions = {
 # 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
@@ -168,7 +178,15 @@ doc_events = {
 		"on_update": "pokiza.api.narx.kartochka_on_update",
 	},
 	"Kassa": {
-		"on_submit": "pokiza.events.kassa.on_submit",
+		"on_submit": [
+			"pokiza.events.kassa.on_submit",
+			"pokiza.nazorat.events.kassa_on_submit",
+		],
+		"on_cancel": "pokiza.nazorat.events.kassa_on_cancel",
+	},
+	"Journal Entry": {
+		"on_submit": "pokiza.nazorat.events.je_on_submit",
+		"on_cancel": "pokiza.nazorat.events.je_on_cancel",
 	},
 	"Sales Order": {
 		"validate": "pokiza.api.navbat.so_validate",
@@ -202,6 +220,19 @@ doc_events = {
 
 # Scheduled Tasks
 # ---------------
+
+# Nazorat tizimi: rahbar hisobotlari (vaqt — System Settings time_zone, Asia/Tashkent)
+scheduler_events = {
+	"cron": {
+		"0 8 * * *": ["pokiza.nazorat.jadval.kunlik"],
+		"0 8 * * 1": ["pokiza.nazorat.jadval.haftalik"],
+		"0 8 1 * *": ["pokiza.nazorat.jadval.oylik"],
+		"0 9 11 * *": ["pokiza.nazorat.jadval.tolov_intizomi"],
+		"0 9 * * *": ["pokiza.nazorat.vazifa.kunlik_tekshir", "pokiza.nazorat.signallar.ish_signallari",
+		              "pokiza.nazorat.jadval.jim_mijozlar_signal"],
+		"5 9 * * 1": ["pokiza.nazorat.vazifa.haftalik_natija"],
+	},
+}
 
 # scheduler_events = {
 # 	"all": [

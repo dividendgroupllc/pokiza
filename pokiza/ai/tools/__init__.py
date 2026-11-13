@@ -16,6 +16,7 @@ DENY_DOCTYPES = {
     "Pokiza AI Sozlamalari", "AI Suhbat", "AI Xabar", "Telegram Bot Settings", "Telegram User",
     "Telegram Admin", "Connected App", "Token Cache", "LDAP Settings", "Dropbox Settings",
     "S3 Backup Settings", "Google Settings", "SMS Settings", "Payment Gateway Account",
+    "Nazorat Bot Sozlamalari", "TG Azo", "TG Chat",
 }
 
 
@@ -69,10 +70,10 @@ def rows_payload(rows, columns=None):
 
 
 def _registry():
-    from pokiza.ai.tools import business, dashboard, docs, files, production, reports, sql
+    from pokiza.ai.tools import business, dashboard, docs, files, kpi, production, reports, sql, vazifa
 
     funcs = {}
-    for mod in (docs, reports, business, production, sql, files, dashboard):
+    for mod in (kpi, docs, reports, business, production, sql, files, dashboard, vazifa):
         for spec, func in mod.TOOLS:
             funcs[spec["name"]] = (spec, func)
     return funcs
@@ -88,8 +89,36 @@ def _optional_count(schema):
     return n
 
 
+# Kanalga xos tool'lar: dashboard — faqat web sahifada; vazifa taklifi — faqat Telegram (rahbar tasdiq tugmasi)
+WEB_ONLY = {"show_dashboard"}
+TELEGRAM_ONLY = {"vazifa_taklif", "xabar_yubor"}
+
+
+def _ctx():
+    return getattr(frappe.local, "pokiza_ai", None) or {}
+
+
+def _ruxsat(name):
+    """Joriy suhbat doirasida tool ruxsat etilganmi (kanal + bo'lim). Web/rahbar — hammasi."""
+    ctx = _ctx()
+    kanal = ctx.get("kanal") or "web"
+    if kanal == "web" and name in TELEGRAM_ONLY:
+        return False
+    if kanal == "telegram" and name in WEB_ONLY:
+        return False
+    if name in TELEGRAM_ONLY and not ctx.get("vazifa_berish"):
+        return False
+    allowed = ctx.get("tools")
+    if name == "create_file" and allowed is not None:
+        from pokiza.nazorat.himoya import excel_xodimga
+
+        if not excel_xodimga():  # Nazorat Bot Sozlamalari → Ma'lumot himoyasi: fayl faqat to'liq ruxsatli rolga
+            return False
+    return allowed is None or name in allowed
+
+
 def tool_specs(sql_enabled=True):
-    specs = [spec for spec, _ in _registry().values()]
+    specs = [spec for spec, _ in _registry().values() if _ruxsat(spec["name"])]
     if not sql_enabled:
         specs = [s for s in specs if s["name"] != "sql_query"]
     optional = sum(_optional_count(s["input_schema"]) for s in specs if s["strict"])
@@ -156,7 +185,15 @@ def run_tool(name, args):
         if not entry:
             raise ToolError(f"Noma'lum tool: {name}")
         spec, func = entry
+        if not _ruxsat(name):
+            raise ToolError(f"'{name}' bu suhbat doirasida ruxsat etilmagan (bo'lim cheklovi)")
         _validate(spec, args)
+        if _ctx().get("bolim"):
+            from pokiza.nazorat.scope import ai_arg_xato
+
+            xato = ai_arg_xato(_ctx()["bolim"], name, args)
+            if xato:
+                raise ToolError(xato)
         if read_only:
             frappe.db.rollback()
             frappe.flags.read_only = True
@@ -164,6 +201,10 @@ def run_tool(name, args):
         result = func(**args)
         content = _fit(result)
         is_error = False
+        if name == "create_file" and _ctx().get("tools") is not None:
+            from pokiza.nazorat.himoya import qayd
+
+            qayd("fayl", izoh=args.get("title"))
     except ToolError as e:
         content, is_error = str(e), True
     except frappe.InReadOnlyMode:

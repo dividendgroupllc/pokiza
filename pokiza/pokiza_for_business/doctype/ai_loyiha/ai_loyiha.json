@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-13 15:00:00.000000",
+ "modified": "2026-11-13 15:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "Pokiza for business",
+ "name": "AI Loyiha",
+ "track_changes": 1,
+ "title_field": "nomi",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "field_order": [
+  "nomi",
+  "user",
+  "korsatma"
+ ],
+ "fields": [
+  {
+   "fieldname": "nomi",
+   "fieldtype": "Data",
+   "label": "Nomi",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "korsatma",
+   "fieldtype": "Long Text",
+   "label": "AI uchun ko'rsatma",
+   "description": "Shu loyihadagi har bir suhbatda AI bilishi kerak bo'lgan narsa: maqsad, kontekst, javob uslubi."
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "states": []
+}

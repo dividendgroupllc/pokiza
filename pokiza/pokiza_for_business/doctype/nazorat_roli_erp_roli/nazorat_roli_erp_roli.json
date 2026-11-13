@@ -1,0 +1,30 @@
+{
+ "actions": [],
+ "creation": "2026-11-10 21:00:00.000000",
+ "modified": "2026-11-10 21:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "module": "Pokiza for business",
+ "engine": "InnoDB",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "doctype": "DocType",
+ "name": "Nazorat Roli ERP Roli",
+ "istable": 1,
+ "editable_grid": 1,
+ "field_order": [
+  "role"
+ ],
+ "fields": [
+  {
+   "fieldname": "role",
+   "fieldtype": "Link",
+   "options": "Role",
+   "label": "ERP roli",
+   "in_list_view": 1,
+   "reqd": 1
+  }
+ ],
+ "permissions": []
+}

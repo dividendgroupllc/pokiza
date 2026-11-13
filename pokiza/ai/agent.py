@@ -97,9 +97,10 @@ def _text_of(turn):
     return "\n\n".join(parts).strip()
 
 
-def run(suhbat, xabar):
+def run(suhbat, xabar, publisher=None, kontekst=None):
+    """publisher — kanal (standart: web realtime). kontekst — {kanal, bolim, tools, on_vazifa ...} (Telegram)."""
     user = frappe.session.user
-    pub = Publisher(user, suhbat, xabar)
+    pub = publisher or Publisher(user, suhbat, xabar)
     s = get_settings()
     turn, audit = [], []
     totals = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0}
@@ -111,6 +112,7 @@ def run(suhbat, xabar):
         "dashboards": [],
         "on_file": lambda f: pub.send("file", file=f),
         "on_dashboard": lambda d: pub.send("dashboard", dashboard=d),
+        **(kontekst or {}),
     }
     files, dashboards = frappe.local.pokiza_ai["files"], frappe.local.pokiza_ai["dashboards"]
 
@@ -119,6 +121,15 @@ def run(suhbat, xabar):
         prepare_voice(suhbat, xabar, pub.send)
         history = build_history(suhbat, xabar)
         tools = tool_specs(sql_enabled=s.sql_enabled)
+        # loyiha (web): doimiy ko'rsatma system'ga, bilim fayllari birinchi xabar boshiga (prompt kesh uchun barqaror)
+        from pokiza.ai.loyiha import kontekst as loyiha_kontekst
+
+        loyiha_matn, loyiha_bloklar = loyiha_kontekst(suhbat)
+        system = SYSTEM_PROMPT
+        if loyiha_matn:
+            system = [{"type": "text", "text": SYSTEM_PROMPT}, {"type": "text", "text": loyiha_matn}]
+        if loyiha_bloklar and history and history[0]["role"] == "user":
+            history[0] = {"role": "user", "content": loyiha_bloklar + list(history[0]["content"])}
         retried_bad_json = False
 
         for _step in range(int(s.max_steps)):
@@ -132,7 +143,7 @@ def run(suhbat, xabar):
                 with client.beta.messages.stream(
                     model=s.model,
                     max_tokens=MAX_TOKENS,
-                    system=SYSTEM_PROMPT,
+                    system=system,
                     tools=tools,
                     messages=history + turn,
                     thinking={"type": "adaptive", "display": "summarized"},

@@ -47,6 +47,14 @@ def _load_table(t, max_rows):
     source = t.get("source")
     title = (t.get("title") or "Jadval").strip()[:120]
 
+    from pokiza.ai.tools import _ruxsat
+
+    # rol cheklovi: SQL/report manbasi faqat shu vositalar ochiq bo'lgan rolda (aks holda faqat rows)
+    if source == "sql" and not _ruxsat("sql_query"):
+        raise ToolError("Bu rolda SQL manbasi yopiq: faqat o'zingga ochiq vositalar natijasidan rows bilan jadval tuz")
+    if source == "report" and not _ruxsat("run_report"):
+        raise ToolError("Bu rolda report manbasi yopiq: faqat o'zingga ochiq vositalar natijasidan rows bilan jadval tuz")
+
     if source == "sql":
         from pokiza.ai import sql_guard
 

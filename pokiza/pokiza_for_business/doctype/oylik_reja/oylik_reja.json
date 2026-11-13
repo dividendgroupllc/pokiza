@@ -1,0 +1,131 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "yil",
+  "oy",
+  "column_break_1",
+  "section_1",
+  "savdo_reja",
+  "sof_marja_reja",
+  "column_break_2",
+  "quvvat_reja_t",
+  "sof_daromad_usd_reja",
+  "section_foyda",
+  "foyda_ishlatilishi",
+  "section_2",
+  "izoh"
+ ],
+ "fields": [
+  {
+   "fieldname": "yil",
+   "fieldtype": "Int",
+   "label": "Yil",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "oy",
+   "fieldtype": "Select",
+   "label": "Oy",
+   "options": "01\n02\n03\n04\n05\n06\n07\n08\n09\n10\n11\n12",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_1",
+   "fieldtype": "Section Break",
+   "label": "Reja raqamlari"
+  },
+  {
+   "fieldname": "savdo_reja",
+   "fieldtype": "Currency",
+   "label": "Savdo rejasi (so'm)",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Savdo rejasi, masalan 5 000 000 000"
+  },
+  {
+   "fieldname": "sof_marja_reja",
+   "fieldtype": "Percent",
+   "label": "Sof rentabellik rejasi (%)",
+   "in_list_view": 1,
+   "description": "Sof rentabellik = sof foyda / savdo"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "quvvat_reja_t",
+   "fieldtype": "Float",
+   "label": "Ishlab chiqarish rejasi (tonna)",
+   "description": "Quvvat rejasi; bo'sh bo'lsa sozlamalardagi to'liq quvvat (180 t)"
+  },
+  {
+   "fieldname": "sof_daromad_usd_reja",
+   "fieldtype": "Float",
+   "label": "Sof daromad rejasi ($)",
+   "description": "Sof daromad maqsadi (USD), masalan 50 000"
+  },
+  {
+   "fieldname": "section_foyda",
+   "fieldtype": "Section Break",
+   "label": "Sof foyda ishlatilishi (oy yakunida)",
+   "description": "Sof foyda nimalarga sarflandi. Dividend avtomatik hisoblanadi — bu yerga boshqa yo'nalishlarni yozing."
+  },
+  {
+   "fieldname": "foyda_ishlatilishi",
+   "fieldtype": "Table",
+   "label": "Foyda ishlatilishi",
+   "options": "Oylik Reja Foyda"
+  },
+  {
+   "fieldname": "section_2",
+   "fieldtype": "Section Break",
+   "label": "Izoh"
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-11 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Oylik Reja",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "share": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "role": "Accounts Manager",
+   "report": 1
+  }
+ ],
+ "sort_field": "yil",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "format:REJA-{yil}-{oy}",
+ "track_changes": 1
+}

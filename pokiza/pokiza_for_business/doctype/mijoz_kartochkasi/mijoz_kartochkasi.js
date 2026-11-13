@@ -46,6 +46,9 @@ frappe.ui.form.on("Mijoz Kartochkasi", {
 	},
 
 	refresh(frm) {
+		if (!frm.is_new() && frm.doc.mijoz && window.pokiza_mijoz_hisobot) {
+			frm.add_custom_button(__("Oylik savdo tahlili (PDF)"), () => pokiza_mijoz_hisobot(frm.doc.mijoz));
+		}
 		if (!frm.is_new() && frm.doc.mijoz) {
 			frm.add_custom_button(__("90 kunlik tarixdan to'ldirish"), () => {
 				frappe.call({

@@ -74,7 +74,7 @@ def transcribe(content, mime):
     if r is None:
         raise VoiceError("Gemini'ga ulanib bo'lmadi (internet yoki proxy)")
     if r.status_code in RETRY_STATUS or r.status_code == 404:
-        raise VoiceError("Ovozni matnga o'giruvchi servis (Gemini) hozir band. Bir daqiqadan keyin \"Qayta urinish\"ni bosing.")
+        raise VoiceError("Ovozni matnga o'giruvchi servis (Gemini) hozir band. Bir daqiqadan keyin qayta yuboring.")
     if r.status_code != 200:
         try:
             msg = r.json().get("error", {}).get("message", "")

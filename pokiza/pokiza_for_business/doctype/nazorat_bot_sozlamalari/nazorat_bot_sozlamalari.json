@@ -1,0 +1,190 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 14:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "faol",
+  "bot_token",
+  "bot_username",
+  "column_break_1",
+  "rahbar",
+  "sayt_url",
+  "section_1",
+  "webhook_secret",
+  "webhook_holati",
+  "section_ai",
+  "ai_kunlik_limit",
+  "section_guruh",
+  "rahbar_tekshiruvi",
+  "guruh_signallari",
+  "section_himoya",
+  "himoya_excel_xodim",
+  "himoya_forward",
+  "himoya_rahbarga",
+  "himoya_web_ai_belgi",
+  "column_break_himoya",
+  "himoya_kop_fayl",
+  "himoya_kop_savol"
+ ],
+ "fields": [
+  {
+   "fieldname": "faol",
+   "fieldtype": "Check",
+   "label": "Bot faol",
+   "default": "0"
+  },
+  {
+   "fieldname": "bot_token",
+   "fieldtype": "Password",
+   "label": "Bot token",
+   "description": "@BotFather bergan token. Shifrlangan saqlanadi, hech kimga ko'rsatilmaydi."
+  },
+  {
+   "fieldname": "bot_username",
+   "fieldtype": "Data",
+   "label": "Bot username",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "rahbar",
+   "fieldtype": "Link",
+   "label": "Rahbar (ERP foydalanuvchi)",
+   "options": "User",
+   "description": "Shu foydalanuvchi Telegram'ga ulanganda 'Rahbar' roli oladi: barcha hisobotlar va dividend signali unga boradi"
+  },
+  {
+   "fieldname": "sayt_url",
+   "fieldtype": "Data",
+   "label": "Sayt manzili (https://...)",
+   "description": "Bo'sh bo'lsa joriy sayt manzili. Webhook shu manzilga o'rnatiladi."
+  },
+  {
+   "fieldname": "section_1",
+   "fieldtype": "Section Break",
+   "label": "Webhook"
+  },
+  {
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook maxfiy kaliti",
+   "read_only": 1,
+   "description": "Avtomatik yaratiladi. Telegram har so'rovda yuboradi — kalitsiz so'rovlar rad etiladi."
+  },
+  {
+   "fieldname": "webhook_holati",
+   "fieldtype": "Small Text",
+   "label": "Holat",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_ai",
+   "fieldtype": "Section Break",
+   "label": "AI (Telegram)"
+  },
+  {
+   "fieldname": "ai_kunlik_limit",
+   "fieldtype": "Int",
+   "label": "Bir foydalanuvchi: kuniga savol",
+   "default": "40"
+  },
+  {
+   "fieldname": "section_guruh",
+   "fieldtype": "Section Break",
+   "label": "Vazifalar va signallar",
+   "description": "Bot faqat shaxsiy chatda ishlaydi, guruhga qo'shilsa o'zi chiqib ketadi. Vazifalar, eslatmalar va signallar har kimning shaxsiy chatiga keladi."
+  },
+  {
+   "fieldname": "rahbar_tekshiruvi",
+   "fieldtype": "Check",
+   "label": "Bajarilgan vazifani beruvchi tasdiqlaydi",
+   "default": "1",
+   "description": "Xodim 'Bajarildi' bosgach, vazifa beruvchida 👍 Qabul / ↩️ Qaytarish tugmalari chiqadi"
+  },
+  {
+   "fieldname": "guruh_signallari",
+   "fieldtype": "Check",
+   "label": "Har kuni 09:00 ish signallari (kiritilmagan hujjatlar)",
+   "default": "1",
+   "description": "Mas'ul xodimga o'ziga tegishli signallar, rahbarga hammasi — shaxsiy chatda"
+  },
+  {
+   "fieldname": "section_himoya",
+   "fieldtype": "Section Break",
+   "label": "Ma'lumot himoyasi",
+   "description": "Xodimlar AI va bot orqali ma'lumotni yig'ib olib chiqib ketmasligi uchun. Rahbar (to'liq ruxsatli rol) va administratorlarga cheklov qo'yilmaydi."
+  },
+  {
+   "fieldname": "himoya_excel_xodim",
+   "fieldtype": "Check",
+   "label": "Xodimlar AI'dan Excel/PDF fayl ola oladi",
+   "default": "0",
+   "description": "O'chiq — fayl faqat rahbarga. Yoqilsa — Nazorat Roli'da \"Excel\" belgisi bor rollarga ham."
+  },
+  {
+   "fieldname": "himoya_forward",
+   "fieldtype": "Check",
+   "label": "Xodimlarga yuborilgan xabar va fayllarni forward qilish va saqlash taqiqlansin",
+   "default": "1",
+   "description": "Telegram himoyasi: xabarni boshqa chatga uzatib, faylni yuklab yoki nusxalab bo'lmaydi (ko'p qurilmalarda skrinshot ham)."
+  },
+  {
+   "fieldname": "himoya_rahbarga",
+   "fieldtype": "Check",
+   "label": "Rahbarga ham taqiq qo'yilsin",
+   "default": "0",
+   "depends_on": "himoya_forward"
+  },
+  {
+   "fieldname": "himoya_web_ai_belgi",
+   "fieldtype": "Check",
+   "label": "ERP'dagi AI chat ham TG Azo'dagi \"AI bilan savol-javob\" belgisini talab qilsin",
+   "default": "1"
+  },
+  {
+   "fieldname": "column_break_himoya",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "himoya_kop_fayl",
+   "fieldtype": "Int",
+   "label": "Xodim bir kunda shuncha fayl olsa — rahbarga xabar",
+   "default": "3",
+   "description": "0 — xabar yuborilmaydi"
+  },
+  {
+   "fieldname": "himoya_kop_savol",
+   "fieldtype": "Int",
+   "label": "Xodim bir kunda shuncha savol bersa — rahbarga xabar",
+   "default": "25",
+   "description": "0 — xabar yuborilmaydi. Kunlik savol limiti alohida (AI bo'limi)."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-13 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Nazorat Bot Sozlamalari",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "share": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "issingle": 1,
+ "track_changes": 1
+}

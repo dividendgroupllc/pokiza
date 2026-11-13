@@ -1,5 +1,8 @@
 // Pokiza AI — biznes ma'lumotlari bo'yicha chat (Claude)
 const PAI_API = "pokiza.ai.api.";
+const PAI_LOYIHA = "pokiza.ai.loyiha.";
+const PAI_PROJ_ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.pdf,.xlsx,.xls,.csv";
+const PAI_PROJ_MAX_FILES = 10;
 const PAI_MAX_FILES = 5;
 const PAI_ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.pdf,.xlsx,.xls,.csv,.ogg,.oga,.opus,.mp3,.m4a,.wav,.webm,.aac";
 const PAI_VOICE_MAX_SEC = 300;
@@ -58,6 +61,8 @@ const PAI_ICONS = {
 	download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
 	menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
 	plus: '<path d="M12 5v14M5 12h14"/>',
+	folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+	move: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M10 13h6M13 10l3 3-3 3"/>',
 	x: '<path d="M6 6l12 12M18 6 6 18"/>',
 	down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
 	retry: '<path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/>',
@@ -98,6 +103,8 @@ class PokizaAI {
 		this.page = page;
 		this.wrapper = wrapper;
 		this.suhbat = null;
+		this.loyiha = null; // ochiq loyiha (loyiha oynasi yoki loyihadagi suhbat)
+		this.projects = [];
 		this.running = null; // {xabar, $el, text, thinking}
 		this.attachments = []; // {id, file, status: uploading|ready|error, info, preview}
 		this.last_user = null; // {text, files}
@@ -253,11 +260,36 @@ class PokizaAI {
 
 	// ---------- suhbatlar ro'yxati ----------
 	async load_list() {
-		const r = await frappe.call({ method: PAI_API + "list_conversations" });
-		const rows = r.message || [];
+		const [r, p] = await Promise.all([
+			frappe.call({ method: PAI_API + "list_conversations" }),
+			frappe.call({ method: PAI_LOYIHA + "list_projects" }),
+		]);
+		this.projects = p.message || [];
+		const rows = (r.message || []).filter((x) => !x.loyiha);
 		this.$list.empty();
+
+		const $ph = $(`<div class="pai-list-group pai-proj-head"><span>Loyihalar</span>
+			<button type="button" class="pai-proj-add" title="Yangi loyiha" aria-label="Yangi loyiha">${pai_icon("plus", 14)}</button></div>`);
+		$ph.find(".pai-proj-add").on("click", () => this.edit_project());
+		this.$list.append($ph);
+		if (!this.projects.length) {
+			$(`<button type="button" class="pai-item pai-proj-empty">${pai_icon("folder", 15)}<span>Loyiha yaratish</span></button>`)
+				.on("click", () => this.edit_project())
+				.appendTo(this.$list);
+		}
+		this.projects.forEach((pr) => {
+			const $p = $(`<div class="pai-item pai-proj-item" tabindex="0" role="button" data-proj="${pr.name}">
+				${pai_icon("folder", 15)}<span class="pai-item-title"></span><span class="pai-proj-count"></span></div>`);
+			$p.find(".pai-item-title").text(pr.nomi);
+			$p.find(".pai-proj-count").text(pr.chats || "");
+			$p.toggleClass("active", pr.name === this.loyiha && !this.suhbat);
+			$p.on("click", () => this.open_project(pr.name));
+			$p.on("keydown", (e) => e.key === "Enter" && this.open_project(pr.name));
+			this.$list.append($p);
+		});
+
 		if (!rows.length) {
-			this.$list.html(`<div class="pai-list-empty">Savollaringiz shu yerda saqlanadi</div>`);
+			this.$list.append(`<div class="pai-list-group">Suhbatlar</div><div class="pai-list-empty">Savollaringiz shu yerda saqlanadi</div>`);
 			return;
 		}
 		let group = null;
@@ -267,30 +299,239 @@ class PokizaAI {
 				group = g;
 				this.$list.append(`<div class="pai-list-group">${g}</div>`);
 			}
-			const $item = $(`
-				<div class="pai-item ${row.name === this.suhbat ? "active" : ""}" data-name="${row.name}" tabindex="0" role="button">
-					<span class="pai-item-title"></span>
-					<span class="pai-item-actions">
-						<button type="button" class="pai-rename" title="Nomini o'zgartirish" aria-label="Nomini o'zgartirish">${pai_icon("edit", 14)}</button>
-						<button type="button" class="pai-delete" title="O'chirish" aria-label="O'chirish">${pai_icon("trash", 14)}</button>
-					</span>
-				</div>`);
-			$item.find(".pai-item-title").text(row.title || "Suhbat");
-			$item.toggleClass("busy", row.status === "Ishlayapti");
-			$item.on("click", () => this.open(row.name));
-			$item.on("keydown", (e) => {
-				if (e.key === "Enter" && e.target === $item.get(0)) this.open(row.name);
-			});
-			$item.find(".pai-rename").on("click", (e) => {
-				e.stopPropagation();
-				this.rename(row);
-			});
-			$item.find(".pai-delete").on("click", (e) => {
-				e.stopPropagation();
-				this.remove(row);
-			});
-			this.$list.append($item);
+			this.$list.append(this.chat_item(row));
 		});
+	}
+
+	chat_item(row) {
+		const $item = $(`
+			<div class="pai-item ${row.name === this.suhbat ? "active" : ""}" data-name="${row.name}" tabindex="0" role="button">
+				<span class="pai-item-title"></span>
+				<span class="pai-item-actions">
+					<button type="button" class="pai-move" title="Loyihaga ko'chirish" aria-label="Loyihaga ko'chirish">${pai_icon("move", 14)}</button>
+					<button type="button" class="pai-rename" title="Nomini o'zgartirish" aria-label="Nomini o'zgartirish">${pai_icon("edit", 14)}</button>
+					<button type="button" class="pai-delete" title="O'chirish" aria-label="O'chirish">${pai_icon("trash", 14)}</button>
+				</span>
+			</div>`);
+		$item.find(".pai-item-title").text(row.title || "Suhbat");
+		$item.toggleClass("busy", row.status === "Ishlayapti");
+		$item.on("click", () => this.open(row.name));
+		$item.on("keydown", (e) => {
+			if (e.key === "Enter" && e.target === $item.get(0)) this.open(row.name);
+		});
+		$item.find(".pai-move").on("click", (e) => {
+			e.stopPropagation();
+			this.move(row);
+		});
+		$item.find(".pai-rename").on("click", (e) => {
+			e.stopPropagation();
+			this.rename(row);
+		});
+		$item.find(".pai-delete").on("click", (e) => {
+			e.stopPropagation();
+			this.remove(row);
+		});
+		return $item;
+	}
+
+	set_title(title, proj_name) {
+		this.$title.empty();
+		if (proj_name && this.loyiha) {
+			$(`<button type="button" class="pai-crumb" title="Loyihaga qaytish"></button>`)
+				.text(proj_name)
+				.on("click", () => this.open_project(this.loyiha))
+				.appendTo(this.$title);
+			this.$title.append(`<span class="pai-crumb-sep">/</span>`);
+		}
+		$(`<span class="pai-crumb-cur"></span>`).text(title || "Suhbat").appendTo(this.$title);
+	}
+
+	proj_nomi(name) {
+		return (this.projects.find((p) => p.name === name) || {}).nomi || (this.project && this.project.name === name ? this.project.nomi : "");
+	}
+
+	move(row) {
+		if (!this.projects.length) {
+			frappe.show_alert({ message: "Avval chap paneldagi «Loyihalar» yonidagi + bilan loyiha yarating", indicator: "orange" });
+			return;
+		}
+		const options = [{ label: "— Loyihasiz —", value: "" }].concat(this.projects.map((p) => ({ label: p.nomi, value: p.name })));
+		const d = new frappe.ui.Dialog({
+			title: "Suhbatni loyihaga ko'chirish",
+			fields: [{ fieldname: "loyiha", fieldtype: "Select", label: "Loyiha", options, default: row.loyiha || "" }],
+			primary_action_label: "Ko'chirish",
+			primary_action: async (v) => {
+				await frappe.call({ method: PAI_LOYIHA + "move_conversation", args: { suhbat: row.name, loyiha: v.loyiha || null } });
+				d.hide();
+				if (row.name === this.suhbat) {
+					this.loyiha = v.loyiha || null;
+					this.set_title(row.title, this.proj_nomi(this.loyiha));
+				}
+				frappe.show_alert({ message: v.loyiha ? "Loyihaga ko'chirildi" : "Loyihadan chiqarildi", indicator: "green" });
+				this.load_list();
+			},
+		});
+		d.show();
+	}
+
+	// ---------- loyihalar ----------
+	edit_project(p) {
+		const d = new frappe.ui.Dialog({
+			title: p ? "Loyihani tahrirlash" : "Yangi loyiha",
+			fields: [
+				{ fieldname: "nomi", fieldtype: "Data", label: "Nomi", reqd: 1, default: p ? p.nomi : "" },
+				{
+					fieldname: "korsatma",
+					fieldtype: "Text",
+					label: "AI uchun ko'rsatma",
+					default: p ? p.korsatma || "" : "",
+					description:
+						"Shu loyihadagi har bir suhbatda AI buni biladi. Masalan: «Bu loyiha Jizzax filiali sotuvi haqida. Javobni qisqa, jadval bilan ber, summani mln so'mda yoz.»",
+				},
+			],
+			primary_action_label: p ? "Saqlash" : "Yaratish",
+			primary_action: async (v) => {
+				const r = await frappe.call({
+					method: PAI_LOYIHA + "save_project",
+					args: { nomi: v.nomi, korsatma: v.korsatma || "", name: p ? p.name : null },
+				});
+				d.hide();
+				await this.load_list();
+				this.open_project(r.message);
+			},
+		});
+		d.show();
+	}
+
+	async open_project(name) {
+		if (this.running) {
+			frappe.show_alert({ message: "Avval joriy javob tugashini kuting yoki to'xtating", indicator: "orange" });
+			return;
+		}
+		this.suhbat = null;
+		this.loyiha = name;
+		this.$root.removeClass("pai-side-open");
+		this.$list.find(".pai-item").removeClass("active");
+		this.$list.find(`.pai-proj-item[data-proj="${name}"]`).addClass("active");
+		this.$thread.html(`<div class="pai-loading">Yuklanmoqda…</div>`);
+		const r = await frappe.call({ method: PAI_LOYIHA + "get_project", args: { name } });
+		const p = (this.project = r.message);
+		this.set_title(p.nomi);
+		this.$input.attr("placeholder", `«${p.nomi}» loyihasida yangi suhbat — savol yozing…`);
+		this.render_project(p);
+		this.focus();
+	}
+
+	render_project(p) {
+		const $v = $(`
+			<div class="pai-proj">
+				<div class="pai-proj-top">
+					<span class="pai-proj-ico">${pai_icon("folder", 22)}</span>
+					<h2 class="pai-proj-name"></h2>
+					<button type="button" class="pai-icon-btn pai-proj-edit" title="Tahrirlash" aria-label="Loyihani tahrirlash">${pai_icon("edit", 16)}</button>
+					<button type="button" class="pai-icon-btn pai-proj-del" title="Loyihani o'chirish" aria-label="Loyihani o'chirish">${pai_icon("trash", 16)}</button>
+				</div>
+				<section class="pai-proj-sec">
+					<div class="pai-proj-label">AI uchun ko'rsatma</div>
+					<div class="pai-proj-text"></div>
+				</section>
+				<section class="pai-proj-sec">
+					<div class="pai-proj-label">Fayllar <span class="pai-proj-n"></span>
+						<button type="button" class="pai-proj-addfile">${pai_icon("plus", 14)}<span>Fayl qo'shish</span></button>
+						<input type="file" class="pai-proj-file" multiple accept="${PAI_PROJ_ACCEPT}" hidden>
+					</div>
+					<div class="pai-proj-files"></div>
+					<div class="pai-proj-note">PDF, Excel/CSV yoki rasm. Loyihadagi har bir suhbatda AI bu fayllarni ko'radi.</div>
+				</section>
+				<section class="pai-proj-sec">
+					<div class="pai-proj-label">Suhbatlar</div>
+					<div class="pai-proj-chats"></div>
+				</section>
+			</div>`);
+		$v.find(".pai-proj-name").text(p.nomi);
+		if (p.korsatma) $v.find(".pai-proj-text").text(p.korsatma);
+		else
+			$v.find(".pai-proj-text")
+				.addClass("empty")
+				.append($(`<button type="button" class="pai-proj-link">Ko'rsatma yozing</button>`).on("click", () => this.edit_project(p)))
+				.append(" — AI shu loyihada nimani bilishi va qanday javob berishi kerak.");
+		$v.find(".pai-proj-edit").on("click", () => this.edit_project(p));
+		$v.find(".pai-proj-del").on("click", () => this.delete_project(p));
+
+		$v.find(".pai-proj-n").text(`${p.files.length} / ${PAI_PROJ_MAX_FILES}`);
+		const $files = $v.find(".pai-proj-files");
+		p.files.forEach((f) => {
+			const $f = $(`<div class="pai-proj-f"><span class="pai-proj-ext"></span><span class="pai-proj-fname"></span>
+				<span class="pai-proj-fsize"></span>
+				<button type="button" class="pai-proj-frm" title="Olib tashlash" aria-label="Faylni olib tashlash">${pai_icon("x", 14)}</button></div>`);
+			$f.find(".pai-proj-ext").text(pai_ext(f.file_name).toUpperCase()).attr("data-kind", f.kind);
+			$f.find(".pai-proj-fname").text(f.file_name);
+			$f.find(".pai-proj-fsize").text(pai_size(f.size));
+			$f.find(".pai-proj-frm").on("click", async () => {
+				await frappe.call({ method: PAI_LOYIHA + "remove_file", args: { loyiha: p.name, file: f.name } });
+				this.open_project(p.name);
+			});
+			$files.append($f);
+		});
+		const $inp = $v.find(".pai-proj-file");
+		$v.find(".pai-proj-addfile").prop("disabled", p.files.length >= PAI_PROJ_MAX_FILES).on("click", () => $inp.trigger("click"));
+		$inp.on("change", (e) => this.upload_project_files(p, [...e.target.files]));
+
+		const $chats = $v.find(".pai-proj-chats");
+		if (!p.chats.length) $chats.html(`<div class="pai-proj-note">Hali suhbat yo'q. Pastda savol yozing — yangi suhbat shu loyihada ochiladi.</div>`);
+		p.chats.forEach((c) => {
+			const $c = $(`<button type="button" class="pai-proj-chat"><span class="pai-proj-ctitle"></span><span class="pai-proj-cdate"></span></button>`);
+			$c.find(".pai-proj-ctitle").text(c.title || "Suhbat");
+			$c.find(".pai-proj-cdate").text(this.date_group(c.last_message_at || c.modified));
+			$c.on("click", () => this.open(c.name));
+			$chats.append($c);
+		});
+		this.$thread.empty().append($v);
+	}
+
+	async upload_project_files(p, files) {
+		const ok = PAI_PROJ_ACCEPT.split(",");
+		let n = p.files.length;
+		for (const file of files) {
+			if (n >= PAI_PROJ_MAX_FILES) {
+				frappe.show_alert({ message: `Loyihada ko'pi bilan ${PAI_PROJ_MAX_FILES} ta fayl`, indicator: "orange" });
+				break;
+			}
+			if (!ok.includes("." + pai_ext(file.name))) {
+				frappe.show_alert({ message: `${file.name}: faqat PDF, Excel/CSV yoki rasm`, indicator: "orange" });
+				continue;
+			}
+			const fd = new FormData();
+			fd.append("file", file, file.name);
+			fd.append("loyiha", p.name);
+			frappe.show_alert({ message: `${file.name} yuklanmoqda…`, indicator: "blue" });
+			try {
+				const res = await fetch(`/api/method/${PAI_LOYIHA}upload_file`, {
+					method: "POST",
+					headers: { "X-Frappe-CSRF-Token": frappe.csrf_token, Accept: "application/json" },
+					body: fd,
+				});
+				const data = await res.json();
+				if (!res.ok) throw new Error(this.server_error(data) || "Yuklab bo'lmadi");
+				n++;
+			} catch (e) {
+				frappe.show_alert({ message: `${file.name}: ${e.message}`, indicator: "red" });
+			}
+		}
+		if (this.loyiha === p.name && !this.suhbat) this.open_project(p.name);
+	}
+
+	delete_project(p) {
+		frappe.confirm(
+			`"${frappe.utils.escape_html(p.nomi)}" loyihasi, ko'rsatmasi va fayllari o'chiriladi. Undagi suhbatlar saqlanib, umumiy ro'yxatga o'tadi.`,
+			async () => {
+				await frappe.call({ method: PAI_LOYIHA + "delete_project", args: { name: p.name } });
+				this.loyiha = null;
+				this.project = null;
+				this.new_chat();
+				this.load_list();
+			}
+		);
 	}
 
 	date_group(dt) {
@@ -307,7 +548,7 @@ class PokizaAI {
 			{ fieldname: "title", fieldtype: "Data", label: "Sarlavha", default: row.title, reqd: 1 },
 			async (v) => {
 				await frappe.call({ method: PAI_API + "rename_conversation", args: { suhbat: row.name, title: v.title } });
-				if (row.name === this.suhbat) this.$title.text(v.title);
+				if (row.name === this.suhbat) this.set_title(v.title, this.proj_nomi(this.loyiha));
 				this.load_list();
 			},
 			"Suhbat nomini o'zgartirish",
@@ -332,7 +573,10 @@ class PokizaAI {
 			return;
 		}
 		this.suhbat = null;
+		this.loyiha = null;
+		this.project = null;
 		this.$title.text("Pokiza AI");
+		this.$input.attr("placeholder", "Savol yozing yoki ovozli xabar yuboring…");
 		this.$list.find(".pai-item").removeClass("active");
 		this.$root.removeClass("pai-side-open");
 		this.show_empty();
@@ -369,11 +613,14 @@ class PokizaAI {
 		this.suhbat = name;
 		this.$root.removeClass("pai-side-open");
 		this.$list.find(".pai-item").removeClass("active");
+		this.$list.find(`.pai-proj-item[data-proj]`).removeClass("active");
 		this.$list.find(`.pai-item[data-name="${name}"]`).addClass("active");
 		this.$thread.html(`<div class="pai-loading">Yuklanmoqda…</div>`);
 		const r = await frappe.call({ method: PAI_API + "get_conversation", args: { suhbat: name } });
 		const data = r.message;
-		this.$title.text(data.suhbat.title || "Suhbat");
+		this.loyiha = data.suhbat.loyiha || null;
+		this.set_title(data.suhbat.title || "Suhbat", data.suhbat.loyiha_nomi);
+		this.$input.attr("placeholder", "Savol yozing yoki ovozli xabar yuboring…");
 		this.$thread.empty();
 		let pending = null;
 		data.messages.forEach((m) => {
@@ -969,13 +1216,17 @@ class PokizaAI {
 		try {
 			const r = await frappe.call({
 				method: PAI_API + "send_message",
-				args: { text, suhbat: this.suhbat, files: JSON.stringify(file_names) },
+				args: { text, suhbat: this.suhbat, files: JSON.stringify(file_names), loyiha: this.suhbat ? null : this.loyiha },
 				freeze: false,
 			});
 			const isNew = !this.suhbat;
 			this.suhbat = r.message.suhbat;
 			if (isNew) {
-				this.$title.text(text.slice(0, 80) || (file_names.length && shown.every((f) => f.kind === "audio") ? "Ovozli xabar" : "Suhbat"));
+				this.set_title(
+					text.slice(0, 80) || (file_names.length && shown.every((f) => f.kind === "audio") ? "Ovozli xabar" : "Suhbat"),
+					this.proj_nomi(this.loyiha)
+				);
+				this.$input.attr("placeholder", "Savol yozing yoki ovozli xabar yuboring…");
 				this.load_list();
 			}
 			this.start_running(r.message.xabar, $el);

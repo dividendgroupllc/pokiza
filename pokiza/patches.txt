@@ -36,3 +36,8 @@ pokiza.patches.v0_0.hide_kelgan_vaqt
 pokiza.patches.v0_0.add_kartochka_indexes
 pokiza.patches.v0_0.sync_kartochka_item_price
 pokiza.patches.v0_0.add_pokiza_ai_setup
+pokiza.patches.v0_0.add_nazorat_fields
+pokiza.patches.v0_0.nazorat_guruh_defaults
+pokiza.patches.v0_0.nazorat_rollari
+pokiza.patches.v0_0.nazorat_guruhsiz
+pokiza.patches.v0_0.nazorat_himoya_defaults

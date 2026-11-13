@@ -16,7 +16,14 @@
   "kartochka_sana",
   "section_qatorlar",
   "qatorlar",
-  "izoh"
+  "izoh",
+  "section_nazorat",
+  "tolov_foiz",
+  "tolov_kuni",
+  "column_break_nazorat",
+  "oldingi_tovar_sharti",
+  "section_maqsad",
+  "maqsadlar"
  ],
  "fields": [
   {
@@ -92,11 +99,52 @@
    "fieldname": "izoh",
    "fieldtype": "Small Text",
    "label": "Izoh"
+  },
+  {
+   "fieldname": "section_nazorat",
+   "fieldtype": "Section Break",
+   "label": "To'lov intizomi (nazorat)",
+   "description": "Rahbar hisobotidagi \"Debitorlik\" va \"Nazoratdagi mijozlar\" shu maydonlardan hisoblanadi. Yuqoridagi \"To'lov sharti\" matni faqat ma'lumot uchun."
+  },
+  {
+   "fieldname": "tolov_foiz",
+   "fieldtype": "Percent",
+   "label": "Har oy yopiladigan qism (%)",
+   "description": "70/30 kelishuvda 70: o'tgan oy tovarining shuncha foizi to'lov kunigacha yopilishi shart. NAXT = 100"
+  },
+  {
+   "fieldname": "tolov_kuni",
+   "fieldtype": "Int",
+   "label": "To'lov kuni (keyingi oyning sanasi)",
+   "description": "Masalan 10: oktabr tovari 10-noyabrgacha. NAXT = 0 (shu oy ichida)"
+  },
+  {
+   "fieldname": "column_break_nazorat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oldingi_tovar_sharti",
+   "fieldtype": "Check",
+   "label": "Keyingi tovardan oldin oldingisini yopadi",
+   "description": "Nazoratdagi mijoz: yangi tovar olishdan oldin oldingi tovar puli to'liq yopilishi kerak"
+  },
+  {
+   "fieldname": "section_maqsad",
+   "fieldtype": "Section Break",
+   "label": "Oylik maqsadlar",
+   "collapsible": 1,
+   "description": "Oylik mijoz hisobotining \"Keyingi oy maqsadi\" bo'limi shu jadvaldan olinadi."
+  },
+  {
+   "fieldname": "maqsadlar",
+   "fieldtype": "Table",
+   "label": "Maqsadlar",
+   "options": "Mijoz Oylik Maqsad"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-08 12:00:00.000000",
+ "modified": "2026-11-13 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pokiza for business",
  "name": "Mijoz Kartochkasi",

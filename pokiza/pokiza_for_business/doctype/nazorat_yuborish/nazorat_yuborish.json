@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "field:kalit",
+ "field_order": [
+  "kalit",
+  "turi",
+  "chat_id",
+  "column_break_1",
+  "holat",
+  "message_id",
+  "xato"
+ ],
+ "fields": [
+  {
+   "fieldname": "kalit",
+   "fieldtype": "Data",
+   "label": "Kalit",
+   "reqd": 1,
+   "unique": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "turi",
+   "fieldtype": "Data",
+   "label": "Turi",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "chat_id",
+   "fieldtype": "Data",
+   "label": "Chat",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "holat",
+   "fieldtype": "Select",
+   "label": "Holat",
+   "options": "Yuborilmoqda\nYuborildi\nXato",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "label": "Telegram message id",
+   "read_only": 1
+  },
+  {
+   "fieldname": "xato",
+   "fieldtype": "Small Text",
+   "label": "Xato",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-09 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Nazorat Yuborish",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "in_create": 1
+}

@@ -19,6 +19,8 @@ WHERE TABLE_SCHEMA = '<DB_NAME>'
     '__UserSettings',
     'tabAI Suhbat',
     'tabAI Xabar',
+    'tabTG Azo',
+    'tabTG Chat',
     'tabAccess Log',
     'tabActivity Log',
     'tabCommunication',

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>{{ m.oldingi }}ga nisbatan {{ m.oy }} savdo tahlili — {{ m.mijoz_nomi|e }}</title>
+<style>
+{{ font_css }}
+@page { size: A4; margin: 0; background: #06151a; }
+:root {
+	--bg: #06151a; --card: #0b2026; --card2: #0e262d; --line: rgba(120, 220, 230, .13);
+	--ink: #eaf4f5; --muted: #8fa7ab; --accent: #2ee6f0; --red: #ff4d5f; --red-bg: rgba(255, 77, 95, .14);
+	--green: #2bd46f; --green-bg: rgba(43, 212, 111, .13); --amber: #ffb020; --blue: #3b8cff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; font-size: 9pt; }
+.page { padding: 11mm 9mm 6mm; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* sarlavha */
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 6mm; margin-bottom: 6mm; }
+.head h1 { margin: 0; font-size: 19pt; font-weight: 800; letter-spacing: -.02em; line-height: 1.12; }
+.head h1 .oy { color: var(--accent); }
+.mijoz { margin-top: 2mm; font-size: 10.5pt; color: var(--muted); }
+.mijoz b { color: var(--ink); font-weight: 600; }
+.davr { flex: none; border: 1px solid var(--line); background: var(--card); border-radius: 3mm; padding: 3mm 4.5mm; }
+.davr .l { color: var(--muted); font-size: 8pt; }
+.davr .v { font-weight: 700; font-size: 10.5pt; margin-top: .6mm; }
+
+/* kartalar */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4.5mm; margin-bottom: 4.5mm; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 4.5mm; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 3.5mm; padding: 4mm 4.5mm; }
+.card-h { display: flex; align-items: center; gap: 2.5mm; margin-bottom: 3.2mm; }
+.ico { width: 8.5mm; height: 8.5mm; border-radius: 2.2mm; flex: none; display: flex; align-items: center; justify-content: center; }
+.ico svg { width: 4.8mm; height: 4.8mm; }
+.card-h h2 { margin: 0; font-size: 10.5pt; font-weight: 700; line-height: 1.2; }
+.i-blue { background: #134a8a; } .i-green { background: #0f6b47; } .i-red { background: #7a1f2b; }
+.i-teal { background: #0f5d55; } .i-violet { background: #4b2e8f; } .i-amber { background: #7a5410; }
+.i-target { background: #1d3f7a; }
+
+/* asosiy raqam kartalari */
+.kpi { display: flex; align-items: center; gap: 4mm; }
+.kpi .vals { flex: 1; display: flex; gap: 5mm; }
+.kpi .v { font-size: 13pt; font-weight: 700; white-space: nowrap; }
+.kpi .l { color: var(--muted); font-size: 8.5pt; margin-top: .5mm; }
+.badge { flex: none; border-radius: 2.5mm; padding: 2mm 3mm; text-align: center; min-width: 25mm; white-space: nowrap; }
+.badge .p { font-size: 13pt; font-weight: 800; }
+.badge .d { font-size: 9.5pt; font-weight: 600; margin-top: .6mm; }
+.neg { color: var(--red); } .pos { color: var(--green); }
+.badge.neg { background: var(--red-bg); } .badge.pos { background: var(--green-bg); } .badge.zero { background: rgba(255,255,255,.06); }
+
+/* jadvallar */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 8pt; padding: 1.5mm 2mm; background: var(--card2); }
+td { padding: 2.1mm 2mm; border-top: 1px solid var(--line); font-size: 9pt; }
+td.r { white-space: nowrap; }
+td.r, th.r { text-align: right; }
+td.n { width: 6mm; color: var(--muted); }
+td.b { font-weight: 700; }
+tr.jami td { background: var(--red-bg); font-weight: 700; }
+tr.jami.pos td { background: var(--green-bg); }
+.empty { color: var(--muted); padding: 3mm 0; }
+
+/* asosiy mahsulot */
+.focus { display: grid; grid-template-columns: 1.15fr .75fr 1fr; gap: 5mm; align-items: center; }
+.ring { position: relative; width: 34mm; height: 34mm; margin: 0 auto; }
+.ring svg { width: 34mm; height: 34mm; }
+.ring .c { position: absolute; left: 0; right: 0; top: 11mm; text-align: center; }
+.ring .c .p { font-size: 16pt; font-weight: 800; }
+.ring .c .t { font-size: 8.5pt; color: var(--ink); }
+.insight { border-left: 1px solid var(--line); padding-left: 5mm; font-size: 9.5pt; line-height: 1.45; }
+.insight .em { white-space: nowrap; }
+.insight p { margin: 0 0 2.5mm; }
+.insight .em { font-weight: 700; }
+
+/* ulush */
+.share { display: flex; align-items: center; gap: 3mm; }
+.share .ring { width: 27mm; height: 27mm; margin: 0; flex: none; }
+.share .ring svg { width: 27mm; height: 27mm; }
+.share .ring .c { top: 9mm; }
+.share .ring .c .p { font-size: 9pt; white-space: nowrap; }
+.legend .row { margin-bottom: 2.5mm; }
+.legend .dot { display: inline-block; width: 2.6mm; height: 2.6mm; border-radius: 50%; margin-right: 1.5mm; vertical-align: middle; }
+.legend .nm { font-size: 8.5pt; }
+.legend .pc { font-size: 11.5pt; font-weight: 800; margin-top: .5mm; }
+
+/* maqsad */
+.goal td { font-size: 9pt; }
+.goal .t { color: var(--accent); font-weight: 700; }
+.banner { margin-top: 3mm; border-radius: 2.5mm; padding: 2.6mm 3.5mm; background: linear-gradient(90deg, #12408a, #0b2f66);
+	border: 1px solid rgba(80, 150, 255, .35); font-size: 9.5pt; line-height: 1.35; }
+.banner b { color: var(--accent); }
+.foot { margin-top: 3mm; color: var(--muted); font-size: 7.5pt; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+{%- macro badge(p, d, birlik) -%}
+	{%- set k = 'neg' if (p or 0) < 0 else ('pos' if (p or 0) > 0 else 'zero') -%}
+	<div class="badge {{ k }}"><div class="p {{ k }} num">{{ '↓ ' if (p or 0) < 0 else ('↑ ' if (p or 0) > 0 else '') }}{{ ishorali(p, 1) if p is not none else '—' }}%</div>
+	<div class="d {{ k }} num">{{ d }}{{ birlik }}</div></div>
+{%- endmacro -%}
+{%- set ICO = {
+	'box': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg>',
+	'coin': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
+	'down': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M5 5v14M10 9v10M15 13v6M20 16v3"/></svg>',
+	'up': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+	'focus': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="m3 17 6-6 4 4 8-8"/><circle cx="21" cy="7" r="1"/></svg>',
+	'pie': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 2.5A9 9 0 0 1 21.5 9H15z"/></svg>',
+	'bars': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6"><path d="M6 20v-6M12 20V8M18 20V4"/></svg>',
+	'target': '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>',
+} -%}
+<div class="page">
+	<div class="head">
+		<div>
+			<h1>{{ m.oldingi }}ga nisbatan <span class="oy">{{ m.oy }}</span> savdo tahlili</h1>
+			<div class="mijoz">Mijoz: <b>{{ m.mijoz_nomi|e }}</b>{% if m.company %} · {{ m.company|e }}{% endif %}</div>
+		</div>
+		<div class="davr"><div class="l">Hisobot davri</div><div class="v">{{ m.oldingi_yil }} — {{ m.oy_yil }}</div></div>
+	</div>
+
+	{% if m.bosh %}
+	<div class="card"><p class="empty">{{ m.oldingi_yil }} va {{ m.oy_yil }} oylarida bu mijozga tasdiqlangan sotuv yo'q.</p></div>
+	{% else %}
+
+	<div class="grid2">
+		<div class="card">
+			<div class="card-h"><div class="ico i-blue">{{ ICO.box }}</div><h2>Savdo hajmi</h2></div>
+			<div class="kpi">
+				<div class="vals">
+					<div><div class="v num">{{ son(m.kg0) }} kg</div><div class="l">{{ m.oldingi }}</div></div>
+					<div><div class="v num">{{ son(m.kg1) }} kg</div><div class="l">{{ m.oy }}</div></div>
+				</div>
+				{{ badge(m.kg_foiz, ishorali(m.kg_farq), ' kg') }}
+			</div>
+		</div>
+		<div class="card">
+			<div class="card-h"><div class="ico i-green">{{ ICO.coin }}</div><h2>Savdo summasi <span style="color: var(--muted); font-weight: 500">(so'm)</span></h2></div>
+			<div class="kpi">
+				<div class="vals">
+					<div><div class="v num">{{ summa(m.s0) }}</div><div class="l">{{ m.oldingi }}</div></div>
+					<div><div class="v num">{{ summa(m.s1) }}</div><div class="l">{{ m.oy }}</div></div>
+				</div>
+				{{ badge(m.s_foiz, summa(m.s_farq, true), '') }}
+			</div>
+		</div>
+	</div>
+
+	<div class="grid2">
+		<div class="card">
+			<div class="card-h"><div class="ico i-red">{{ ICO.down }}</div><h2>Savdosi kamaygan mahsulotlar</h2></div>
+			{% if m.kamaygan %}
+			<table><tr><th>#</th><th>Mahsulot</th><th class="r">Kamayish (kg)</th></tr>
+			{% for r in m.kamaygan %}<tr><td class="n">{{ loop.index }}</td><td>{{ r.nom|e }}</td><td class="r b neg num">{{ ishorali(r.farq) }}</td></tr>{% endfor %}
+			</table>
+			{% else %}<p class="empty">Kamaygan mahsulot yo'q.</p>{% endif %}
+		</div>
+		<div class="card">
+			<div class="card-h"><div class="ico i-teal">{{ ICO.up }}</div><h2 style="color: var(--accent)">Savdosi oshgan mahsulotlar</h2></div>
+			{% if m.oshgan %}
+			<table><tr><th>#</th><th>Mahsulot</th><th class="r">O'sish (kg)</th></tr>
+			{% for r in m.oshgan %}<tr><td class="n">{{ loop.index }}</td><td>{{ r.nom|e }}</td><td class="r b pos num">{{ ishorali(r.farq) }}</td></tr>{% endfor %}
+			</table>
+			{% else %}<p class="empty">Oshgan mahsulot yo'q.</p>{% endif %}
+		</div>
+	</div>
+
+	{% set a = m.asosiy %}
+	{% if a %}
+	{% set kam = (a.farq or 0) < 0 %}
+	<div class="card" style="margin-bottom: 4mm">
+		<div class="card-h"><div class="ico i-violet">{{ ICO.focus }}</div><h2>Asosiy mahsulot tahlili — {{ a.nom|e }}</h2></div>
+		<div class="focus">
+			<table>
+				<tr><th>Oy</th><th class="r">Savdo hajmi (kg)</th></tr>
+				<tr><td>{{ m.oldingi }}</td><td class="r num">{{ son(a.kg0) }}</td></tr>
+				<tr><td>{{ m.oy }}</td><td class="r num">{{ son(a.kg1) }}</td></tr>
+				<tr class="jami {{ '' if kam else 'pos' }}"><td class="{{ 'neg' if kam else 'pos' }}">{{ 'Kamayish' if kam else "O'sish" }}</td>
+					<td class="r num {{ 'neg' if kam else 'pos' }}">{{ ishorali(a.farq) }}</td></tr>
+			</table>
+			<div class="ring">
+				{{ donut((a.foiz or 0) | abs, '#ff4d5f' if kam else '#2bd46f') }}
+				<div class="c"><div class="p num {{ 'neg' if kam else 'pos' }}">{{ son((a.foiz or 0) | abs, 1) }}%</div><div class="t">{{ 'kamayish' if kam else "o'sish" }}</div></div>
+			</div>
+			<div class="insight">
+				<p>{{ a.nom|e }} savdosi <span class="em {{ 'neg' if kam else 'pos' }}">{{ son(a.farq | abs) }} kg ga ({{ son((a.foiz or 0) | abs, 1) }}%)</span> {{ 'kamaygan' if kam else 'oshgan' }}.</p>
+				{% if a.hissa %}
+				{% if a.hissa > 100 %}
+				<p>Bu umumiy {{ 'pasayish' if kam else "o'sish" }}dan ham ko'p: qolgan mahsulotlar {{ "o'sgani" if kam else 'kamaygani' }} hisobiga umumiy farq kichikroq.</p>
+				{% else %}
+				<p>Umumiy savdo hajmi {{ 'pasayishining' if kam else "o'sishining" }} <span class="em {{ 'neg' if kam else 'pos' }}">{{ a.hissa }}% qismi aynan shu mahsulot</span> hisobiga to'g'ri kelmoqda.</p>
+				{% endif %}
+				{% endif %}
+			</div>
+		</div>
+	</div>
+
+	<div class="grid3">
+		<div class="card">
+			<div class="card-h"><div class="ico i-amber">{{ ICO.pie }}</div><h2>Hajm ulushi</h2></div>
+			<div class="share">
+				<div class="ring">
+					{{ donut(a.ulush or 0, '#ff5a3c', '#8d9a9c') }}
+					<div class="c"><div class="p num">{{ son(m.kg1) }} kg</div><div class="t" style="color: var(--muted)">{{ m.oy }}</div></div>
+				</div>
+				<div class="legend">
+					<div class="row"><span class="dot" style="background:#ff5a3c"></span><span class="nm">{{ a.nom|e }}</span><div class="pc num" style="color:#ff5a3c">{{ son(a.ulush, 1) }}%</div></div>
+					<div class="row"><span class="dot" style="background:#8d9a9c"></span><span class="nm">Qolgan mahsulotlar</span><div class="pc num">{{ son(100 - (a.ulush or 0), 1) if a.ulush is not none else '—' }}%</div></div>
+				</div>
+			</div>
+		</div>
+		<div class="card">
+			<div class="card-h"><div class="ico i-green">{{ ICO.bars }}</div><h2>Boshqa mahsulotlar</h2></div>
+			{% set bkam = (a.boshqa1 - a.boshqa0) < 0 %}
+			<div style="color: var(--muted); font-size: 8pt; margin: -1.2mm 0 2mm">{{ a.nom|e }}dan tashqari</div>
+			<table>
+				<tr><th>Oy</th><th class="r">Savdo hajmi (kg)</th></tr>
+				<tr><td>{{ m.oldingi }}</td><td class="r num">{{ son(a.boshqa0) }}</td></tr>
+				<tr><td>{{ m.oy }}</td><td class="r num">{{ son(a.boshqa1) }}</td></tr>
+				<tr class="jami {{ '' if bkam else 'pos' }}"><td class="{{ 'neg' if bkam else 'pos' }}">O'zgarish</td>
+					<td class="r num {{ 'neg' if bkam else 'pos' }}">{{ ishorali(a.boshqa1 - a.boshqa0) }}{% if a.boshqa_foiz is not none %} ({{ ishorali(a.boshqa_foiz, 1) }}%){% endif %}</td></tr>
+			</table>
+		</div>
+		<div class="card goal">
+			<div class="card-h"><div class="ico i-target">{{ ICO.target }}</div><h2>Keyingi oy maqsadi</h2></div>
+			{% if m.maqsad %}
+			<table>
+				<tr><th>Ko'rsatkich</th><th class="r">{{ m.oy }}</th><th class="r">{{ m.keyingi }}</th></tr>
+				{% if m.maqsad.maqsad_kg %}<tr><td>Savdo hajmi</td><td class="r num">{{ son(m.kg1) }} kg</td><td class="r t num">{{ son(m.maqsad.maqsad_kg) }} kg</td></tr>{% endif %}
+				{% if m.maqsad.maqsad_summa %}<tr><td>Savdo summasi</td><td class="r num">{{ summa(m.s1) }}</td><td class="r t num">{{ summa(m.maqsad.maqsad_summa) }}</td></tr>{% endif %}
+			</table>
+			{% set o = m.maqsad.kg_osish if m.maqsad.kg_osish is not none else m.maqsad.summa_osish %}
+			<div class="banner">Maqsad: {% if m.maqsad.izoh %}{{ m.maqsad.izoh|e }}{% elif o is not none and o > 0 %}savdoni kamida <b>{{ son(o, 0) }}%</b> oshirish.{% else %}{{ m.keyingi }} oyi rejasini bajarish.{% endif %}</div>
+			{% else %}
+			<p class="empty">{{ m.keyingi_yil }} uchun maqsad kiritilmagan (Mijoz Kartochkasi → Oylik maqsadlar).</p>
+			{% endif %}
+		</div>
+	</div>
+	{% endif %}
+	{% endif %}
+
+	<div class="foot">
+		<span>Tasdiqlangan sotuv fakturalari bo'yicha, qaytarishlar ayirilgan; summa QQS'siz.{% if m.dona1 or m.dona0 %} Vazni kiritilmagan donali mahsulotlar kg'ga qo'shilmagan:{% if m.dona0 %} {{ m.oldingi }} {{ son(m.dona0) }} dona{% endif %}{% if m.dona1 %}{{ ',' if m.dona0 }} {{ m.oy }} {{ son(m.dona1) }} dona{% endif %}.{% endif %}</span>
+	</div>
+</div>
+</body>
+</html>

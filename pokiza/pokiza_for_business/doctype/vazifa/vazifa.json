@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "creation": "2026-11-09 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "format:VZ-{#####}",
+ "field_order": [
+  "sarlavha",
+  "masul",
+  "muddat",
+  "column_break_1",
+  "holat",
+  "bolim",
+  "berdi",
+  "section_1",
+  "tavsif",
+  "rad_sababi",
+  "izoh",
+  "section_2",
+  "qabul_vaqti",
+  "bajarilgan_vaqt",
+  "column_break_2",
+  "eslatma_yuborildi",
+  "manba",
+  "tasdiqlandi",
+  "tasdiq_vaqti",
+  "tarix"
+ ],
+ "fields": [
+  {
+   "fieldname": "sarlavha",
+   "fieldtype": "Data",
+   "label": "Vazifa",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "masul",
+   "fieldtype": "Link",
+   "label": "Mas'ul",
+   "options": "User",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "muddat",
+   "fieldtype": "Date",
+   "label": "Muddat",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "holat",
+   "fieldtype": "Select",
+   "label": "Holat",
+   "options": "Yangi\nQabul qilindi\nRad etildi\nBajarildi\nMuddati o'tdi\nBekor qilindi",
+   "default": "Yangi",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "bolim",
+   "fieldtype": "Link",
+   "label": "Bo'lim (rol)",
+   "options": "Nazorat Roli",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "berdi",
+   "fieldtype": "Link",
+   "label": "Kim berdi",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_1",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "tavsif",
+   "fieldtype": "Small Text",
+   "label": "Tavsif"
+  },
+  {
+   "fieldname": "rad_sababi",
+   "fieldtype": "Small Text",
+   "label": "Rad etish sababi",
+   "depends_on": "eval:doc.holat=='Rad etildi'"
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  },
+  {
+   "fieldname": "section_2",
+   "fieldtype": "Section Break",
+   "collapsible": 1,
+   "label": "Tizim"
+  },
+  {
+   "fieldname": "qabul_vaqti",
+   "fieldtype": "Datetime",
+   "label": "Qabul qilingan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bajarilgan_vaqt",
+   "fieldtype": "Datetime",
+   "label": "Bajarilgan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "eslatma_yuborildi",
+   "fieldtype": "Check",
+   "label": "Eslatma yuborildi",
+   "read_only": 1
+  },
+  {
+   "fieldname": "manba",
+   "fieldtype": "Select",
+   "label": "Qayerdan",
+   "options": "ERP\nTelegram\nAI",
+   "default": "ERP",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tasdiqlandi",
+   "fieldtype": "Check",
+   "label": "Beruvchi tasdiqladi",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tasdiq_vaqti",
+   "fieldtype": "Datetime",
+   "label": "Tasdiq vaqti",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tarix",
+   "fieldtype": "Small Text",
+   "label": "Tarix",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Pokiza for business",
+ "name": "Vazifa",
+ "owner": "Administrator",
+ "title_field": "sarlavha",
+ "show_title_field_in_link": 1,
+ "track_changes": 1,
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "role": "System Manager",
+   "report": 1,
+   "share": 1,
+   "export": 1
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "role": "All",
+   "if_owner": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

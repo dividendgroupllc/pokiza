@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nazorat sinovi</title>
+<style>
+:root {
+	--bg: #f5f6f4; --panel: #ffffff; --ink: #1d2321; --muted: #66706c; --line: #e2e5e1; --soft: #eef1ed;
+	--accent: #0f7a5c; --accent-soft: #e3f2ec; --ok: #0ca30c; --ok-soft: #e4f6e4; --no: #d03b3b; --no-soft: #fbe7e7;
+	--skip: #8a8f8c; --code: #f0f2ef; --shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+	--bg: #121514; --panel: #1a1e1c; --ink: #e8ece9; --muted: #98a19d; --line: #2c322f; --soft: #222724;
+	--accent: #3cc79a; --accent-soft: #1d3a30; --ok: #3fcf3f; --ok-soft: #1c3320; --no: #ff6b6b; --no-soft: #3a2020;
+	--skip: #8a8f8c; --code: #232825; --shadow: none;
+} }
+:root[data-theme="dark"] {
+	--bg: #121514; --panel: #1a1e1c; --ink: #e8ece9; --muted: #98a19d; --line: #2c322f; --soft: #222724;
+	--accent: #3cc79a; --accent-soft: #1d3a30; --ok: #3fcf3f; --ok-soft: #1c3320; --no: #ff6b6b; --no-soft: #3a2020;
+	--skip: #8a8f8c; --code: #232825; --shadow: none;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 76px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+a { color: var(--accent); }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13px; word-break: break-word; }
+pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+
+/* yuqori panel */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); }
+.bar-in { max-width: 1320px; margin: 0 auto; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.brand { font-weight: 700; font-size: 16px; }
+.prog { display: flex; align-items: center; gap: 10px; flex: 1 1 260px; min-width: 220px; }
+.track { flex: 1; height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; display: flex; }
+.track i { display: block; height: 100%; }
+.track .ok { background: var(--ok); } .track .no { background: var(--no); } .track .skip { background: var(--skip); }
+.nums { font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nums b { color: var(--ink); }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn:focus-visible, .seg button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* sahifa */
+.wrap { max-width: 1320px; margin: 0 auto; padding: 22px 20px 80px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; }
+nav.toc { position: sticky; top: 72px; align-self: start; max-height: calc(100vh - 90px); overflow: auto; font-size: 14px; }
+nav.toc a { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 7px; color: var(--ink); text-decoration: none; }
+nav.toc a:hover { background: var(--soft); }
+nav.toc a.cur { background: var(--accent-soft); color: var(--accent); }
+nav.toc .c { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc .c.done { color: var(--ok); } nav.toc .c.bad { color: var(--no); }
+main { min-width: 0; }
+.intro { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.intro h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -.01em; }
+.intro p { margin: 6px 0; color: var(--muted); max-width: 75ch; }
+.sec { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 22px 18px; margin-bottom: 18px; box-shadow: var(--shadow); }
+.sec h2 { font-size: 20px; margin: 16px 0 8px; }
+.sec h3 { font-size: 15px; margin: 18px 0 8px; color: var(--muted); }
+.sec p, .sec li { max-width: 80ch; }
+.sec hr { display: none; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 14px; }
+th { text-align: left; font-weight: 600; font-size: 12.5px; color: var(--muted); background: var(--soft); padding: 7px 10px; }
+td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+table:not(.test) { display: block; overflow-x: auto; }
+
+/* sinov qatorlari */
+table.test td:first-child { width: 52px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.test td:nth-child(3) { color: var(--muted); }
+table.test tr.ok td { background: var(--ok-soft); }
+table.test tr.no td { background: var(--no-soft); }
+table.test tr.skip td { opacity: .6; }
+td.st { width: 210px; }
+th.h-st { width: 210px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; color: var(--muted); width: 38px; height: 30px; font-size: 15px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button:hover { color: var(--ink); background: var(--soft); }
+tr.ok .seg button[data-v="ok"] { background: var(--ok); color: #fff; }
+tr.no .seg button[data-v="no"] { background: var(--no); color: #fff; }
+tr.skip .seg button[data-v="skip"] { background: var(--skip); color: #fff; }
+td.st textarea { display: block; width: 100%; margin-top: 6px; resize: vertical; min-height: 30px; border: 1px solid var(--line); border-radius: 7px;
+	background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; padding: 5px 8px; }
+tr:not(.no) td.st textarea:placeholder-shown { display: none; }
+tr.no td.st textarea, td.st textarea:focus { display: block; }
+body.f-todo table.test tr.ok, body.f-todo table.test tr.skip, body.f-bad table.test tbody tr:not(.no) { display: none; }
+body.f-bad .sec:not(:has(tr.no)) , body.f-todo .sec:has(table.test):not(:has(tbody tr:not(.ok):not(.skip))) { display: none; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 900px) {
+	.wrap { grid-template-columns: 1fr; padding: 14px 16px 60px; }
+	nav.toc { display: none; }
+	.bar-in { padding: 8px 16px; }
+	table.test, table.test tbody, table.test tr, table.test td { display: block; width: 100%; }
+	table.test thead { display: none; }
+	table.test tr { border-top: 1px solid var(--line); padding: 8px 0; }
+	table.test td { border: 0; padding: 3px 8px; }
+	td.st { width: auto; }
+}
+@media print {
+	.bar, nav.toc, .seg, td.st textarea:placeholder-shown { display: none !important; }
+	.wrap { display: block; } .sec { break-inside: avoid-page; box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<div class="bar"><div class="bar-in">
+	<div class="brand">Nazorat sinovi</div>
+	<div class="prog">
+		<div class="track" aria-hidden="true"><i class="ok"></i><i class="no"></i><i class="skip"></i></div>
+		<div class="nums" id="nums"></div>
+	</div>
+	<div class="tools">
+		<button class="btn on" data-f="all">Hammasi</button>
+		<button class="btn" data-f="todo">Tekshirilmagan</button>
+		<button class="btn" data-f="bad">Mos kelmagan</button>
+		<button class="btn" id="copy" title="Mos kelmagan sinovlarni izohi bilan nusxalaydi — Claude'ga yuborish uchun">Xatolarni nusxalash</button>
+		<button class="btn" id="print">Chop etish</button>
+		<button class="btn" id="reset">Tozalash</button>
+	</div>
+</div></div>
+
+<div class="wrap">
+	<nav class="toc" id="toc"><a href="#1-tizim-haqida" data-sec="1-tizim-haqida">1. Tizim haqida</a>
+<a href="#2-ishga-tushirish" data-sec="2-ishga-tushirish">2. Ishga tushirish</a>
+<a href="#3-sozlamalar" data-sec="3-sozlamalar">3. Sozlamalar</a>
+<a href="#4-korsatkichlar" data-sec="4-korsatkichlar">4. Ko'rsatkichlar</a>
+<a href="#5-ai-chat-web" data-sec="5-ai-chat-web">5. AI chat (web)</a>
+<a href="#6-nazorat-boti-va-ulanish" data-sec="6-nazorat-boti-va-ulanish">6. Nazorat boti va ulanish</a>
+<a href="#7-rahbar-hisobotlar-tugmalar-grafik-dividend" data-sec="7-rahbar-hisobotlar-tugmalar-grafik-dividend">7. Rahbar: hisobotlar, tugmalar, grafik, dividend</a>
+<a href="#8-rollar-kim-nimani-koradi" data-sec="8-rollar-kim-nimani-koradi">8. Rollar: kim nimani ko'radi</a>
+<a href="#9-bot-faqat-shaxsiy-chatda" data-sec="9-bot-faqat-shaxsiy-chatda">9. Bot faqat shaxsiy chatda</a>
+<a href="#10-vazifalar" data-sec="10-vazifalar">10. Vazifalar</a>
+<a href="#11-ai-telegramda" data-sec="11-ai-telegramda">11. AI Telegram'da</a>
+<a href="#12-rahbar-paneli" data-sec="12-rahbar-paneli">12. Rahbar paneli</a>
+<a href="#13-avtomatik-ishlar-scheduler" data-sec="13-avtomatik-ishlar-scheduler">13. Avtomatik ishlar (scheduler)</a>
+<a href="#14-xavfsizlik" data-sec="14-xavfsizlik">14. Xavfsizlik</a>
+<a href="#15-malumot-sifati-bilib-qoying" data-sec="15-malumot-sifati-bilib-qoying">15. Ma'lumot sifati (bilib qo'ying)</a>
+<a href="#16-oylik-mijoz-hisoboti-pdf" data-sec="16-oylik-mijoz-hisoboti-pdf">16. Oylik mijoz hisoboti (PDF)</a>
+<a href="#17-prodga-chiqarish-siz-qilasiz" data-sec="17-prodga-chiqarish-siz-qilasiz">17. Prod'ga chiqarish (siz qilasiz)</a></nav>
+	<main>
+		<div class="intro">
+			<h1>Pokiza Nazorat tizimi — qo'lda tekshirish</h1>
+			<p>Har bir sinovda qadamni bajaring, natijani "Kutiladi" ustuni bilan solishtiring va belgilang:
+			<b>✓</b> mos keldi, <b>✕</b> mos kelmadi (izohga nima chiqqanini yozing), <b>–</b> o'tkazib yuborildi.</p>
+			<p>Belgilar shu brauzerda saqlanib qoladi: faylni yopib ochsangiz ham yo'qolmaydi. Oxirida
+			<b>Xatolarni nusxalash</b> tugmasini bosing va matnni yuboring.</p>
+		</div>
+		<h1 id="pokiza-nazorat-tizimi-qollanma-va-sinov">Pokiza Nazorat tizimi — qo'llanma va sinov</h1>
+
+<p>Har bo'limda avval <strong>tizim nima qilishi</strong> tushuntiriladi, keyin <strong>sinov jadvali</strong> keladi: qadam va
+kutilgan natija. Natija mos kelsa ✅ qo'ying. Mos kelmasa, sinov raqamini (masalan <strong>5.3</strong>) va
+skrinshot yoki xato matnini yuboring.</p>
+
+<ol>
+<li>Tizim haqida</li>
+<li>Ishga tushirish</li>
+<li>Sozlamalar</li>
+<li>Ko'rsatkichlar</li>
+<li>AI chat (web)</li>
+<li>Nazorat boti va ulanish</li>
+<li>Rahbar: hisobotlar, tugmalar, grafik, dividend</li>
+<li>Rollar: kim nimani ko'radi</li>
+<li>Bot faqat shaxsiy chatda</li>
+<li>Vazifalar</li>
+<li>AI Telegram'da</li>
+<li>Rahbar paneli</li>
+<li>Avtomatik ishlar</li>
+<li>Xavfsizlik</li>
+<li>Ma'lumot sifati</li>
+<li>Oylik mijoz hisoboti (PDF)</li>
+<li>Prod'ga chiqarish</li>
+</ol>
+
+<hr />
+
+<section class="sec" id="s-1-tizim-haqida"><h2 id="1-tizim-haqida">1. Tizim haqida</h2>
+
+<p>Rahbar zavodni ERP'ga kirmasdan, Telegram orqali nazorat qiladi. Barcha raqamlar ERP'dan avtomatik
+olinadi. Har bir ko'rsatkich <strong>bitta joyda</strong> hisoblanadi, shuning uchun Telegram hisobotida, rahbar
+panelida va AI javobida bir xil raqam chiqadi.</p>
+
+<p>Har ko'rsatkichda:</p>
+
+<ul>
+<li><strong>fakt</strong>: nima bo'ldi;</li>
+<li><strong>reja</strong> va bajarilish %;</li>
+<li><strong>oldingi davr</strong> bilan solishtirish (↑ / ↓ %);</li>
+<li><strong>rang</strong>: 🟢 yaxshi · 🟡 diqqat · 🔴 yomon · ▫️ rangsiz (reja kiritilmagan yoki rang kerak emas).</li>
+</ul>
+
+<p>Foydalanuvchi hamma joyda ko'rsatkichni <strong>nomi bilan</strong> ko'radi: "Savdo", "Quvvat", "Debitorlik"…
+Telegram'da, rahbar panelida va AI javobida hech qanday ichki kod (harf-raqam) chiqmaydi.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Qism</th>
+  <th>Qayerda</th>
+  <th>Kim ishlatadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Nazorat boti</td>
+  <td>Telegram (alohida ichki bot), shaxsiy chat</td>
+  <td>Rahbar, xodimlar</td>
+</tr>
+<tr>
+  <td>Rahbar paneli</td>
+  <td>ERP → <code>/app/rahbar-paneli</code></td>
+  <td>Rahbar, bo'lim boshliqlari</td>
+</tr>
+<tr>
+  <td>Pokiza AI</td>
+  <td>ERP → <code>/app/pokiza-ai</code> va Telegram</td>
+  <td>Rahbar, ruxsat berilgan xodimlar</td>
+</tr>
+<tr>
+  <td>Sozlamalar</td>
+  <td>ERP: Nazorat Sozlamalari, Oylik Reja, Nazorat Bot Sozlamalari, TG Azo, TG Chat</td>
+  <td>Administrator</td>
+</tr>
+</tbody>
+</table>
+
+<p>Mijozlarga akt sverka yuboradigan eski bot o'zgarmagan. Nazorat boti undan butunlay alohida.</p>
+
+<hr />
+
+</section><section class="sec" id="s-2-ishga-tushirish"><h2 id="2-ishga-tushirish">2. Ishga tushirish</h2>
+
+<ul>
+<li><strong>Terminal 1:</strong> <code>cd ~/frappe-bench-15 &amp;&amp; bench start</code>. Bu buyruq web'ni, worker'larni va
+scheduler'ni ishga tushiradi. AI javoblari va vazifa xabarlari worker orqali ketadi.</li>
+<li><strong>Kod o'zgargandan keyin</strong> worker'lar yangilanishi uchun Ctrl+C bosing va yana <code>bench start</code> qiling.</li>
+<li><strong>ERP'ga kirish:</strong> brauzerda <code>http://localhost:8001</code>. <strong>Administrator emas, oddiy foydalanuvchi</strong>
+bilan ham kira oladigan bo'ling: Administrator Telegram'ga ulana olmaydi, bu xavfsizlik uchun
+shunday qilingan.</li>
+</ul>
+
+<hr />
+
+</section><section class="sec" id="s-3-sozlamalar"><h2 id="3-sozlamalar">3. Sozlamalar</h2>
+
+<p><strong>Nima uchun kerak:</strong> reja va chegaralarsiz tizim faqat faktni ko'rsatadi, rang va bajarilish foizi
+chiqmaydi.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Sahifa</th>
+  <th>Nima saqlanadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Nazorat Sozlamalari</strong></td>
+  <td>Rang chegaralari (quvvat 90/70%, savdo 95/85%, rentabellik 1 pp, $50K/$40K), to'liq quvvat 180 t, jimlik 7 kun, bitta mijoz ulushi 25%, postavshik to'lov kuni 10, Дивиденд 1/2/3 kimga tegishli. <strong>"Qo'shimcha ko'rsatkichlar ranglari"</strong> bo'limida: mijoz rentabelligi, mijoz dinamikasi, top mahsulotlar, kategoriyalar, xarajatlar, brak, dividend va foyda taqsimoti chegaralari</td>
+</tr>
+<tr>
+  <td><strong>Oylik Reja</strong></td>
+  <td>Har oy boshida rahbar kiritadi: savdo, sof rentabellik %, tonna, $ maqsad. Oy yakunida <strong>"Foyda ishlatilishi"</strong> jadvali: sof foyda dividenddan tashqari nimalarga ketgani (uskuna, qarz, zaxira…). Sahifani faqat administrator va Accounts Manager ko'radi</td>
+</tr>
+<tr>
+  <td><strong>Currency Exchange</strong> (ERPNext)</td>
+  <td>USD→UZS kursi. Sof daromad ($) shu yerdagi eng so'nggi kurs bilan hisoblanadi. Kurs boshqa joyda kiritilmaydi</td>
+</tr>
+<tr>
+  <td><strong>Mijoz Kartochkasi</strong></td>
+  <td>To'lov sharti: yopiladigan % (70/30 dagi 70), to'lov kuni (20), "keyingi tovardan oldin oldingisini yopadi" belgisi. Eski "70/30 20-SANA" matni avtomatik ko'chirilgan</td>
+</tr>
+<tr>
+  <td><strong>Item</strong></td>
+  <td>"Kategoriya (nazorat)": sosiska, kopchyonniy, varyonniy, delikates, boshqa</td>
+</tr>
+<tr>
+  <td><strong>Account</strong></td>
+  <td>"Xarajat turi (nazorat)": doimiy yoki o'zgaruvchi</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Kategoriya va xarajat turini to'ldirish.</strong> Tizim mahsulot va hisob nomlaridan taklif tuzib qo'ygan:
+<code>~/Downloads/nazorat_taklif.xlsx</code>. Siz tekshirib, kerak bo'lsa tuzatasiz, keyin bitta buyruq bilan
+yozasiz. Bunda faqat bo'sh maydonlar to'ldiriladi.</p>
+
+<h3 id="sinov">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="3.1">
+  <td>3.1</td>
+  <td><strong>Nazorat Sozlamalari</strong>ni oching</td>
+  <td>Chegaralar to'ldirilgan, kurs maydoni yo'q</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.2">
+  <td>3.2</td>
+  <td><strong>Currency Exchange</strong> → bugungi USD→UZS kursi</td>
+  <td>Saqlanadi (oxirgi kurs 02.09.2026 da kiritilgan)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.3">
+  <td>3.3</td>
+  <td><strong>Oylik Reja</strong> → New: 2026 / 10 — savdo 5 000 000 000, rentabellik 20, tonna 180, $ 50 000. Xuddi shunday 2026 / 11</td>
+  <td><code>REJA-2026-10</code>, <code>REJA-2026-11</code></td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.4">
+  <td>3.4</td>
+  <td>Oylik Reja: savdoni 0 qilib saqlashga urining</td>
+  <td>Xato: "0 dan katta bo'lishi kerak"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.5">
+  <td>3.5</td>
+  <td><strong>Mijoz Kartochkasi</strong> → ЧП Жамилов Жонибек</td>
+  <td>70% / 20-sana to'lgan</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.6">
+  <td>3.6</td>
+  <td>Kartochkada to'lov kunini 40 qilib saqlang</td>
+  <td>Xato: 0..28</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.7">
+  <td>3.7</td>
+  <td>Excel'ni tekshirib saqlang, keyin: <code>bench --site pokiza.local execute pokiza.nazorat.setup.qollash --kwargs "{'fayl': '/home/sardorbek/Downloads/nazorat_taklif.xlsx'}"</code></td>
+  <td>"Yozildi: N mahsulot kategoriyasi, M xarajat turi"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="3.8">
+  <td>3.8</td>
+  <td>Item va Account'ni oching</td>
+  <td>Kategoriya va xarajat turi ko'rinadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-4-korsatkichlar"><h2 id="4-korsatkichlar">4. Ko'rsatkichlar</h2>
+
+<p>TZ bo'yicha 26 ta ko'rsatkich bor. Ularning hammasi bitta "KPI dvigateli"da hisoblanadi.</p>
+
+<h3 id="oylik-oyning-1-sanasida-otgan-oy-uchun">Oylik (oyning 1-sanasida, o'tgan oy uchun)</h3>
+
+<p><strong>Strategik fokus</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Qanday hisoblanadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Quvvatdan foydalanish</td>
+  <td>Ishlab chiqarilgan tonna / to'liq quvvat 180 t. Oylik Reja'da tonna bo'lsa, "rejaning X%" alohida qator</td>
+</tr>
+<tr>
+  <td>Savdo</td>
+  <td>Tasdiqlangan sotuv fakturalari (qaytarishlar ayirilgan) / oylik reja</td>
+</tr>
+<tr>
+  <td>Sof rentabellik</td>
+  <td>Sof foyda / savdo. Rejada va yuqori — yashil, rejadan 1 pp gacha past — sariq, undan past — qizil</td>
+</tr>
+<tr>
+  <td>O'rtacha chek</td>
+  <td>Kg'dagi savdo / sotilgan kg. Donali mahsulotlar Item'dagi vazn (Weight Per Unit) bilan kiradi. Rang: o'sdi / o'zgarmadi / tushdi</td>
+</tr>
+<tr>
+  <td>Sof daromad ($)</td>
+  <td>Sof foyda / Currency Exchange'dagi kurs. Maqsad $50K</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Mijozlar va sotish</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Qanday hisoblanadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Mijoz rentabelligi</td>
+  <td>Har mijoz: savdo − tannarx − bonus. Eng pastlari birinchi</td>
+</tr>
+<tr>
+  <td>Mijoz dinamikasi</td>
+  <td>Kim o'sdi, kim tushdi (o'tgan oyga nisbatan)</td>
+</tr>
+<tr>
+  <td>Top mahsulotlar</td>
+  <td>Daromadning 50% ini beradigan mahsulotlar</td>
+</tr>
+<tr>
+  <td>Kategoriyalar</td>
+  <td>Sosiska / kopchyonniy / varyonniy / delikates: ulushi va marjasi</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Moliya va to'lovlar</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Qanday hisoblanadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Postavshiklarga to'lov</td>
+  <td>O'tgan oy xaridi keyingi oyning 10-sanasigacha yopildimi (ortiqcha ham, kam ham emas). Yakuniy holat <strong>11-sanada</strong> alohida xabar bilan keladi</td>
+</tr>
+<tr>
+  <td>Debitorlik (mijozlardan to'lov)</td>
+  <td>Kelishuv (70/30, sana) bo'yicha: kim buzdi, kim qancha to'lashi kerak</td>
+</tr>
+<tr>
+  <td>Xarajatlar</td>
+  <td>Xarajat / savdo, doimiy va o'zgaruvchi alohida</td>
+</tr>
+<tr>
+  <td>Brak va vozvrat</td>
+  <td>Brak kg («Brak» oynasidan yozilgan Material Issue, «Брак» hisobi) / ishlab chiqarilgan kg; qaytgan tovar</td>
+</tr>
+<tr>
+  <td>Dividend</td>
+  <td>Rahbar olgan pul: kim, qancha, qachon</td>
+</tr>
+<tr>
+  <td>Sof foyda taqsimoti</td>
+  <td>Foyda: dividend + Oylik Reja'dagi "Foyda ishlatilishi" + oborotda qolgani</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Vazifalar</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Qanday hisoblanadi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Vazifalar bajarilishi</td>
+  <td>Har xodim: jami — bajarilgan — bajarilmagan</td>
+</tr>
+</tbody>
+</table>
+
+<h3 id="haftalik-dushanba-otgan-hafta-uchun">Haftalik (dushanba, o'tgan hafta uchun)</h3>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Nima</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Savdo</td>
+  <td>Reja = oylik rejaning 1/4 qismi</td>
+</tr>
+<tr>
+  <td>O'rtacha chek</td>
+  <td>O'tgan haftaga nisbatan</td>
+</tr>
+<tr>
+  <td>Quvvat</td>
+  <td>6 900 kg × ish kunlari</td>
+</tr>
+<tr>
+  <td>Jim mijozlar</td>
+  <td>7 kundan beri buyurtma bermagan mijozlar</td>
+</tr>
+<tr>
+  <td>Nazoratdagi mijozlar</td>
+  <td>"Keyingi tovardan oldin yopadi" sharti bor mijozlar: kim yopmagan</td>
+</tr>
+<tr>
+  <td>Kechikkan vazifalar</td>
+  <td>Berilgan, rad etilgan, muddati o'tgan</td>
+</tr>
+</tbody>
+</table>
+
+<h3 id="kunlik-oxirgi-ish-kuni-uchun-dushanba-kuni-shanba-korsatiladi">Kunlik (oxirgi ish kuni uchun; dushanba kuni shanba ko'rsatiladi)</h3>
+
+<table>
+<thead>
+<tr>
+  <th>Ko'rsatkich</th>
+  <th>Nima</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Savdo</td>
+  <td>Kim qancha oldi, oy boshidan jami</td>
+</tr>
+<tr>
+  <td>Ishlab chiqarish</td>
+  <td>Tonna va quvvat %</td>
+</tr>
+<tr>
+  <td>Kassa kirimi</td>
+  <td>Kimdan qancha kirdi</td>
+</tr>
+<tr>
+  <td>Dividend</td>
+  <td>Kunlik va oy boshidan</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Davr qanday tanlanadi:</strong> Telegram'da <code>◀</code> / <code>▶</code> tugmalari bilan, rahbar panelida sana tanlagich
+bilan. Hech narsa qo'lda yozilmaydi.</p>
+
+<p>Oy hali tugamagan bo'lsa, reja o'tgan ish kunlariga proporsional olinadi, savdo uchun esa oy
+oxiriga prognoz chiqadi.</p>
+
+<p><strong>Avtomatik tekshiruv (4.1):</strong> bu buyruq ko'rsatkichlar dvigatelini <strong>mustaqil</strong> tekshiradi. Savdo,
+quvvat, o'rtacha chek, rentabellik, dividend va kassa bazadan to'g'ridan-to'g'ri, oddiy SQL bilan
+qayta hisoblanadi va dvigatel natijasi bilan solishtiriladi. Qolgan ko'rsatkichlar xatosiz hisoblanishi
+tekshiriladi. "hammasi mos" chiqsa, Telegram'dagi, paneldagi va AI'dagi raqamlarga ishonsa bo'ladi.
+Kod o'zgargandan keyin va prod'ga chiqarilgandan keyin bir marta ishga tushiriladi. Hech narsani
+o'zgartirmaydi, faqat o'qiydi.</p>
+
+<h3 id="sinov-2">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="4.1">
+  <td>4.1</td>
+  <td><code>bench --site pokiza.local execute pokiza.nazorat.metrics.tekshir.run --kwargs "{'davr': '2026-10'}"</code></td>
+  <td>Oxirida <code>NATIJA: hammasi mos</code></td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="4.2">
+  <td>4.2</td>
+  <td>Xuddi shu, <code>'2026-09'</code></td>
+  <td><code>hammasi mos</code></td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-5-ai-chat-web"><h2 id="5-ai-chat-web">5. AI chat (web)</h2>
+
+<p>Pokiza AI'ga savol berilganda, u avval rasmiy ko'rsatkichlarni oladi (<code>get_kpi</code>). Shuning uchun
+javobdagi raqam Telegram hisoboti bilan bir xil bo'ladi. Qurilmagan yoki ma'lumoti yo'q narsani
+o'ylab topmaydi.</p>
+
+<p><strong>Loyihalar</strong> (ChatGPT / Claude'dagi "Project" kabi). Chap panelda <strong>Loyihalar</strong> yonidagi <strong>+</strong> → nomi va
+<strong>AI uchun ko'rsatma</strong> (masalan: "Bu loyiha Jizzax filiali sotuvi haqida. Javobni qisqa, jadval bilan ber").
+Loyihaga 10 tagacha fayl qo'shiladi: PDF, Excel/CSV yoki rasm. Loyiha ichida yozilgan har bir yangi suhbatda AI
+ko'rsatmani, fayllarni va shu loyihadagi boshqa suhbatlar mavzusini biladi. Mavjud suhbatni loyihaga ko'chirish
+uchun suhbat ustidagi papka tugmasi. Loyiha o'chirilsa, suhbatlari saqlanib, umumiy ro'yxatga o'tadi.
+Har kim faqat o'z loyihalarini ko'radi. Ko'rsatma rol cheklovlarini va "faqat o'qish" qoidasini bekor qilmaydi.
+Loyihalar faqat web chatda, Telegram'da yo'q.</p>
+
+<h3 id="sinov-3">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Savol (<code>/app/pokiza-ai</code>)</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="5.1">
+  <td>5.1</td>
+  <td>"Oktabr savdosi rejaga nisbatan qanday?"</td>
+  <td>4,67 mlrd, reja 5 mlrd, 93,4%, 🟡</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.2">
+  <td>5.2</td>
+  <td>"Oktabrda quvvat qancha ishladi?"</td>
+  <td>151,5 t</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.3">
+  <td>5.3</td>
+  <td>"Qaysi mijozlar to'lov kelishuvini buzdi?"</td>
+  <td>Debitorlik ro'yxati (Jizzakh Local, Мухаммад Зубайр …)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.4">
+  <td>5.4</td>
+  <td>"Oktabrda sof daromad dollarda qancha?"</td>
+  <td>Kurs Currency Exchange'dan olinganini aytadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.5">
+  <td>5.5</td>
+  <td>Dashboard so'rang (masalan "oylik savdo grafigi")</td>
+  <td>Avvalgidek ishlaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.6">
+  <td>5.6</td>
+  <td>Istalgan javobni o'qing</td>
+  <td>Javobda A2, C1 kabi kodlar <strong>yo'q</strong>, faqat nomlar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.7">
+  <td>5.7</td>
+  <td>Loyihalar <strong>+</strong> → nomi "Jizzax filiali", ko'rsatma "Javobni faqat jadval bilan ber" → Yaratish</td>
+  <td>Loyiha oynasi: ko'rsatma, Fayllar 0 / 10, Suhbatlar bo'sh</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.8">
+  <td>5.8</td>
+  <td>Loyihada pastdan savol yozing</td>
+  <td>Javob jadval ko'rinishida; suhbat loyiha ichida, sarlavhada "Jizzax filiali / …"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.9">
+  <td>5.9</td>
+  <td>Loyihaga CSV yoki Excel qo'shing, keyin yangi suhbatda shu fayl haqida so'rang</td>
+  <td>AI fayl ichidagini biladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.10">
+  <td>5.10</td>
+  <td>Umumiy ro'yxatdagi suhbat ustida papka tugmasi → loyihani tanlang</td>
+  <td>Suhbat loyihaga o'tadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="5.11">
+  <td>5.11</td>
+  <td>Loyihani o'chiring</td>
+  <td>Loyiha yo'qoladi, suhbatlari umumiy ro'yxatda qoladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-6-nazorat-boti-va-ulanish"><h2 id="6-nazorat-boti-va-ulanish">6. Nazorat boti va ulanish</h2>
+
+<p><strong>Ulanish qanday ishlaydi (ikki yo'l):</strong></p>
+
+<ul>
+<li><strong>Admin ulaydi (odatiy):</strong> administrator yoki rahbar xodimning User sahifasini ochadi
+(User → <code>ishlabchiqarish@gmail.com</code>) → <strong>Telegram'ga ulash</strong> → bo'limni tanlaydi (rolga qarab
+oldindan tanlangan bo'ladi) → <strong>Kod yaratish</strong> → havolani nusxalab xodimga yuboradi. Xodim
+havolani o'z telefonida ochib Start bosadi.</li>
+<li><strong>Xodim o'zi:</strong> ERP'ga kirib <strong>My Settings</strong> → <strong>Telegram'ga ulash</strong> → <strong>Telegram'da ochish</strong> → Start.
+Bunda bo'limni keyin admin TG Azo'da belgilaydi.</li>
+</ul>
+
+<p>User sahifasi tepasida holat ko'rinadi: "Telegram ulangan: Ism @username · bo'lim: …" yoki
+"Telegram ulanmagan". Bot yoqilmagan bo'lsa, tugma shuni aytadi.</p>
+
+<p>Kod 10 daqiqa amal qiladi va faqat bir marta ishlaydi. Telefon raqam so'ralmaydi. 5 marta noto'g'ri
+kod kiritilsa, 1 soatga bloklanadi. "Nazorat Bot Sozlamalari → Rahbar" maydonida ko'rsatilgan
+foydalanuvchi ulanganda avtomatik <strong>Rahbar</strong> roli oladi.</p>
+
+<p><strong>Lokal va prod farqi:</strong> lokalda bot faqat polling ishlab turganda javob beradi (2-terminal). Prod'da
+polling kerak emas, u yerda webhook ishlaydi.</p>
+
+<h3 id="sinov-4">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="6.1">
+  <td>6.1</td>
+  <td>@BotFather → /newbot → nomi "Pokiza Nazorat", username <code>pokiza_nazorat_bot</code></td>
+  <td>Token beriladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.2">
+  <td>6.2</td>
+  <td>ERP → <strong>Nazorat Bot Sozlamalari</strong>: token, Rahbar = o'z foydalanuvchingiz, "Bot faol" → Save</td>
+  <td>Saqlanadi, token yulduzcha bilan ko'rinadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.3">
+  <td>6.3</td>
+  <td>"Tekshirish va webhook o'rnatish" tugmasi</td>
+  <td>"Token to'g'ri: @… Sayt HTTPS emas — lokalda polling"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.4">
+  <td>6.4</td>
+  <td><strong>Terminal 2:</strong> <code>bench --site pokiza.local execute pokiza.nazorat.tg.polling.run</code></td>
+  <td>"🤖 @pokiza<em>nazorat</em>bot polling rejimida"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.5">
+  <td>6.5</td>
+  <td>Ulanmasdan botga istalgan xabar yozing</td>
+  <td>"🔒 Siz Nazorat botiga hali ulanmagansiz"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.6">
+  <td>6.6</td>
+  <td>My Settings → <strong>Telegram'ga ulash</strong> → Telegram'da ochish → Start</td>
+  <td>"✅ Ulandingiz! Salom, …" va pastda tugmali menyu</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.7">
+  <td>6.7</td>
+  <td>Shu havolani ikkinchi marta bosing</td>
+  <td>"Kod noto'g'ri yoki muddati o'tgan"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.7a">
+  <td>6.7a</td>
+  <td>Admin: User → <code>ishlabchiqarish@gmail.com</code> → <strong>Telegram'ga ulash</strong></td>
+  <td>Dialog, bo'lim "Ishlab chiqarish" tanlangan</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.7b">
+  <td>6.7b</td>
+  <td>Kod yaratish → havolani boshqa Telegram akkauntdan oching → Start</td>
+  <td>Ulandi; User sahifasida "Telegram ulangan … bo'lim: Ishlab chiqarish"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.7c">
+  <td>6.7c</td>
+  <td>Xodim akkauntida boshqa xodimning User sahifasi</td>
+  <td>Tugma chiqmaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.8">
+  <td>6.8</td>
+  <td>Ishlab chiqarish xodimining menyusi</td>
+  <td>Faqat Kunlik / Haftalik / Oylik, Ko'rsatkichlar, Vazifalarim; "Vazifa berish" yo'q</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.9">
+  <td>6.9</td>
+  <td>Buxgalteriya xodimining menyusi</td>
+  <td>"Haftalik" yo'q (bu bo'limda haftalik ko'rsatkich yo'q)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="6.10">
+  <td>6.10</td>
+  <td>Nazorat Bot Sozlamalari → "Tekshirish va webhook o'rnatish" ni qayta bosing</td>
+  <td>Telegram'dagi "/" ro'yxatida faqat <code>/start</code> qoladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-7-rahbar-hisobotlar-tugmalar-grafik-dividend"><h2 id="7-rahbar-hisobotlar-tugmalar-grafik-dividend">7. Rahbar: hisobotlar, tugmalar, grafik, dividend</h2>
+
+<p>Rahbar <strong>hamma</strong> ko'rsatkichni ko'radi.</p>
+
+<p><strong>Avtomatik keladi (shaxsiy chatga):</strong></p>
+
+<ul>
+<li>08:00 — kunlik hisobot;</li>
+<li>dushanba 08:00 — haftalik;</li>
+<li>oyning 1-sanasi — oylik;</li>
+<li><strong>darhol</strong> — kassadan dividend olinganda yoki bekor qilinganda ("💸 Rahbar pul oldi").</li>
+</ul>
+
+<p>Xodimlarga ham shu vaqtda o'z bo'limi bo'yicha hisobot keladi (TG Azo → "08:00 hisobotlari shaxsiy
+chatga keladi" belgisi bilan o'chirsa bo'ladi).</p>
+
+<p>Kunlik hisobotda qoralama (tasdiqlanmagan) hujjatlar haqida ham ogohlantirish chiqadi.</p>
+
+<p><strong>Menyu (buyruq yozish shart emas):</strong> botning pastida doimiy tugmalar turadi:
+<code>📅 Kunlik</code> <code>🗓 Haftalik</code> <code>📊 Oylik</code> · <code>📈 Ko'rsatkichlar</code> <code>📌 Vazifalarim</code> · <code>➕ Vazifa berish</code>.
+Har kim faqat o'ziga tegishli tugmalarni ko'radi. Masalan, "Vazifa berish" faqat rahbarda bo'ladi.
+Bo'lim xodimiga esa o'z ko'rsatkichi bo'lmagan hisobot turi chiqmaydi.</p>
+
+<p><strong>Hisobot ko'rinishi:</strong></p>
+
+<ul>
+<li>Har ko'rsatkich 1–2 qatordan iborat: rang, qisqa nom, qiymat. Rejasi borida progress-chiziq <code>▰▰▰▰▰▰▰▰▰▱ 93%</code> chiqadi.</li>
+<li>O'tgan davrga nisbatan o'zgarish ham ko'rsatiladi. Foizli ko'rsatkichlarda u <strong>pp</strong> bilan beriladi.</li>
+<li>Oylik hisobot rahbarda 4 bo'limga guruhlanadi.</li>
+<li>Ogohlantirishlar oxirida <strong>yig'iladigan blokda</strong> turadi ("⚠️ N ta eslatma" — bosilsa ochiladi).</li>
+<li>Kunlikdagi "tasdiqlanmagan hujjat" eslatmasi faqat tegishli bo'limga boradi: sotuv fakturasi Sotuvga, xarid va kassa Buxgalteriyaga, hammasi rahbarga.</li>
+</ul>
+
+<p><strong>Tugmalar:</strong> hisobot ostida ko'rsatkich nomlari rangi bilan turadi (masalan, <code>🟡 Savdo</code>). Bosilsa batafsil kartochka chiqadi:</p>
+
+<ul>
+<li>katta raqam;</li>
+<li>reja;</li>
+<li>o'tgan davr;</li>
+<li>asosiy tarkib;</li>
+<li>top-8 ro'yxat.</li>
+</ul>
+
+<p>Kartochka ostida 📈 grafik tugmalari bo'ladi. Eng pastdagi <code>◀ sentabr 2026</code> / <code>noyabr 2026 ▶</code> tugmalari
+<strong>shu xabarning o'zida</strong> oldingi yoki keyingi davrni ochadi.</p>
+
+<p>Eski <code>/kunlik</code>, <code>/haftalik</code>, <code>/oylik</code>, <code>/vazifalar</code> buyruqlari ham ishlaydi, lekin menyuda ko'rinmaydi —
+hammasi tugmalar orqali.</p>
+
+<h3 id="sinov-5">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="7.1">
+  <td>7.1</td>
+  <td>Menyu → <code>📊 Oylik</code></td>
+  <td>Oktabr hisoboti: 4 guruh, progress-chiziqlar, "⚠️ N ta eslatma" bloki, nomli tugmalar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.1a">
+  <td>7.1a</td>
+  <td><code>◀ sentabr 2026</code> tugmasi</td>
+  <td>Shu xabar sentabr hisobotiga almashadi; <code>oktabr 2026 ▶</code> bilan qaytadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.2">
+  <td>7.2</td>
+  <td><code>🟡 Savdo</code> tugmasi</td>
+  <td>Kartochka: 4,67 mlrd, ▰ 93%, sentabrga nisbatan ↑15%, top-8 mijoz</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.3">
+  <td>7.3</td>
+  <td>"📈 12 oylik"</td>
+  <td>Ustunli grafik rasm (oxirgi qiymat yozilgan, reja punktir)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.4">
+  <td>7.4</td>
+  <td><code>📅 Kunlik</code>, <code>🗓 Haftalik</code></td>
+  <td>Oxirgi ish kuni / o'tgan hafta; kunlikda "Tasdiqlanmagan sotuv fakturasi"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.5">
+  <td>7.5</td>
+  <td><code>📈 Ko'rsatkichlar</code> → <code>Debitorlik · oy</code></td>
+  <td>Tugmali ro'yxat; qarzdorlar kartochkasi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.5a">
+  <td>7.5a</td>
+  <td>Kartochkadagi "📈 12 oylik" grafik</td>
+  <td>Rasm sarlavhasida faqat nom (kod yo'q)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.6">
+  <td>7.6</td>
+  <td>08:00 ni kutmasdan: <code>bench --site pokiza.local execute pokiza.nazorat.jadval.kunlik</code></td>
+  <td>Rahbarga keladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.7">
+  <td>7.7</td>
+  <td>7.6 ni yana bir marta ishga tushiring</td>
+  <td>Ikkinchi marta <strong>kelmaydi</strong> (Nazorat Yuborish jurnali)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.8">
+  <td>7.8</td>
+  <td><code>...jadval.haftalik</code> va <code>...jadval.oylik</code></td>
+  <td>Haftalik va oylik hisobotlar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.9">
+  <td>7.9</td>
+  <td>Kassa: Расход, Дивиденд 1, kichik summa → Submit</td>
+  <td>Rahbarga darhol "💸 Rahbar pul oldi"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.10">
+  <td>7.10</td>
+  <td>Shu Kassa'ni Cancel</td>
+  <td>"↩️ Dividend hujjati BEKOR qilindi"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="7.11">
+  <td>7.11</td>
+  <td>Nazorat Sozlamalari → "Дивиденд 1 — kim" ga ism yozing, 7.9 ni takrorlang</td>
+  <td>Xabarda ism chiqadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-8-rollar-kim-nimani-koradi"><h2 id="8-rollar-kim-nimani-koradi">8. Rollar: kim nimani ko'radi</h2>
+
+<p>Kim nimani ko'rishi <strong>ERP'da sozlanadi</strong>: <strong>Nazorat Roli</strong> sahifasi. Kod o'zgartirish kerak emas.</p>
+
+<ul>
+<li><strong>Rol sahifasida:</strong>
+<ul>
+<li>rol nomi;</li>
+<li>"To'liq ruxsat" — rahbar darajasi, hamma narsa ochiq;</li>
+<li>"Vazifa bera oladi" — vazifa beradi va xodimlarga botdan xabar yuboradi;</li>
+<li>ko'rsatkichlar ro'yxati — <strong>nomi bilan</strong> belgi qo'yiladi (Savdo, Quvvat, Debitorlik…);</li>
+<li>AI nimalarni ko'ra oladi — mijoz qarzi, postavshik qarzi, kassa, ishlab chiqarish, savdo tarixi,
+Excel va "butun baza bo'yicha erkin so'rov" (bu oxirgisi xavfli);</li>
+<li>ERP rollari — xodimni ulashda shu ERP roli bo'lsa, bu rol avtomatik taklif qilinadi.</li>
+</ul></li>
+<li><strong>Xodimga rol berish:</strong> <strong>TG Azo</strong> → "Nazorat roli" maydoni. Shu zahoti menyusi, hisobotlari va AI
+doirasi o'zgaradi.</li>
+<li><p><strong>Botdan rol berish (faqat administrator):</strong> botda <code>👥 Xodimlar</code> → xodim → kartochka. Tugmalar:</p>
+
+<ul>
+<li>🎭 Rolni o'zgartirish — Nazorat Roli tanlanadi; 🔑 belgili (to'liq ruxsatli) rol alohida tasdiq bilan beriladi;</li>
+<li>🤖 AI bilan savol-javob — yoqish / o'chirish;</li>
+<li>📅 08:00 hisobotlari — yoqish / o'chirish;</li>
+<li>⛔ Botdan uzish / ✅ Qayta yoqish.</li>
+</ul>
+
+<p><p>Har o'zgarish TG Azo tarixiga va izohiga yoziladi (kim, qachon, nima). Xodimga botda xabar boradi, menyusi
+yangi roliga moslanadi. Administrator o'z rolini o'zgartira va o'zini uza olmaydi. Menyu faqat System Manager
+rolidagi foydalanuvchida ko'rinadi, boshqalar tugmani bosa olmaydi.</p></li>
+<li><strong>Tayyor rollar</strong> (avvalgi bo'limlar ko'chirilgan): Rahbar, Sotuv, Ishlab chiqarish, Buxgalteriya, Ombor.</li>
+<li>Rahbar rolini o'chirib bo'lmaydi.</li>
+</ul></p>
+
+<table>
+<thead>
+<tr>
+  <th>Rol</th>
+  <th>Ko'radi (standart)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Sotuv</td>
+  <td>Savdo, o'rtacha chek, mijoz dinamikasi, top mahsulotlar, jim mijozlar, nazoratdagi mijozlar</td>
+</tr>
+<tr>
+  <td>Ishlab chiqarish</td>
+  <td>Quvvat, kunlik ishlab chiqarish, brak</td>
+</tr>
+<tr>
+  <td>Buxgalteriya</td>
+  <td>Postavshik, debitorlik, xarajatlar, kassa</td>
+</tr>
+<tr>
+  <td>Rahbar</td>
+  <td>Hammasi</td>
+</tr>
+</tbody>
+</table>
+
+<p>Rol berilmagan xodim hech qanday ko'rsatkich ko'rmaydi.</p>
+
+<h3 id="sinov-6">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="8.0">
+  <td>8.0</td>
+  <td><strong>Nazorat Roli</strong> → New: "Logistika", faqat "Jim mijozlar" va "Excel" belgilansin → Save; TG Azo'da xodimga shu rolni bering; botga <code>/start</code></td>
+  <td>Menyuda faqat Haftalik va Ko'rsatkichlar; ichida faqat "Jim mijozlar"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.1">
+  <td>8.1</td>
+  <td>Ikkinchi foydalanuvchi (xodim) 6.6 kabi ulansin, bo'lim tanlanmasin</td>
+  <td>"✅ Ulandingiz!", "Bo'lim hali biriktirilmagan"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.2">
+  <td>8.2</td>
+  <td>Xodimning pastki menyusi</td>
+  <td>Faqat <code>📌 Vazifalarim</code> (hisobot va ko'rsatkich tugmalari yo'q)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.3">
+  <td>8.3</td>
+  <td><strong>TG Azo</strong> → xodim → Nazorat roli = Sotuv; botga <code>/start</code></td>
+  <td>Menyuda Kunlik / Haftalik / Oylik va Ko'rsatkichlar paydo bo'ladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.4">
+  <td>8.4</td>
+  <td><code>📈 Ko'rsatkichlar</code></td>
+  <td>Faqat Savdo, O'rtacha chek, Mijoz dinamikasi, Top mahsulotlar, Jim mijozlar, Nazoratdagi mijozlar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.5">
+  <td>8.5</td>
+  <td><code>📊 Oylik</code></td>
+  <td>Faqat savdo ko'rsatkichlari; foyda, rentabellik, dividend yo'q</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.6">
+  <td>8.6</td>
+  <td>Administrator botda <code>👥 Xodimlar</code> → xodim → 🎭 Rolni o'zgartirish → Ishlab chiqarish</td>
+  <td>Xodimga "Rolingiz o'zgardi" xabari, menyusi yangilanadi; TG Azo izohida yozuv</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.7">
+  <td>8.7</td>
+  <td>Xuddi shu yerda "Rahbar 🔑" ni tanlang</td>
+  <td>Avval "to'liq ruxsatli rol — tasdiqlaysizmi?" chiqadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.8">
+  <td>8.8</td>
+  <td>Xodim kartochkasida ⛔ Botdan uzish → xodim botga <code>/start</code></td>
+  <td>Xodimga "ulanmagansiz" chiqadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="8.9">
+  <td>8.9</td>
+  <td>Oddiy xodim botga <code>👥 Xodimlar</code> deb yozadi</td>
+  <td>"Bu bo'lim faqat administrator uchun"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-9-bot-faqat-shaxsiy-chatda"><h2 id="9-bot-faqat-shaxsiy-chatda">9. Bot faqat shaxsiy chatda</h2>
+
+<p>Nazorat boti faqat xodimlar uchun va faqat <strong>shaxsiy chatda</strong> ishlaydi. Telegram guruhi yo'q.</p>
+
+<ul>
+<li>Botni guruhga qo'shsa, u <strong>jim chiqib ketadi</strong>: guruhga hech narsa yozmaydi, guruhdagi xabarlarga javob bermaydi.</li>
+<li>Vazifalar, eslatmalar, kunlik ro'yxat, ish signallari, hisobotlar va AI javoblari — hammasi har kimning
+shaxsiy chatiga, o'z roli doirasida keladi.</li>
+<li><strong>Ish signallari (har kuni 09:00)</strong> — oxirgi ish kuni bo'yicha nima kiritilmagan, raqamsiz:
+<ul>
+<li>tasdiqlanmagan sotuv fakturasi → Sotuv xodimlariga;</li>
+<li>tasdiqlanmagan xarid fakturasi, kassa hujjati, kassa yozuvi yo'q → Buxgalteriyaga;</li>
+<li>ishlab chiqarish kiritilmagan → Ishlab chiqarishga;</li>
+<li><strong>rahbarga hammasi</strong>, har signal yonida mas'ul xodimlar nomi bilan.</li>
+</ul></li>
+</ul>
+
+<p>Kim mas'ulligi xodimning Nazorat Roli'dan olinadi (TG Azo → rol).</p>
+
+<ul>
+<li><strong>Sozlamalar</strong> (Nazorat Bot Sozlamalari → Vazifalar va signallar): bajarilgan vazifani beruvchi tasdiqlaydimi;
+ish signallari yoqilganmi.</li>
+<li>Botni guruhga umuman qo'shib bo'lmasligi uchun <strong>@BotFather → /setjoingroups → Disable</strong> qiling (bir martalik).</li>
+</ul>
+
+<h3 id="sinov-7">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="9.1">
+  <td>9.1</td>
+  <td>Botni istalgan Telegram guruhiga qo'shing</td>
+  <td>Bot hech narsa yozmasdan guruhdan chiqib ketadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="9.2">
+  <td>9.2</td>
+  <td>Nazorat Bot Sozlamalari → <strong>Tekshirish va webhook o'rnatish</strong> tugmasi</td>
+  <td>Guruh buyruqlari menyusi o'chadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="9.3">
+  <td>9.3</td>
+  <td><code>bench --site pokiza.local execute pokiza.nazorat.signallar.ish_signallari</code></td>
+  <td>Mas'ul xodimga — o'z signallari, rahbarga — hammasi, mas'ullar nomi bilan (shaxsiy chatda)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="9.4">
+  <td>9.4</td>
+  <td>Sozlamada "ish signallari"ni o'chiring, 9.3 ni takrorlang</td>
+  <td>Hech narsa kelmaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-10-vazifalar"><h2 id="10-vazifalar">10. Vazifalar</h2>
+
+<ul>
+<li><strong>Rahbar vazifa beradi</strong> uch yo'l bilan: botda <code>➕ Vazifa berish</code>, ERP'da <strong>Vazifa</strong> → New, yoki AI orqali (11-bo'lim).</li>
+<li><strong>Hammasi shaxsiy chatda:</strong>
+<ul>
+<li>mas'ulga tugmali xabar keladi: ✅ Qabul qilaman / ❌ Rad etaman → ✔️ Bajarildi;</li>
+<li>qabul qilinsa, beruvchiga qisqa xabar boradi;</li>
+<li>rad etilsa, sabab so'raladi va beruvchiga sababi bilan boradi;</li>
+<li><strong>beruvchi tekshiruvi:</strong> "Bajarildi"dan keyin beruvchiga 👍 Qabul qilaman / ↩️ Qaytarish keladi;
+qaytarishda sabab so'raladi, mas'ulga sababi bilan qaytadi;</li>
+<li>ertangi muddat eslatmasi va "muddati o'tdi" xabari mas'ulga, "muddati o'tdi" beruvchiga ham.</li>
+<li>vazifa ERP'da o'zgarsa ham mas'uldagi vazifa xabari yangilanadi.</li>
+</ul></li>
+<li><strong>09:00 da har kimga o'z ro'yxati</strong> (bo'sh bo'lsa xabar kelmaydi):
+<ul>
+<li>o'zidagi vazifalar: bugun muddati tugaydiganlar, muddati o'tganlar, hali qabul qilmaganlari (tugmalar bilan);</li>
+<li>o'zi bergan vazifalardan: tekshiruv kutayotganlar va muddati o'tganlar.</li>
+</ul></li>
+<li><strong>Dushanba 09:05:</strong> rahbarga o'tgan hafta natijasi — har xodimning bajargani, kechikkani va reyting (summalarsiz).</li>
+<li><strong>ERP'dagi cheklov:</strong> xodim faqat o'ziga tegishli vazifani ko'radi va faqat holat, rad sababi va
+izohni o'zgartira oladi. Tasdiq va tarix faqat ko'rish uchun.</li>
+<li><strong>Statistika:</strong> oylik hisobotda "Vazifalar bajarilishi", haftalikda "Kechikkan vazifalar".</li>
+</ul>
+
+<h3 id="sinov-8">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="10.1">
+  <td>10.1</td>
+  <td>Rahbar botda <code>➕ Vazifa berish</code> → xodim → matn → "3 kun" → ✅ Yaratish</td>
+  <td>Xodimning shaxsiy chatida vazifa va ✅ / ❌</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.3">
+  <td>10.3</td>
+  <td>Mas'ul "✅ Qabul qilaman"</td>
+  <td>Rahbarga "qabul qildi" xabari; mas'ulda tugma ✔️ Bajarildi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.4">
+  <td>10.4</td>
+  <td>Mas'ul "✔️ Bajarildi"</td>
+  <td>Rahbarga "tekshirib qabul qiling" va 👍 / ↩️</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.6">
+  <td>10.6</td>
+  <td>Rahbar "↩️ Qaytarish" → sabab yozadi</td>
+  <td>Mas'ulga "↩️ qaytarildi" + sabab + ✔️ Bajarildi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.7">
+  <td>10.7</td>
+  <td>Mas'ul yana bajaradi → rahbar 👍</td>
+  <td>ERP'da "Beruvchi tasdiqladi" ✔</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.8">
+  <td>10.8</td>
+  <td>Yangi vazifa → mas'ul "❌ Rad etaman" → sabab</td>
+  <td>Rahbarga "rad etdi" + sabab</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.9">
+  <td>10.9</td>
+  <td>ERP'da <strong>Vazifa</strong> → New</td>
+  <td>Mas'ulga tugmali xabar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.10">
+  <td>10.10</td>
+  <td>Xodim ERP'da muddatni o'zgartirishga urinadi</td>
+  <td>Xato: faqat holat/izoh</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.11">
+  <td>10.11</td>
+  <td>(System Manager) bir vazifa muddatini kechaga qo'ying → <code>bench --site pokiza.local execute pokiza.nazorat.vazifa.kunlik_tekshir</code></td>
+  <td>Mas'ul va beruvchiga "⏰ Muddati o'tdi"; ikkalasiga ham o'z kunlik ro'yxati</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.12">
+  <td>10.12</td>
+  <td><code>bench --site pokiza.local execute pokiza.nazorat.vazifa.haftalik_natija</code></td>
+  <td>Rahbarga o'tgan hafta natijasi (o'tgan hafta muddatli vazifa bo'lsa)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="10.13">
+  <td>10.13</td>
+  <td>Botda <code>📌 Vazifalarim</code></td>
+  <td>Ro'yxat muddatlar bilan ("2 kun qoldi", "kechikdi")</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-11-ai-telegramda"><h2 id="11-ai-telegramda">11. AI Telegram'da</h2>
+
+<p>Telegram'da ham web'dagi Pokiza AI'ning o'zi javob beradi.</p>
+
+<ul>
+<li><strong>Shaxsiy chat:</strong> rahbar istalgan savolni matn yoki <strong>ovozli xabar</strong> bilan beradi. Excel so'ralsa,
+fayl keladi. Xodim savol bera oladi, agar TG Azo'da "AI bilan savol-javob" belgisi bo'lsa; javob
+faqat o'z bo'limi doirasida bo'ladi.</li>
+<li><strong>Vazifa berish:</strong> rahbar "Alisherga ... vazifasini ber" desa, AI vazifani faqat <strong>taklif</strong> qiladi.
+Vazifa <strong>✅ Yaratish</strong> bosilgandagina yaratiladi va mas'ulga ketadi.</li>
+<li><strong>Xodimga xabar:</strong> rahbar shaxsiy chatda "Odilga yoz, ..." desa, AI xabar matnini ko'rsatadi.
+Xabar <strong>✅ Yuborish</strong> bosilgandagina ketadi.</li>
+<li><strong>Navbat:</strong> javob tayyorlanayotganda yana savol yozilsa, savol yo'qolmaydi: navbatga qo'yiladi va
+oldingi javobdan keyin ishlanadi.</li>
+<li><strong>Ruxsat:</strong> bot faqat AI ruxsati bor odamga javob beradi. Web AI chat ham TG Azo'dagi rol
+bo'yicha cheklangan (administrator — cheklovsiz).</li>
+<li><strong>Limitlar:</strong> bir foydalanuvchiga kuniga 40 ta savol (Nazorat Bot Sozlamalari). Bundan tashqari AI'ning
+oylik $ limiti ham amal qiladi.</li>
+<li><strong>Tarix:</strong> Telegram suhbatlari ERP'dagi Pokiza AI sahifasida ham ko'rinadi.</li>
+</ul>
+
+<h3 id="sinov-9">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="11.1">
+  <td>11.1</td>
+  <td>Rahbar shaxsiy chatda: "Oktabr savdosi rejaga nisbatan?"</td>
+  <td>"yozmoqda…" → qisqa javob</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.2">
+  <td>11.2</td>
+  <td>Ovozli xabar bilan savol</td>
+  <td>Javob</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.3">
+  <td>11.3</td>
+  <td>"Oktabr mijozlar savdosini Excel qilib ber"</td>
+  <td>Excel fayl keladi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.4">
+  <td>11.4</td>
+  <td>"<xodim ismi>ga ertagacha ... vazifasini ber"</td>
+  <td>Javob + "✅ Yaratish"; bosilgach vazifa mas'ulga ketadi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.5">
+  <td>11.5</td>
+  <td>Xodim (AI belgisi yo'q) shaxsiy chatda matn yozadi</td>
+  <td>"Pastdagi menyudan tanlang 👇"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.6">
+  <td>11.6</td>
+  <td>Xodimga AI belgisini qo'ying (bo'lim Sotuv): "Oktabrda sof foyda qancha?"</td>
+  <td>"Sotuv bo'limi uchun yopiq"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="11.11">
+  <td>11.11</td>
+  <td>ERP → Pokiza AI sahifasi</td>
+  <td>Telegram suhbatlari ham ro'yxatda</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-12-rahbar-paneli"><h2 id="12-rahbar-paneli">12. Rahbar paneli</h2>
+
+<p><code>/app/rahbar-paneli</code> — ERP ichidagi ko'rsatkichlar sahifasi.</p>
+
+<ul>
+<li><strong>Davr:</strong> Oylik / Haftalik / Kunlik tugmalari, sana tanlagich (maydonda davr oralig'i ko'rinadi),
+<code>‹ ›</code> va "Joriy / O'tgan" tugmalari. Kelajakdagi davrga o'tib bo'lmaydi.</li>
+<li><strong>Oylik ko'rinish</strong> 4 bo'limga guruhlangan: Strategik fokus (katta kartochkalar, reja chizig'i bilan),
+Mijozlar va sotish, Moliya va to'lovlar, Vazifalar va jamoa.</li>
+<li><strong>Har kartochkada</strong> ko'rsatkich nomi, holat (belgi va so'z bilan), qiymat, reja va o'zgarish. Kod yozilmaydi.</li>
+<li><strong>Kartochka bosilsa:</strong> trend grafigi, "Jadval ko'rinishi", asosiy raqamlar va tafsilot jadvali.</li>
+<li><strong>Raqamlar va cheklov:</strong> raqamlar Telegram bilan bir xil. Xodim faqat o'z bo'limini ko'radi.</li>
+</ul>
+
+<h3 id="sinov-10">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="12.1">
+  <td>12.1</td>
+  <td><code>http://localhost:8001/app/rahbar-paneli</code> (System Manager)</td>
+  <td>Oktabr, 4 bo'lim, kartochkalarda faqat nomlar</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="12.2">
+  <td>12.2</td>
+  <td>Haftalik / Kunlik tugmalari; sana tanlagichdan sentabrni tanlang; <code>‹ ›</code></td>
+  <td>Ko'rsatkichlar shu davrga; joriy davrda <code>›</code> o'chiq</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="12.3">
+  <td>12.3</td>
+  <td>Kartochkani bosing</td>
+  <td>Oyna sarlavhasida nom; grafik, jadval, tafsilot</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="12.4">
+  <td>12.4</td>
+  <td>Sotuv bo'limli xodim bilan kiring (Sales Manager roli)</td>
+  <td>Faqat savdo, foyda/dividend yo'q</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="12.5">
+  <td>12.5</td>
+  <td>Telegram <code>📊 Oylik</code> bilan solishtiring</td>
+  <td>Raqamlar bir xil</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-13-avtomatik-ishlar-scheduler"><h2 id="13-avtomatik-ishlar-scheduler">13. Avtomatik ishlar (scheduler)</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Vaqt</th>
+  <th>Nima</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Har kuni 08:00</td>
+  <td>Kunlik hisobot</td>
+</tr>
+<tr>
+  <td>Dushanba 08:00</td>
+  <td>Haftalik hisobot</td>
+</tr>
+<tr>
+  <td>Oyning 1-sanasi 08:00</td>
+  <td>Oylik hisobot</td>
+</tr>
+<tr>
+  <td></td>
+  <td>(08:00 hisobotlari — rahbarga va xodimlarga, shaxsiy chatda)</td>
+</tr>
+<tr>
+  <td>Har kuni 09:00</td>
+  <td>Vazifalar: muddati o'tganlarni belgilash, eslatmalar, har kimga o'z ro'yxati; ish signallari (mas'ulga va rahbarga); Sotuvga bugun jim bo'lgan mijozlar (shaxsiy chatda)</td>
+</tr>
+<tr>
+  <td>Dushanba 09:05</td>
+  <td>Rahbarga o'tgan hafta vazifa natijasi</td>
+</tr>
+<tr>
+  <td>Oyning 11-sanasi 09:00</td>
+  <td>To'lov intizomi: postavshiklar va debitorlik bo'yicha yakuniy holat (to'lov muddati 10-sana)</td>
+</tr>
+<tr>
+  <td>Darhol</td>
+  <td>Dividend: Kassa yoki to'g'ridan-to'g'ri Journal Entry (dividend hisobi) submit/cancel qilinganda</td>
+</tr>
+</tbody>
+</table>
+
+<p>Har bir xabar bir marta ketadi: hisobotlar <strong>Nazorat Yuborish</strong> jurnaliga yoziladi, qolgan xabarlar
+kunlik belgi bilan. Bot o'chirilsa (Nazorat Bot Sozlamalari → Faol), hech qanday xabar ketmaydi.</p>
+
+<p>Lokalda scheduler o'chiq. Sinovda hisobotlarni buyruq bilan qo'lda yuborasiz (7.6). Avtomatik
+ishlashini ko'rmoqchi bo'lsangiz, <code>bench --site pokiza.local enable-scheduler</code> qiling. Bunda boshqa
+app'larning rejali vazifalari ham ishga tushadi.</p>
+
+<hr />
+
+</section><section class="sec" id="s-14-xavfsizlik"><h2 id="14-xavfsizlik">14. Xavfsizlik</h2>
+
+<ul>
+<li><strong>AI faqat o'qiydi.</strong> Bazaga hech narsa yoza olmaydi. Vazifa va xodimga xabar faqat taklif
+ko'rinishida, rahbar tugma bosib tasdiqlaydi.</li>
+<li><strong>Excel fayl</strong> faqat rolda ochiq ma'lumotdan tuziladi. Erkin SQL va report faqat "butun baza" belgisi bor rolda.</li>
+<li><strong>Bot faqat shaxsiy chatda.</strong> Guruhga qo'shilsa chiqib ketadi, guruhga hech narsa yozmaydi.</li>
+<li><strong>Telegram ulash:</strong> boshqa xodim uchun kodni administrator yoki rahbar yaratadi. Rahbar administrator
+akkaunti uchun va allaqachon ulangan akkaunt uchun kod yarata olmaydi.</li>
+<li><strong>Bo'lim cheklovi</strong> kod darajasida qo'yilgan. Masalan, Sotuv xodimining AI'siga foydani yoki ish
+haqini hisoblaydigan vosita umuman berilmaydi.</li>
+<li><strong>Vazifa tugmalari</strong>: mas'ulda (qabul, rad, bajarildi) va beruvchida (tasdiq, qaytarish).</li>
+<li><strong>Ulanmagan</strong> Telegram foydalanuvchiga bot ma'lumot bermaydi.</li>
+<li><strong>Webhook maxfiy kalit bilan himoyalangan.</strong> Bot tokeni ERP'da shifrlangan holda saqlanadi.</li>
+</ul>
+
+<p><strong>Ma'lumot himoyasi</strong> (Nazorat Bot Sozlamalari → "Ma'lumot himoyasi"): xodim AI orqali ma'lumotni yig'ib
+olib chiqib ketmasligi uchun. Rahbar va administratorga cheklov qo'yilmaydi.</p>
+
+<table>
+<thead>
+<tr>
+  <th>Sozlama</th>
+  <th>Standart</th>
+  <th>Nima qiladi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Xodimlar AI'dan Excel/PDF fayl ola oladi</td>
+  <td>o'chiq</td>
+  <td>O'chiq bo'lsa fayl faqat rahbarga. Yoqilsa — Nazorat Roli'da "Excel" belgisi bor rollarga ham</td>
+</tr>
+<tr>
+  <td>Forward va saqlash taqiqlansin</td>
+  <td>yoqiq</td>
+  <td>Xodimga bot yuborgan xabar va faylni boshqa chatga uzatib, yuklab olib bo'lmaydi</td>
+</tr>
+<tr>
+  <td>Rahbarga ham taqiq</td>
+  <td>o'chiq</td>
+  <td>Yoqilsa rahbarning xabarlari ham himoyalanadi</td>
+</tr>
+<tr>
+  <td>ERP'dagi AI chat ham "AI bilan savol-javob" belgisini talab qilsin</td>
+  <td>yoqiq</td>
+  <td>Belgisi yo'q xodim web AI'dan ham foydalana olmaydi</td>
+</tr>
+<tr>
+  <td>Bir kunda shuncha fayl — rahbarga xabar</td>
+  <td>3</td>
+  <td>Xodim chegaraga yetganda rahbarga "Diqqat" xabari (0 — o'chiq)</td>
+</tr>
+<tr>
+  <td>Bir kunda shuncha savol — rahbarga xabar</td>
+  <td>25</td>
+  <td>Xuddi shunday, savollar soni bo'yicha</td>
+</tr>
+</tbody>
+</table>
+
+<p>Barcha AI suhbatlari ERP'da (<strong>AI Suhbat</strong>) saqlanadi — kim nima so'ragani ko'rinadi. ERP'ning o'z
+hisobotlaridan Excel yuklash ERP rollari bilan alohida cheklanadi.</p>
+
+<h3 id="sinov-11">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="14.1">
+  <td>14.1</td>
+  <td>Sotuv xodimi (AI belgisi bor) botda: "mijozlar qarzini Excel qilib ber"</td>
+  <td>Fayl berilmaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="14.2">
+  <td>14.2</td>
+  <td>Sozlamada "Xodimlar AI'dan Excel…" ni yoqing, 14.1 ni takrorlang</td>
+  <td>Fayl keladi; uni forward qilib bo'lmaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="14.3">
+  <td>14.3</td>
+  <td>Xodimga kelgan bot xabarini boshqa chatga forward qilishga urining</td>
+  <td>Telegram ruxsat bermaydi</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="14.4">
+  <td>14.4</td>
+  <td>AI belgisi yo'q xodim ERP → Pokiza AI sahifasida savol beradi</td>
+  <td>"AI bilan savol-javob ruxsati berilmagan"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="14.5">
+  <td>14.5</td>
+  <td>"Bir kunda shuncha savol" ni 2 qiling; xodim 2 ta savol beradi</td>
+  <td>Rahbarga "⚠️ Diqqat: … bugun AI'ga 2 ta savol berdi"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-15-malumot-sifati-bilib-qoying"><h2 id="15-malumot-sifati-bilib-qoying">15. Ma'lumot sifati (bilib qo'ying)</h2>
+
+<ul>
+<li><strong>Brak:</strong> "Brak va vozvrat" ko'rsatkichi brakni «Brak» oynasidan yozilgan Material Issue'lardan oladi (tannarxi «Брак» hisobida). Davrda brak yozilmagan bo'lsa, 0% va "brak yozilmagan" izohi chiqadi.</li>
+<li><strong>Kategoriya va xarajat turi:</strong> belgilanmaguncha "Kategoriyalar" va "Xarajatlar" to'liq chiqmaydi (3.7).</li>
+<li><strong>Mijoz kelishuvi:</strong> kiritilmagan qarzdorlar "Debitorlik"da alohida eslatma bo'lib chiqadi.</li>
+<li><strong>Qoralama hujjatlar:</strong> hisobotga kirmaydi; kunlik hisobot tegishli bo'limga ular haqida eslatadi.</li>
+<li><strong>Mijoz qarzi</strong> GL qoldig'idan olinadi. Fakturalardagi "qolgan summa" ishlatilmaydi, chunki
+to'lovlar fakturalarga bog'lanmagan.</li>
+<li><strong>Kurs:</strong> Currency Exchange'dagi kurs 45 kundan eski bo'lsa, "Sof daromad"da ogohlantirish chiqadi.</li>
+</ul>
+
+<hr />
+
+</section><section class="sec" id="s-16-oylik-mijoz-hisoboti-pdf"><h2 id="16-oylik-mijoz-hisoboti-pdf">16. Oylik mijoz hisoboti (PDF)</h2>
+
+<p>Mijozga beriladigan bir sahifalik "savdo tahlili". Avval bu hisobot AI orqali qo'lda tayyorlanardi,
+endi ERP o'zi yasaydi. Tanlangan oy o'tgan oyga solishtiriladi.</p>
+
+<p><strong>Hisobotda nima bor:</strong></p>
+
+<ul>
+<li>savdo hajmi (kg) va savdo summasi: ikki oy va o'zgarish (% va farq);</li>
+<li>savdosi eng ko'p kamaygan va eng ko'p oshgan 5 ta mahsulot;</li>
+<li>asosiy mahsulot tahlili: mijoz eng ko'p oladigan mahsulot, uning o'zgarishi va umumiy o'zgarishdagi hissasi;</li>
+<li>hajm ulushi: asosiy mahsulot va qolgan mahsulotlar;</li>
+<li>keyingi oy maqsadi.</li>
+</ul>
+
+<p><strong>Raqamlar qayerdan olinadi:</strong></p>
+
+<ul>
+<li>faqat tasdiqlangan sotuv fakturalari, qaytarishlar ayirilgan;</li>
+<li>summa QQS'siz;</li>
+<li>hajm: kg'dagi mahsulotlar + donali mahsulotlar × Item'dagi vazn. Vazni kiritilmagan donali
+mahsulotlar kg'ga qo'shilmaydi, pastda alohida "N dona" deb yoziladi.</li>
+</ul>
+
+<p><strong>Maqsad qayerdan olinadi:</strong> <strong>Mijoz Kartochkasi → Oylik maqsadlar</strong> jadvali. Har qatorda yil, oy,
+maqsad kg, maqsad summa va ixtiyoriy izoh bo'ladi. Bir oy bir marta kiritiladi. Maqsad kiritilmagan
+bo'lsa, hisobotda "maqsad kiritilmagan" deb yoziladi. Izoh yozilsa, banner'da shu izoh chiqadi.
+Izoh bo'lmasa, avtomatik "savdoni kamida N% oshirish" yoziladi.</p>
+
+<p><strong>Qanday olinadi:</strong> <strong>Customer</strong> sahifasi → <strong>Hisobotlar → Oylik savdo tahlili (PDF)</strong>. Yoki
+<strong>Mijoz Kartochkasi</strong> → <strong>Oylik savdo tahlili (PDF)</strong>. Oy tanlanadi, PDF yangi oynada ochiladi.
+PDF'ni yuklab olib, mijozga yuborasiz.</p>
+
+<h3 id="sinov-12">Sinov</h3>
+
+<table class="test">
+<thead>
+<tr>
+  <th>#</th>
+  <th>Qadam</th>
+  <th>Kutiladi</th>
+<th class="h-st">Natija</th></tr>
+</thead>
+<tbody>
+<tr data-id="16.1">
+  <td>16.1</td>
+  <td>Mijoz Kartochkasi → ЧП Жамилов Жонибек → "Oylik maqsadlar"</td>
+  <td>2026 Oktabr 40 000 kg / 1 mlrd, Noyabr 42 000 kg</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.2">
+  <td>16.2</td>
+  <td><strong>Oylik savdo tahlili (PDF)</strong> → Sentabr 2026</td>
+  <td>Bir sahifali PDF: 38 628 → 31 660 kg (−18,0%), 913,1 → 807,2 mln (−11,6%)</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.3">
+  <td>16.3</td>
+  <td>PDF'dagi asosiy mahsulot</td>
+  <td>Сосиски НЕЖНАЯ: 26 212 → 19 695 kg, −24,9%, umumiy pasayishning 94%i</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.4">
+  <td>16.4</td>
+  <td>PDF'dagi maqsad</td>
+  <td>Oktabr: 40 000 kg, 1,00 mlrd; "kamida 26% oshirish"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.5">
+  <td>16.5</td>
+  <td>Customer → Мухиддин → Hisobotlar → Oylik savdo tahlili → Oktabr 2026</td>
+  <td>PDF; maqsad bo'limida "Noyabr 2026 uchun maqsad kiritilmagan"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.6">
+  <td>16.6</td>
+  <td>Kartochkada bir oyni ikki marta kiriting → Save</td>
+  <td>Xato: "ikki marta kiritilgan"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.7">
+  <td>16.7</td>
+  <td>Maqsad qatoriga izoh yozing (masalan "Sosiska savdosini qayta tiklash"), PDF'ni qayta oling</td>
+  <td>Banner'da shu izoh</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.8">
+  <td>16.8</td>
+  <td>Sotuvi bo'lmagan mijoz uchun PDF</td>
+  <td>"tasdiqlangan sotuv yo'q"</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+<tr data-id="16.9">
+  <td>16.9</td>
+  <td>Hisobotdagi raqamlarni ERP'da tekshiring: Sales Analytics yoki Sales Invoice ro'yxati (mijoz + oy, tasdiqlangan)</td>
+  <td>Summa bir xil</td>
+<td class="st"><div class="seg"><button data-v="ok" title="Mos keldi">✓</button><button data-v="no" title="Mos kelmadi">✕</button><button data-v="skip" title="O'tkazib yuborildi">–</button></div><textarea placeholder="Izoh (xato matni, nima chiqdi…)" rows="1"></textarea></td></tr>
+</tbody>
+</table>
+
+<hr />
+
+</section><section class="sec" id="s-17-prodga-chiqarish-siz-qilasiz"><h2 id="17-prodga-chiqarish-siz-qilasiz">17. Prod'ga chiqarish (siz qilasiz)</h2>
+
+<ol>
+<li><code>git pull</code></li>
+<li><code>bench pip install matplotlib</code> (yoki <code>bench setup requirements</code>)</li>
+<li><code>bench --site pokiza.local migrate</code></li>
+<li><code>bench build --app pokiza</code></li>
+<li><code>bench restart</code></li>
+<li><code>bench --site pokiza.local execute pokiza.nazorat.metrics.tekshir.run --kwargs "{'davr': '2026-10'}"</code> → "hammasi mos"</li>
+<li>Nazorat Bot Sozlamalari: token, Rahbar, <strong>Sayt manzili (https://…)</strong> → "Tekshirish va webhook
+o'rnatish". Prod'da polling <strong>kerak emas</strong>.</li>
+<li>Scheduler yoqilganini tekshiring: <code>bench --site pokiza.local scheduler status</code></li>
+<li><strong>Worker'lar:</strong> AI javob yozayotganda bot tugmalari qotib qolmasligi uchun tezkor navbat (short, default)
+va AI navbati (long) alohida worker'da bo'lishi kerak. <code>bench setup supervisor</code> buni o'zi qiladi
+(default-, short- va long-worker). Tekshirish: <code>sudo supervisorctl status | grep worker</code> — kamida
+short va long worker'lar RUNNING bo'lsin. Bitta umumiy worker bo'lsa: <code>config/common_site_config.json</code>
+da <code>"background_workers": 2</code> qo'yib, <code>bench setup supervisor &amp;&amp; sudo supervisorctl reread &amp;&amp; sudo supervisorctl update</code>.</li>
+</ol>
+</section>
+	</main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+	const KEY = "pokiza-nazorat-sinov-v1";
+	let st = {};
+	try { st = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { st = {}; }
+	const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+	const rows = [...document.querySelectorAll("table.test tbody tr")];
+
+	function paint(tr) {
+		const s = st[tr.dataset.id] || {};
+		tr.classList.remove("ok", "no", "skip");
+		if (s.v) tr.classList.add(s.v);
+		const ta = tr.querySelector("textarea");
+		if (ta.value !== (s.izoh || "")) ta.value = s.izoh || "";
+	}
+	function totals() {
+		let ok = 0, no = 0, skip = 0;
+		rows.forEach((r) => { const v = (st[r.dataset.id] || {}).v; if (v === "ok") ok++; else if (v === "no") no++; else if (v === "skip") skip++; });
+		const n = rows.length, t = document.querySelector(".track");
+		t.querySelector(".ok").style.width = (ok / n * 100) + "%";
+		t.querySelector(".no").style.width = (no / n * 100) + "%";
+		t.querySelector(".skip").style.width = (skip / n * 100) + "%";
+		document.getElementById("nums").innerHTML =
+			`<b>${ok + no + skip}</b> / ${n} tekshirildi · ✓ <b>${ok}</b> · ✕ <b>${no}</b> · – <b>${skip}</b>`;
+		document.querySelectorAll("#toc a").forEach((a) => {
+			const sec = document.getElementById("s-" + a.dataset.sec);
+			const rs = sec ? [...sec.querySelectorAll("table.test tbody tr")] : [];
+			let c = a.querySelector(".c");
+			if (!c) { c = document.createElement("span"); c.className = "c"; a.appendChild(c); }
+			if (!rs.length) { c.textContent = ""; return; }
+			const done = rs.filter((r) => (st[r.dataset.id] || {}).v).length;
+			const bad = rs.filter((r) => (st[r.dataset.id] || {}).v === "no").length;
+			c.textContent = bad ? `${done}/${rs.length} · ✕${bad}` : `${done}/${rs.length}`;
+			c.className = "c" + (bad ? " bad" : done === rs.length ? " done" : "");
+		});
+	}
+	rows.forEach((tr) => {
+		paint(tr);
+		tr.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+			const s = st[tr.dataset.id] || (st[tr.dataset.id] = {});
+			s.v = s.v === b.dataset.v ? undefined : b.dataset.v;
+			save(); paint(tr); totals();
+			if (s.v === "no") tr.querySelector("textarea").focus();
+		}));
+		tr.querySelector("textarea").addEventListener("input", (e) => {
+			(st[tr.dataset.id] || (st[tr.dataset.id] = {})).izoh = e.target.value; save();
+		});
+	});
+	totals();
+
+	document.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => {
+		document.querySelectorAll("[data-f]").forEach((x) => x.classList.toggle("on", x === b));
+		document.body.classList.remove("f-todo", "f-bad");
+		if (b.dataset.f !== "all") document.body.classList.add("f-" + b.dataset.f);
+	}));
+	const toast = (t) => { const el = document.getElementById("toast"); el.textContent = t; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 2200); };
+	document.getElementById("copy").addEventListener("click", () => {
+		const bad = rows.filter((r) => (st[r.dataset.id] || {}).v === "no");
+		if (!bad.length) return toast("Mos kelmagan sinov yo'q");
+		const txt = bad.map((r) => {
+			const td = r.querySelectorAll("td");
+			return `${r.dataset.id} — ${td[1].innerText.trim()}\n  Kutilgan: ${td[2].innerText.trim()}\n  Chiqdi: ${(st[r.dataset.id].izoh || "(izoh yo'q)").trim()}`;
+		}).join("\n\n");
+		const done = () => toast(`${bad.length} ta xato nusxalandi`);
+		(navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(done, () => {
+			const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select();
+			try { document.execCommand("copy"); done(); } catch (e) { toast("Nusxalab bo'lmadi"); } ta.remove();
+		});
+	});
+	document.getElementById("print").addEventListener("click", () => window.print());
+	document.getElementById("reset").addEventListener("click", () => {
+		if (!confirm("Barcha belgilar va izohlar o'chirilsinmi?")) return;
+		st = {}; save(); rows.forEach(paint); totals();
+	});
+	// joriy bo'limni mundarijada belgilash
+	const links = [...document.querySelectorAll("#toc a")];
+	const obs = new IntersectionObserver((es) => es.forEach((e) => {
+		if (e.isIntersecting) links.forEach((a) => a.classList.toggle("cur", "s-" + a.dataset.sec === e.target.id));
+	}), { rootMargin: "-80px 0px -70% 0px" });
+	document.querySelectorAll(".sec").forEach((s) => obs.observe(s));
+})();
+</script>
+</body>
+</html>

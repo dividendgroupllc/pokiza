@@ -1,0 +1,364 @@
+{
+ "actions": [],
+ "creation": "2026-11-10 21:00:00.000000",
+ "modified": "2026-11-10 21:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "module": "Pokiza for business",
+ "engine": "InnoDB",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "doctype": "DocType",
+ "name": "Nazorat Roli",
+ "autoname": "field:rol_nomi",
+ "naming_rule": "By fieldname",
+ "title_field": "rol_nomi",
+ "field_order": [
+  "rol_nomi",
+  "toliq_ruxsat",
+  "vazifa_berish",
+  "column_break_asosiy",
+  "erp_rollari",
+  "izoh",
+  "section_strategik_fokus",
+  "kpi_a1",
+  "kpi_a2",
+  "kpi_a3",
+  "cb_a4",
+  "kpi_a4",
+  "kpi_a5",
+  "section_mijozlar_va_sotish",
+  "kpi_b1",
+  "kpi_b2",
+  "cb_b3",
+  "kpi_b3",
+  "kpi_b4",
+  "section_moliya_va_tolovlar",
+  "kpi_c1",
+  "kpi_c2",
+  "kpi_c3",
+  "cb_c4",
+  "kpi_c4",
+  "kpi_c5",
+  "kpi_c6",
+  "section_vazifalar",
+  "kpi_d1",
+  "section_korsatkichlar__haftalik",
+  "kpi_h1",
+  "kpi_h2",
+  "kpi_h3",
+  "cb_h4",
+  "kpi_h4",
+  "kpi_h5",
+  "kpi_h6",
+  "section_korsatkichlar__kunlik",
+  "kpi_k1",
+  "kpi_k2",
+  "cb_k3",
+  "kpi_k3",
+  "kpi_k4",
+  "section_ai",
+  "ai_qarz_mijoz",
+  "ai_qarz_postavshik",
+  "ai_kassa",
+  "column_break_ai",
+  "ai_ishlab_chiqarish",
+  "ai_talab",
+  "ai_fayl",
+  "ai_erkin"
+ ],
+ "fields": [
+  {
+   "fieldname": "rol_nomi",
+   "fieldtype": "Data",
+   "label": "Rol nomi",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Masalan: Sotuv, Logistika, Bosh hisobchi. Telegram'ga ulangan xodimga (TG Azo) shu rol tanlanadi."
+  },
+  {
+   "fieldname": "toliq_ruxsat",
+   "fieldtype": "Check",
+   "label": "To'liq ruxsat (rahbar darajasi)",
+   "in_list_view": 1,
+   "description": "Barcha ko'rsatkichlar, barcha AI vositalari va vazifa berish. Pastdagi belgilar e'tiborga olinmaydi."
+  },
+  {
+   "fieldname": "vazifa_berish",
+   "fieldtype": "Check",
+   "label": "Vazifa bera oladi va xodimlarga xabar yubora oladi",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_asosiy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "erp_rollari",
+   "fieldtype": "Table MultiSelect",
+   "options": "Nazorat Roli ERP Roli",
+   "label": "ERP rollari",
+   "description": "Xodimni Telegram'ga ulashda: shu ERP roli bo'lsa, bu rol avtomatik taklif qilinadi."
+  },
+  {
+   "fieldname": "izoh",
+   "fieldtype": "Small Text",
+   "label": "Izoh"
+  },
+  {
+   "fieldname": "section_strategik_fokus",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — oylik: strategik fokus",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0,
+   "description": "Belgilangan ko'rsatkichlar shu roldagi xodimga Telegram'da (hisobot, menyu, AI) va rahbar panelida ko'rinadi."
+  },
+  {
+   "fieldname": "kpi_a1",
+   "fieldtype": "Check",
+   "label": "Quvvatdan foydalanish"
+  },
+  {
+   "fieldname": "kpi_a2",
+   "fieldtype": "Check",
+   "label": "Savdo"
+  },
+  {
+   "fieldname": "kpi_a3",
+   "fieldtype": "Check",
+   "label": "Sof rentabellik"
+  },
+  {
+   "fieldname": "cb_a4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "kpi_a4",
+   "fieldtype": "Check",
+   "label": "O'rtacha chek"
+  },
+  {
+   "fieldname": "kpi_a5",
+   "fieldtype": "Check",
+   "label": "Sof daromad"
+  },
+  {
+   "fieldname": "section_mijozlar_va_sotish",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — oylik: mijozlar va sotish",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "kpi_b1",
+   "fieldtype": "Check",
+   "label": "Mijoz rentabelligi"
+  },
+  {
+   "fieldname": "kpi_b2",
+   "fieldtype": "Check",
+   "label": "Mijoz savdosi dinamikasi"
+  },
+  {
+   "fieldname": "cb_b3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "kpi_b3",
+   "fieldtype": "Check",
+   "label": "Top mahsulotlar (daromadning 50%i)"
+  },
+  {
+   "fieldname": "kpi_b4",
+   "fieldtype": "Check",
+   "label": "Mahsulot mix va kategoriya rentabelligi"
+  },
+  {
+   "fieldname": "section_moliya_va_tolovlar",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — oylik: moliya va to'lovlar",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "kpi_c1",
+   "fieldtype": "Check",
+   "label": "Postavshiklarga to'lov"
+  },
+  {
+   "fieldname": "kpi_c2",
+   "fieldtype": "Check",
+   "label": "Mijozlardan to'lov (debitorlik)"
+  },
+  {
+   "fieldname": "kpi_c3",
+   "fieldtype": "Check",
+   "label": "Xarajatlar"
+  },
+  {
+   "fieldname": "cb_c4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "kpi_c4",
+   "fieldtype": "Check",
+   "label": "Brak va vozvrat"
+  },
+  {
+   "fieldname": "kpi_c5",
+   "fieldtype": "Check",
+   "label": "Rahbar olgan pul (dividend)"
+  },
+  {
+   "fieldname": "kpi_c6",
+   "fieldtype": "Check",
+   "label": "Sof foyda taqsimoti"
+  },
+  {
+   "fieldname": "section_vazifalar",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — oylik: vazifalar",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "kpi_d1",
+   "fieldtype": "Check",
+   "label": "Vazifalar bajarilishi"
+  },
+  {
+   "fieldname": "section_korsatkichlar__haftalik",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — haftalik",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "kpi_h1",
+   "fieldtype": "Check",
+   "label": "Haftalik savdo"
+  },
+  {
+   "fieldname": "kpi_h2",
+   "fieldtype": "Check",
+   "label": "Haftalik o'rtacha chek"
+  },
+  {
+   "fieldname": "kpi_h3",
+   "fieldtype": "Check",
+   "label": "Haftalik quvvat"
+  },
+  {
+   "fieldname": "cb_h4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "kpi_h4",
+   "fieldtype": "Check",
+   "label": "7 kun buyurtma bermagan mijozlar"
+  },
+  {
+   "fieldname": "kpi_h5",
+   "fieldtype": "Check",
+   "label": "Nazoratdagi mijozlar (oldingi tovarni yopish)"
+  },
+  {
+   "fieldname": "kpi_h6",
+   "fieldtype": "Check",
+   "label": "Vazifalar (haftalik)"
+  },
+  {
+   "fieldname": "section_korsatkichlar__kunlik",
+   "fieldtype": "Section Break",
+   "label": "Ko'rsatkichlar — kunlik",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "kpi_k1",
+   "fieldtype": "Check",
+   "label": "Kunlik savdo"
+  },
+  {
+   "fieldname": "kpi_k2",
+   "fieldtype": "Check",
+   "label": "Kunlik ishlab chiqarish"
+  },
+  {
+   "fieldname": "cb_k3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "kpi_k3",
+   "fieldtype": "Check",
+   "label": "Kassa kirimi"
+  },
+  {
+   "fieldname": "kpi_k4",
+   "fieldtype": "Check",
+   "label": "Kunlik dividend"
+  },
+  {
+   "fieldname": "section_ai",
+   "fieldtype": "Section Break",
+   "label": "AI yordamchi nimalarni ko'ra oladi",
+   "depends_on": "eval:!doc.toliq_ruxsat",
+   "description": "Telegram'dagi AI shu rol uchun faqat belgilangan ma'lumotlar bilan ishlaydi. Belgilangan ko'rsatkichlar va vazifalar holati doim ochiq."
+  },
+  {
+   "fieldname": "ai_qarz_mijoz",
+   "fieldtype": "Check",
+   "label": "Mijozlar qarzi (debitorlik)"
+  },
+  {
+   "fieldname": "ai_qarz_postavshik",
+   "fieldtype": "Check",
+   "label": "Postavshiklar qarzi"
+  },
+  {
+   "fieldname": "ai_kassa",
+   "fieldtype": "Check",
+   "label": "Kassa va bank qoldiqlari"
+  },
+  {
+   "fieldname": "column_break_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_ishlab_chiqarish",
+   "fieldtype": "Check",
+   "label": "Ishlab chiqarish (hisobot, xomashyo, navbat, brak, tarozi)"
+  },
+  {
+   "fieldname": "ai_talab",
+   "fieldtype": "Check",
+   "label": "Mahsulot savdo tarixi (talab)"
+  },
+  {
+   "fieldname": "ai_fayl",
+   "fieldtype": "Check",
+   "label": "Excel / fayl tayyorlash"
+  },
+  {
+   "fieldname": "ai_erkin",
+   "fieldtype": "Check",
+   "label": "Butun baza bo'yicha erkin so'rov (ehtiyot bo'ling)",
+   "description": "AI istalgan hujjat va jadvalni o'qiy oladi: foyda, ish haqi va boshqalar ham ko'rinadi. Faqat ishonchli rollarga."
+  }
+ ],
+ "description": "Telegram nazorat boti va rahbar panelida kim nimani ko'rishi.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "share": 1,
+   "export": 1
+  }
+ ]
+}
