@@ -187,7 +187,11 @@ def _kartochka_muzlat_va_stop(doc) -> None:
 
     for row in doc.get("items") or []:
         k = karta.get(row.item_code)
-        if k:
+        # Ommaviy bekor qilib qayta kiritishda (doc.flags.asl_muzlatish) asl schyotdagi muzlatilgan
+        # norma / tannarx / bonus saqlanadi — bugungi kartochka bilan qayta yozilmaydi
+        asl_saqla = doc.flags.get("asl_muzlatish") and (
+            row.get("custom_norma") or flt(row.get("custom_tannarx_kg")) or row.get("custom_bonus_foiz_qator") is not None)
+        if k and not asl_saqla:
             # --- muzlatish (marja hisoboti uchun)
             row.custom_norma = k.norma
             # TANNARX MANBAI (2026-10-28): kartochkadagi nusxa EMAS, balki
@@ -269,7 +273,16 @@ def on_submit(doc, method=None) -> None:
     Dt «Бонус» (rasxod) / Kt Debtors (mijoz, schyotga bog'langan) —
     mijoz qarzi bonus summasiga kamayadi. Manfiy foiz = ustama (teskari
     yozuv, qarz oshadi). JE avto submit bo'ladi.
+
+    Ommaviy bekor qilib qayta kiritishda (doc.flags.asl_bonus) bonus QAYTA HISOBLANMAYDI: asl schyotda
+    amalda turgan bonus summasi (ishorasi bilan; 0 — bonus yo'q yoki qo'lda bekor qilingan) aynan ko'chiriladi.
     """
+    asl_bonus = doc.flags.get("asl_bonus")
+    if asl_bonus is not None:
+        summa = flt(asl_bonus, 2)
+        if summa:
+            _bonus_je(doc, summa, "asl")
+        return
     qatorlik = [
         r for r in (doc.get("items") or [])
         if r.get("custom_bonus_foiz_qator") is not None and flt(r.custom_bonus_foiz_qator)
@@ -294,7 +307,11 @@ def on_submit(doc, method=None) -> None:
         summa = flt(doc.base_grand_total * bonus / 100, 2)
     if not summa:
         return
+    _bonus_je(doc, summa, bonus)
 
+
+def _bonus_je(doc, summa, bonus) -> None:
+    """Bonus (summa > 0) yoki ustama (summa < 0) Journal Entry'si — schyotga cheque_no orqali bog'langan."""
     bonus_account = frappe.db.get_value(
         "Account", {"account_name": "Бонус", "company": doc.company, "is_group": 0}
     )
@@ -335,6 +352,8 @@ def on_submit(doc, method=None) -> None:
         "user_remark": (
             f"{BONUS_REMARK} (kartochka, SKU bo'yicha) — {doc.name}, {doc.customer_name or doc.customer}"
             if bonus == "qatorlik"
+            else f"{BONUS_REMARK} (asl schyotdan: {doc.amended_from}) — {doc.name}, {doc.customer_name or doc.customer}"
+            if bonus == "asl"
             else f"{BONUS_REMARK} {bonus}% — {doc.name}, {doc.customer_name or doc.customer}"
         ),
         "accounts": [debtors_qator, bonus_qator],
@@ -344,7 +363,7 @@ def on_submit(doc, method=None) -> None:
     je.submit()
     frappe.msgprint(
         _("Bonus {0} — {1} avto yozildi: {2}").format(
-            _("(kartochka)") if bonus == "qatorlik" else f"{bonus}%",
+            _("(kartochka)") if bonus == "qatorlik" else _("(asl schyotdan)") if bonus == "asl" else f"{bonus}%",
             frappe.format_value(abs(summa), {"fieldtype": "Currency"}),
             frappe.utils.get_link_to_form("Journal Entry", je.name),
         ),
