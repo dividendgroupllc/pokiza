@@ -3,6 +3,8 @@
 
 const DEFAULT_PRODUCTION_WAREHOUSE = "Склад сырьё - P";
 const FINISHED_GOODS_ITEM_GROUP = "Готовый продукт";
+const FARSH_ITEM_GROUP = "Фарш";
+const MANUFACTURE_ITEM_GROUPS = [FINISHED_GOODS_ITEM_GROUP, FARSH_ITEM_GROUP];
 
 frappe.ui.form.on('Production Entry', {
     setup: function(frm) {
@@ -11,7 +13,7 @@ frappe.ui.form.on('Production Entry', {
         frm.set_query("item_to_manufacture", function() {
             return {
                 filters: {
-                    item_group: FINISHED_GOODS_ITEM_GROUP
+                    item_group: ["in", MANUFACTURE_ITEM_GROUPS]
                 }
             };
         });

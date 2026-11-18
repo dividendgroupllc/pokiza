@@ -7,6 +7,8 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 FINISHED_GOODS_ITEM_GROUP = "Готовый продукт"
+FARSH_ITEM_GROUP = "Фарш"
+MANUFACTURE_ITEM_GROUPS = (FINISHED_GOODS_ITEM_GROUP, FARSH_ITEM_GROUP)
 
 
 class ProductionEntry(Document):
@@ -31,6 +33,10 @@ class ProductionEntry(Document):
         mahsulot tannarxiga singadi (process loss). Eski PE'larda reja_kg
         bo'sh — sarf faktga tenglashadi (eski xatti-harakat).
         """
+        # Ommaviy qayta kiritishda (flags.asl_miqdor) PE'da yozilgan o'sha davrdagi miqdorlar aynan
+        # saqlanadi — bugungi BOM / pasport / qoidalar bilan qayta hisoblanmaydi
+        if self.flags.get("asl_miqdor"):
+            return
         # chiqish = qozondan chiqqan hammasi (sotuvga yaroqli + brak)
         chiqqan = flt(self.qty_to_manufacture) + flt(self.brak_kg)
         sarf_asosi = flt(self.reja_kg) or chiqqan
@@ -117,9 +123,11 @@ class ProductionEntry(Document):
             return
 
         item_group = frappe.get_cached_value("Item", self.item_to_manufacture, "item_group")
-        if item_group != FINISHED_GOODS_ITEM_GROUP:
+        if item_group not in MANUFACTURE_ITEM_GROUPS:
             frappe.throw(
-                _("Item To Manufacture must belong to Item Group {0}").format(FINISHED_GOODS_ITEM_GROUP)
+                _("Item To Manufacture must belong to Item Group {0}").format(
+                    " / ".join(MANUFACTURE_ITEM_GROUPS)
+                )
             )
 
     def update_available_qty(self):
