@@ -18,6 +18,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from pokiza.guruhlar import sotuv_guruhlari
 from pokiza.api.partiya import (
     NORMA_GURUHLAR, SOTUV_GURUH, asosiy_ombor, bom_yagona_gp, sku_bom,
 )
@@ -36,7 +37,7 @@ def _sku_audit(sku):
         a["tayyor"] = False
         a["sabablar"].append("item topilmadi")
         return a
-    if it.item_group != SOTUV_GURUH:
+    if it.item_group not in sotuv_guruhlari():
         a["tayyor"] = False
         a["sabablar"].append("guruh noto'g'ri")
     if it.disabled:
@@ -124,7 +125,7 @@ def ommaviy_audit():
     if "System Manager" not in frappe.get_roles():
         frappe.throw(_("Huquq yo'q"))
     natija = {"tayyor": [], "otkazilmaydi": [], "allaqachon": []}
-    for sku in frappe.get_all("Item", filters={"item_group": SOTUV_GURUH},
+    for sku in frappe.get_all("Item", filters={"item_group": ["in", sotuv_guruhlari()]},
                               order_by="name", pluck="name"):
         a = _sku_audit(sku)
         if a.get("allaqachon"):
@@ -147,7 +148,7 @@ def ommaviy_otkaz(tasdiq=None):
         frappe.throw(_("tasdiq='OTKAZ' yuboring"))
 
     natija = {"otkazildi": [], "xato": [], "otkazilmaydi": 0, "allaqachon": 0}
-    for sku in frappe.get_all("Item", filters={"item_group": SOTUV_GURUH},
+    for sku in frappe.get_all("Item", filters={"item_group": ["in", sotuv_guruhlari()]},
                               order_by="name", pluck="name"):
         a = _sku_audit(sku)
         if a.get("allaqachon"):
@@ -191,9 +192,9 @@ def lokal_batch_tozalash(tasdiq=None):
         SELECT DISTINCT sle.voucher_type, sle.voucher_no
         FROM `tabStock Ledger Entry` sle
         JOIN `tabItem` i ON i.name = sle.item_code
-        WHERE i.item_group = %s AND sle.is_cancelled = 0
+        WHERE i.item_group IN %s AND sle.is_cancelled = 0
         """,
-        SOTUV_GURUH, as_dict=True,
+        (sotuv_guruhlari(),), as_dict=True,
     )
     for turi in ("Sales Invoice", "Stock Entry"):
         for h in [x for x in hujjatlar if x.voucher_type == turi]:
@@ -224,7 +225,7 @@ def lokal_batch_tozalash(tasdiq=None):
 
     # 3) has_batch_no=0 (SLE'lar endi bekor — xavfsiz)
     skular = frappe.get_all("Item", filters={
-        "item_group": SOTUV_GURUH, "has_batch_no": 1}, pluck="name")
+        "item_group": ["in", sotuv_guruhlari()], "has_batch_no": 1}, pluck="name")
     for sku in skular:
         frappe.db.set_value("Item", sku, {"has_batch_no": 0},
                             update_modified=False)
@@ -256,7 +257,7 @@ def bom_yarat_bundledan(tasdiq=None):
     natija = {"yaratiladi": [], "bom_bor": 0, "bundlesiz": [],
               "xato": [], "quruq": quruq}
     for sku in frappe.get_all("Item", filters={
-        "item_group": SOTUV_GURUH, "disabled": 0, "is_stock_item": 1,
+        "item_group": ["in", sotuv_guruhlari()], "disabled": 0, "is_stock_item": 1,
     }, order_by="name", pluck="name"):
         if sku_bom(sku):
             natija["bom_bor"] += 1
@@ -316,7 +317,7 @@ def default_ombor_backfill():
         frappe.throw(_("Huquq yo'q"))
     n = 0
     for sku in frappe.get_all("Item", filters={
-        "item_group": SOTUV_GURUH, "is_stock_item": 1}, pluck="name"):
+        "item_group": ["in", sotuv_guruhlari()], "is_stock_item": 1}, pluck="name"):
         _default_ombor_qoy(sku)
         n += 1
     return {"yangilandi": n}
@@ -349,7 +350,7 @@ def eski_bom_almashtir(tasdiq=None):
         """
         SELECT b.item sku, b.name bom
         FROM `tabBOM` b
-        JOIN `tabItem` s ON s.name = b.item AND s.item_group = %s
+        JOIN `tabItem` s ON s.name = b.item AND s.item_group IN %s
         WHERE b.docstatus = 1 AND b.is_active = 1
           AND (
             -- ГП qatori umuman yo'q (sof xomashyo retsepti)
@@ -376,7 +377,7 @@ def eski_bom_almashtir(tasdiq=None):
             WHERE pb.new_item_code = b.item AND i.item_group IN %s)
         ORDER BY b.item
         """,
-        (SOTUV_GURUH, NORMA_GURUHLAR, NORMA_GURUHLAR), as_dict=True,
+        (sotuv_guruhlari(), NORMA_GURUHLAR, NORMA_GURUHLAR), as_dict=True,
     )
     natija = {"almashdi": [], "xato": [], "quruq": quruq,
               "nomzodlar": [n.sku for n in nomzodlar]}
@@ -451,7 +452,7 @@ def bom_yarat_sht(tasdiq=None):
         SELECT DISTINCT pb.new_item_code sku
         FROM `tabProduct Bundle` pb
         JOIN `tabItem` s ON s.name = pb.new_item_code
-          AND s.item_group = %s AND s.disabled = 0 AND s.is_stock_item = 0
+          AND s.item_group IN %s AND s.disabled = 0 AND s.is_stock_item = 0
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` i ON i.name = pbi.item_code AND i.item_group IN %s
         WHERE NOT EXISTS (
@@ -460,7 +461,7 @@ def bom_yarat_sht(tasdiq=None):
               AND b.is_active = 1)
         ORDER BY sku
         """,
-        (SOTUV_GURUH, NORMA_GURUHLAR), as_dict=True,
+        (sotuv_guruhlari(), NORMA_GURUHLAR), as_dict=True,
     )
     natija = {"yaratildi": [], "xato": [], "quruq": quruq,
               "nomzodlar": [n.sku for n in nomzodlar]}
@@ -536,7 +537,7 @@ def nabor_otkaz(tasdiq=None, faqat=None):
     nomzodlar = []
     otkazilmaydi = []
     for sku in frappe.get_all("Item", filters={
-        "item_group": SOTUV_GURUH, "disabled": 0, "is_stock_item": 0,
+        "item_group": ["in", sotuv_guruhlari()], "disabled": 0, "is_stock_item": 0,
     }, order_by="name", pluck="name"):
         if bolaklar and not any(b in sku for b in bolaklar):
             continue

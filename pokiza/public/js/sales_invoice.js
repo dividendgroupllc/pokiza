@@ -166,7 +166,7 @@ function setSalesItemQuery(frm) {
         filters: {
             disabled: 0,
             is_sales_item: 1,
-            item_group: "Сотув махсулотлари",
+            item_group: ["descendants of (inclusive)", "Сотув махсулотлари"],
         },
     }));
 }

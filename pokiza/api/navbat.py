@@ -1541,9 +1541,10 @@ def zapas_before_submit(doc, method=None):
     atomar qoida. Sotuv guruhidan bo'lmagan item aralashsa bloklanadi."""
     if not _zapas_mi(doc):
         return
+    from pokiza.guruhlar import sotuv_guruhlari
     yot = [d.item_code for d in doc.items
            if frappe.get_cached_value("Item", d.item_code, "item_group")
-           != "Сотув махсулотлари"]
+           not in sotuv_guruhlari()]
     if yot:
         frappe.throw(_("Zapas faqat sotuv mahsulotlari uchun: {0}")
                      .format(", ".join(yot)))
@@ -1869,7 +1870,8 @@ def brak_vozvrat(item_code, kg):
     kg = flt(kg)
     if kg <= 0:
         frappe.throw(_("Kg 0 dan katta bo'lishi kerak"))
-    if frappe.get_cached_value("Item", item_code, "item_group") != "Сотув махсулотлари":
+    from pokiza.guruhlar import sotuv_guruhlari
+    if frappe.get_cached_value("Item", item_code, "item_group") not in sotuv_guruhlari():
         frappe.throw(_("Brak faqat sotuv mahsuloti bo'yicha yoziladi"))
 
     from pokiza.api.partiya import asosiy_ombor, stock_rejimda

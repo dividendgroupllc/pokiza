@@ -9,6 +9,8 @@ import re
 
 import frappe
 
+from pokiza.guruhlar import sotuv_guruhlari
+
 # (regex, kategoriya, ishonch) — tartib muhim: birinchi mos kelgani olinadi
 KATEGORIYA_QOIDALARI = [
     (r"^\s*(ак\.|бонус|услуга)", "Boshqa", "yuqori"),
@@ -51,7 +53,7 @@ def taklif(fayl="/tmp/nazorat_taklif.xlsx"):
         """SELECT sii.item_code, SUM(sii.base_net_amount) FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         WHERE si.docstatus = 1 AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH) GROUP BY sii.item_code"""))
-    items = frappe.get_all("Item", filters={"item_group": "Сотув махсулотлари", "disabled": 0},
+    items = frappe.get_all("Item", filters={"item_group": ["in", sotuv_guruhlari()], "disabled": 0},
                            fields=["name", "item_name", "custom_kategoriya"])
     items.sort(key=lambda r: -(savdo.get(r.name) or 0))
     for it in items:

@@ -48,7 +48,7 @@ frappe.pages["brak-vozvrat-sahifa"].on_page_load = function (wrapper) {
 						in_list_view: 1,
 						reqd: 1,
 						columns: 7,
-						get_query: () => ({ filters: { item_group: "Сотув махсулотлари" } }),
+						get_query: () => ({ filters: { item_group: ["descendants of (inclusive)", "Сотув махсулотлари"] } }),
 					},
 					{
 						fieldname: "kg",

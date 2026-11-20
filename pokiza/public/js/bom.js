@@ -1,6 +1,12 @@
 const BOM_FINISHED_GOODS_ITEM_GROUP = "Готовый продукт";
 // 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi
 const BOM_FARSH_ITEM_GROUP = "Фарш";
+// Sotuv guruhi endi daraxt (Сосиски, Полукопченые... bola guruhlar) —
+// to'liq ro'yxat serverdan bir marta olinadi, kelguncha statik zaxira
+let BOM_ITEM_GURUHLARI = [BOM_FINISHED_GOODS_ITEM_GROUP, BOM_FARSH_ITEM_GROUP, "Сотув махсулотлари"];
+frappe.call("pokiza.guruhlar.bom_item_guruhlari").then((r) => {
+    if (Array.isArray(r.message) && r.message.length) BOM_ITEM_GURUHLARI = r.message;
+});
 
 frappe.ui.form.on("BOM", {
     setup(frm) {
@@ -53,7 +59,7 @@ function setBomItemQuery(frm) {
             filters: {
                 disabled: 0,
                 // farsh BOM'lari + sotuv SKU BOM'lari (sodda rejim 2026-10)
-                item_group: ["in", [BOM_FINISHED_GOODS_ITEM_GROUP, BOM_FARSH_ITEM_GROUP, "Сотув махсулотлари"]],
+                item_group: ["in", BOM_ITEM_GURUHLARI],
             },
         };
     });

@@ -20,7 +20,8 @@ NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 
 class SKUPasporti(Document):
     def validate(self):
-        if self.sku and frappe.get_cached_value("Item", self.sku, "item_group") != SOTUV_GURUH:
+        from pokiza.guruhlar import sotuv_guruhlari
+        if self.sku and frappe.get_cached_value("Item", self.sku, "item_group") not in sotuv_guruhlari():
             frappe.throw(_("{0} «{1}» guruhidan emas").format(self.sku, SOTUV_GURUH))
         korilgan = set()
         for q in self.qatorlar:

@@ -15,8 +15,9 @@ def validate(doc, method=None):
     doc.custom_sarf_jami_summa = flt(
         sum(flt(d.amount) for d in (doc.items or [])), 2)
     # ro'yxatda rang/filtr uchun: sotuv mahsulotining BOMi belgilanadi
+    from pokiza.guruhlar import sotuv_guruhlari
     doc.custom_sotuv_sku = 1 if frappe.get_cached_value(
-        "Item", doc.item, "item_group") == "Сотув махсулотлари" else 0
+        "Item", doc.item, "item_group") in sotuv_guruhlari() else 0
 
 
 def before_validate(doc, method=None):

@@ -9,7 +9,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-NARX_GURUHI = "Сотув махсулотлари"
+from pokiza.guruhlar import sotuv_guruhlari  # noqa: E402
 
 
 def _return_tannarx_tekshir(doc) -> None:
@@ -128,7 +128,7 @@ def before_submit(doc, method=None) -> None:
         if not row.item_code or flt(row.rate):
             continue
         item_group = frappe.get_cached_value("Item", row.item_code, "item_group")
-        if item_group == NARX_GURUHI:
+        if item_group in sotuv_guruhlari():
             narxsiz.append(row.item_code)
 
     if narxsiz:
@@ -172,7 +172,7 @@ def _kartochka_muzlat_va_stop(doc) -> None:
     gp_sklad = None
     for row in doc.get("items") or []:
         if row.item_code and stock_rejimda(row.item_code) and \
-                frappe.get_cached_value("Item", row.item_code, "item_group") == NARX_GURUHI:
+                frappe.get_cached_value("Item", row.item_code, "item_group") in sotuv_guruhlari():
             gp_sklad = gp_sklad or asosiy_ombor()
             row.warehouse = gp_sklad
 

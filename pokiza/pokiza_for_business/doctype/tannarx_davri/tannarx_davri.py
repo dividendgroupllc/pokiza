@@ -23,6 +23,8 @@ dashboardda. Ikkisining farqi «Tannarx Norma Fakt» hisobotida ko'rinadi.
 """
 
 import frappe
+
+from pokiza.guruhlar import sotuv_guruhlari
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, get_first_day, get_last_day, getdate, now_datetime
@@ -76,7 +78,7 @@ class TannarxDavri(Document):
 
         skular = frappe.get_all(
             "Item",
-            filters={"item_group": SOTUV_GURUH, "disabled": 0},
+            filters={"item_group": ["in", sotuv_guruhlari()], "disabled": 0},
             pluck="name",
             order_by="name",
         )

@@ -17,6 +17,8 @@ mahsulot doim OXIRIDA, nom bo'yicha turadi — yo'qolmaydi.
 """
 
 import frappe
+
+from pokiza.guruhlar import sotuv_guruhlari
 from frappe import _
 from frappe.model.document import Document
 
@@ -154,11 +156,11 @@ def tartibsizlar():
     return frappe.db.sql(
         """
         SELECT name, item_name FROM `tabItem`
-        WHERE item_group = 'Сотув махсулотлари' AND disabled = 0
+        WHERE item_group IN %(guruhlar)s AND disabled = 0
           AND name NOT IN %(t)s
         ORDER BY item_name
         """,
-        {"t": tartibli},
+        {"t": tartibli, "guruhlar": sotuv_guruhlari()},
         as_dict=True,
     )
 

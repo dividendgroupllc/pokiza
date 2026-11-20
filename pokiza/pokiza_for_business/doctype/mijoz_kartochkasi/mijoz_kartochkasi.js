@@ -8,7 +8,7 @@
 frappe.ui.form.on("Mijoz Kartochkasi", {
 	setup(frm) {
 		frm.set_query("sku", "qatorlar", () => ({
-			filters: { item_group: "Сотув махсулотлари", disabled: 0 },
+			filters: { item_group: ["descendants of (inclusive)", "Сотув махсулотлари"], disabled: 0 },
 		}));
 		frm.set_query("norma", "qatorlar", () => ({
 			// 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi

@@ -18,7 +18,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, fmt_money, nowdate
 
-SOTUV_GURUH = "Сотув махсулотлари"
+from pokiza.guruhlar import sotuv_guruhlari  # noqa: E402
 # 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
 NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 KUNLAR = 90  # qoralama uchun sotuv tarixi oynasi
@@ -385,11 +385,11 @@ def _tarix_qatorlari(mijozlar):
         WHERE si.docstatus = 1 AND si.is_return = 0
           AND si.customer IN %(mijozlar)s
           AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL %(kunlar)s DAY)
-          AND it.item_group = %(guruh)s AND it.disabled = 0
+          AND it.item_group IN %(guruh)s AND it.disabled = 0
           AND sii.qty > 0
         ORDER BY si.posting_date DESC, si.creation DESC
         """,
-        {"mijozlar": tuple(mijozlar), "kunlar": KUNLAR, "guruh": SOTUV_GURUH},
+        {"mijozlar": tuple(mijozlar), "kunlar": KUNLAR, "guruh": sotuv_guruhlari()},
         as_dict=True,
     )
 

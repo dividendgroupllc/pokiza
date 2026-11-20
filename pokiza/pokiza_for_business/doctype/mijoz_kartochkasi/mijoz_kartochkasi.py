@@ -18,7 +18,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
-SOTUV_GURUH = "Сотув махсулотлари"
+from pokiza.guruhlar import SOTUV_ILDIZ, sotuv_guruhlari  # noqa: E402
 # 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
 NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 
@@ -111,9 +111,9 @@ class MijozKartochkasi(Document):
         ))
 
         for q in self.qatorlar:
-            if q.sku and guruh.get(q.sku) != SOTUV_GURUH:
+            if q.sku and guruh.get(q.sku) not in sotuv_guruhlari():
                 frappe.throw(_("{0}-qator: {1} «{2}» guruhidan emas").format(
-                    q.idx, q.sku, SOTUV_GURUH))
+                    q.idx, q.sku, SOTUV_ILDIZ))
             if q.norma and guruh.get(q.norma) not in NORMA_GURUHLAR:
                 frappe.throw(_("{0}-qator: {1} norma («{2}») guruhidan emas").format(
                     q.idx, q.norma, " / ".join(NORMA_GURUHLAR)))

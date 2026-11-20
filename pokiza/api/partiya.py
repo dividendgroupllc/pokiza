@@ -269,7 +269,8 @@ def batch_rejimga(sku):
         frappe.throw(_("Huquq yo'q"))
 
     item = frappe.get_doc("Item", sku)
-    if item.item_group != SOTUV_GURUH:
+    from pokiza.guruhlar import sotuv_guruhlari
+    if item.item_group not in sotuv_guruhlari():
         frappe.throw(_("{0} «{1}» guruhidan emas").format(sku, SOTUV_GURUH))
     if item.has_batch_no and item.is_stock_item:
         return {"holat": "allaqachon partiya rejimida"}
