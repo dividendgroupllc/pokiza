@@ -169,7 +169,13 @@ override_doctype_class = {
 
 doc_events = {
 	"BOM": {
+		# qoralamada ichki bom_no doim default versiyaga to'g'rilanadi
+		"before_validate": "pokiza.events.bom.before_validate",
 		"validate": "pokiza.events.bom.validate",
+		# yangi default versiya -> tashqi BOM'lardagi eski havolalar
+		# BOM Update Tool (Replace BOM) bilan avto almashadi
+		"on_submit": "pokiza.events.bom.on_submit",
+		"on_update_after_submit": "pokiza.events.bom.on_update_after_submit",
 	},
 	# Kartochka narxi -> mijoz kesimidagi Item Price (pokiza/api/narx.py):
 	# shundan keyin kartochka narxini ERPNext'ning o'zi ustun qo'yadi va

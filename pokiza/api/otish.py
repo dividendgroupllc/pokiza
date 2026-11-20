@@ -19,7 +19,7 @@ from frappe import _
 from frappe.utils import flt
 
 from pokiza.api.partiya import (
-    NORMA_GURUH, SOTUV_GURUH, asosiy_ombor, bom_yagona_gp, sku_bom,
+    NORMA_GURUHLAR, SOTUV_GURUH, asosiy_ombor, bom_yagona_gp, sku_bom,
 )
 
 KG_UOMS = ("кг", "Kg", "kg", "KG", "Кг")
@@ -67,9 +67,9 @@ def _sku_audit(sku):
             FROM `tabProduct Bundle` pb
             JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
             JOIN `tabItem` i ON i.name = pbi.item_code
-            WHERE pb.new_item_code = %s AND i.item_group = %s
+            WHERE pb.new_item_code = %s AND i.item_group IN %s
             """,
-            (sku, NORMA_GURUH),
+            (sku, NORMA_GURUHLAR),
         )[0][0]
         if not bundle_gp:
             a["ogohlar"].append("BOM ham, bundle normasi ham yo'q — ishlab chiqarib bo'lmaydi, BOM to'ldirilsin")
@@ -356,7 +356,7 @@ def eski_bom_almashtir(tasdiq=None):
             NOT EXISTS (
               SELECT 1 FROM `tabBOM Item` bi
               JOIN `tabItem` i ON i.name = bi.item_code
-              WHERE bi.parent = b.name AND i.item_group = %s)
+              WHERE bi.parent = b.name AND i.item_group IN %s)
             -- yoki upakovkasiz (bundle'da upakovka bor)
             OR (NOT EXISTS (
                   SELECT 1 FROM `tabBOM Item` bi
@@ -373,10 +373,10 @@ def eski_bom_almashtir(tasdiq=None):
             SELECT 1 FROM `tabProduct Bundle` pb
             JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
             JOIN `tabItem` i ON i.name = pbi.item_code
-            WHERE pb.new_item_code = b.item AND i.item_group = %s)
+            WHERE pb.new_item_code = b.item AND i.item_group IN %s)
         ORDER BY b.item
         """,
-        (SOTUV_GURUH, NORMA_GURUH, NORMA_GURUH), as_dict=True,
+        (SOTUV_GURUH, NORMA_GURUHLAR, NORMA_GURUHLAR), as_dict=True,
     )
     natija = {"almashdi": [], "xato": [], "quruq": quruq,
               "nomzodlar": [n.sku for n in nomzodlar]}
@@ -453,14 +453,14 @@ def bom_yarat_sht(tasdiq=None):
         JOIN `tabItem` s ON s.name = pb.new_item_code
           AND s.item_group = %s AND s.disabled = 0 AND s.is_stock_item = 0
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
-        JOIN `tabItem` i ON i.name = pbi.item_code AND i.item_group = %s
+        JOIN `tabItem` i ON i.name = pbi.item_code AND i.item_group IN %s
         WHERE NOT EXISTS (
             SELECT 1 FROM `tabBOM` b
             WHERE b.item = pb.new_item_code AND b.docstatus = 1
               AND b.is_active = 1)
         ORDER BY sku
         """,
-        (SOTUV_GURUH, NORMA_GURUH), as_dict=True,
+        (SOTUV_GURUH, NORMA_GURUHLAR), as_dict=True,
     )
     natija = {"yaratildi": [], "xato": [], "quruq": quruq,
               "nomzodlar": [n.sku for n in nomzodlar]}

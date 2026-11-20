@@ -19,7 +19,8 @@ from frappe.model.naming import make_autoname
 from frappe.utils import flt, nowdate
 
 SOTUV_GURUH = "Сотув махсулотлари"
-NORMA_GURUH = "Готовый продукт"
+# 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
+NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 
 
 def asosiy_ombor():
@@ -120,9 +121,9 @@ def bom_yagona_gp(sku):
         """
         SELECT DISTINCT bi.item_code FROM `tabBOM Item` bi
         JOIN `tabItem` i ON i.name = bi.item_code
-        WHERE bi.parent = %s AND i.item_group = %s
+        WHERE bi.parent = %s AND i.item_group IN %s
         """,
-        (b.name, NORMA_GURUH),
+        (b.name, NORMA_GURUHLAR),
     )
     return gplar[0][0] if len(gplar) == 1 else None
 
@@ -195,10 +196,10 @@ def pasport_qatorlari(sku):
                 """
                 SELECT bi.item_code, SUM(bi.qty) FROM `tabBOM Item` bi
                 JOIN `tabItem` i ON i.name = bi.item_code
-                WHERE bi.parent = %s AND i.item_group != %s
+                WHERE bi.parent = %s AND i.item_group NOT IN %s
                 GROUP BY bi.item_code
                 """,
-                (b.name, NORMA_GURUH),
+                (b.name, NORMA_GURUHLAR),
             )
         ]
         if rows:
@@ -237,10 +238,10 @@ def pasport_kochir(sku=None):
             SELECT pbi.item_code, pbi.qty
             FROM `tabProduct Bundle Item` pbi
             JOIN `tabItem` i ON i.name = pbi.item_code
-            WHERE pbi.parent = %s AND i.item_group != %s
+            WHERE pbi.parent = %s AND i.item_group NOT IN %s
             ORDER BY pbi.idx
             """,
-            (pb.name, NORMA_GURUH),
+            (pb.name, NORMA_GURUHLAR),
             as_dict=True,
         )
         doc = frappe.get_doc({

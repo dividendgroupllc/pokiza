@@ -40,7 +40,7 @@ tannarx, foyda-zarar va boshqa biznes ko'rsatkichlari haqida so'raydi.
 
 ## Ishlab chiqarish (asosiy biznes — eng aniq javob shu yerda kerak)
 Model: Pokiza kolbasa/sosiska ishlab chiqaradi, ikki bosqichda.
-1. NORMA (retsept, farsh partiyasi; Item guruhi 'Готовый продукт', masalan "СОС тилла 16000 № 4") —
+1. NORMA (retsept, farsh partiyasi; Item guruhi 'Фарш' — eskisi 'Готовый продукт', masalan "СОС тилла 16000 № 4") —
    Production Entry (`tabProduction Entry`, docstatus=1) bilan BOM bo'yicha xomashyodan ('Сырё') qilinadi:
    `item_to_manufacture` = norma, `qty_to_manufacture` = fakt kg, `reja_kg` = reja (ko'pincha bo'sh),
    `brak_kg`, `chiqish_foiz`. Submit'da Manufacture Stock Entry (`custom_production_entry`) yaratiladi,

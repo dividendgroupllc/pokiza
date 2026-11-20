@@ -36,7 +36,8 @@ from frappe.utils import (
 
 EPS = 0.0001
 KG_UOMS = ("кг", "Kg", "kg")
-GP_GROUP = "Готовый продукт"
+# 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham ГП sanaladi
+GP_GURUHLAR = ("Готовый продукт", "Фарш")
 SLOT_TARTIB = {
     "Ertalab": 0,
     "Tushlik / abed atrofi": 1,
@@ -74,10 +75,10 @@ def _bundle_gp_map(item_codes):
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` ci ON ci.name = pbi.item_code
         WHERE pb.disabled = 0
-          AND ci.item_group = %(gp_group)s
+          AND ci.item_group IN %(gp_group)s
           AND pb.new_item_code IN %(items)s
         """,
-        {"gp_group": GP_GROUP, "items": tuple(item_codes)},
+        {"gp_group": GP_GURUHLAR, "items": tuple(item_codes)},
         as_dict=True,
     )
     out = {}
@@ -1439,9 +1440,9 @@ def _zapas_norma(sku):
         FROM `tabProduct Bundle` pb
         JOIN `tabProduct Bundle Item` pbi ON pbi.parent = pb.name
         JOIN `tabItem` i ON i.name = pbi.item_code
-        WHERE pb.new_item_code = %s AND i.item_group = %s
+        WHERE pb.new_item_code = %s AND i.item_group IN %s
         """,
-        (sku, GP_GROUP),
+        (sku, GP_GURUHLAR),
     )
     return normalar[0][0] if len(normalar) == 1 else None
 
@@ -2383,10 +2384,10 @@ def _gp_qoldiq():
         SELECT b.item_code, SUM(b.actual_qty) AS qty
         FROM `tabBin` b
         JOIN `tabItem` i ON i.name = b.item_code
-        WHERE i.item_group = %(gp)s
+        WHERE i.item_group IN %(gp)s
         GROUP BY b.item_code
         """,
-        {"gp": GP_GROUP},
+        {"gp": GP_GURUHLAR},
         as_dict=True,
     )
     return {r.item_code: flt(r.qty) for r in rows}

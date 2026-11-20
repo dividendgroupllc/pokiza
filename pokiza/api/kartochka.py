@@ -19,7 +19,8 @@ from frappe import _
 from frappe.utils import flt, fmt_money, nowdate
 
 SOTUV_GURUH = "Сотув махсулотлари"
-NORMA_GURUH = "Готовый продукт"
+# 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
+NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 KUNLAR = 90  # qoralama uchun sotuv tarixi oynasi
 
 
@@ -194,7 +195,7 @@ def _upakovka_narxi(sku):
     """SKU bundle'idagi ГП bo'lmagan qatorlar — 1 kg uchun upakovka narxi."""
     jami = 0.0
     for q in _bundle_qatorlari(sku):
-        if q.item_group == NORMA_GURUH:
+        if q.item_group in NORMA_GURUHLAR:
             continue
         jami += flt(q.qty) * _item_narxi(q.item_code)
     return jami
@@ -211,7 +212,7 @@ def bundle_normasi(sku):
         return kesh[sku]
 
     normalar = {q.item_code for q in _bundle_qatorlari(sku)
-                if q.item_group == NORMA_GURUH}
+                if q.item_group in NORMA_GURUHLAR}
     if len(normalar) == 1:
         kesh[sku] = normalar.pop()
     else:
@@ -245,7 +246,7 @@ def tannarx_hisobla(sku, norma=None):
             """,
             b.name, as_dict=True,
         ):
-            if r.item_group == NORMA_GURUH:
+            if r.item_group in NORMA_GURUHLAR:
                 narx = _norma_farsh_narxi(r.item_code) or _item_narxi(r.item_code)
                 farsh += flt(r.qty) / q * narx
             else:

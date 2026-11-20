@@ -19,7 +19,8 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 SOTUV_GURUH = "Сотув махсулотлари"
-NORMA_GURUH = "Готовый продукт"
+# 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
+NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 
 # Jurnalga yoziladigan qator maydonlari — faqat odam kiritadiganlar
 # (tannarx/marja hisoblanadi, ularning o'zgarishi BOM/ombordan kelib chiqadi)
@@ -113,9 +114,9 @@ class MijozKartochkasi(Document):
             if q.sku and guruh.get(q.sku) != SOTUV_GURUH:
                 frappe.throw(_("{0}-qator: {1} «{2}» guruhidan emas").format(
                     q.idx, q.sku, SOTUV_GURUH))
-            if q.norma and guruh.get(q.norma) != NORMA_GURUH:
+            if q.norma and guruh.get(q.norma) not in NORMA_GURUHLAR:
                 frappe.throw(_("{0}-qator: {1} norma («{2}») guruhidan emas").format(
-                    q.idx, q.norma, NORMA_GURUH))
+                    q.idx, q.norma, " / ".join(NORMA_GURUHLAR)))
 
     def validate_takror(self):
         """Bitta SKU uchun bittadan ortiq Aktiv qator bo'lmasin."""

@@ -14,7 +14,8 @@ from frappe import _
 from frappe.model.document import Document
 
 SOTUV_GURUH = "Сотув махсулотлари"
-NORMA_GURUH = "Готовый продукт"
+# 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi — ikkala guruh ham norma
+NORMA_GURUHLAR = ("Готовый продукт", "Фарш")
 
 
 class SKUPasporti(Document):
@@ -25,7 +26,7 @@ class SKUPasporti(Document):
         for q in self.qatorlar:
             if not q.item:
                 continue
-            if frappe.get_cached_value("Item", q.item, "item_group") == NORMA_GURUH:
+            if frappe.get_cached_value("Item", q.item, "item_group") in NORMA_GURUHLAR:
                 frappe.throw(
                     _("{0}-qator: {1} — norma (farsh) pasportga yozilmaydi, "
                       "u mijoz kartochkasidan olinadi").format(q.idx, q.item))

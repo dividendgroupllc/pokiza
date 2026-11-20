@@ -1,4 +1,6 @@
 const BOM_FINISHED_GOODS_ITEM_GROUP = "Готовый продукт";
+// 2026-11: ГП itemlari «Фарш» guruhiga ko'chirildi
+const BOM_FARSH_ITEM_GROUP = "Фарш";
 
 frappe.ui.form.on("BOM", {
     setup(frm) {
@@ -51,7 +53,7 @@ function setBomItemQuery(frm) {
             filters: {
                 disabled: 0,
                 // farsh BOM'lari + sotuv SKU BOM'lari (sodda rejim 2026-10)
-                item_group: ["in", [BOM_FINISHED_GOODS_ITEM_GROUP, "Сотув махсулотлари"]],
+                item_group: ["in", [BOM_FINISHED_GOODS_ITEM_GROUP, BOM_FARSH_ITEM_GROUP, "Сотув махсулотлари"]],
             },
         };
     });
