@@ -3,7 +3,6 @@
 Hammasi ERP'dan sozlanadi — Nazorat Bot Sozlamalari → "Ma'lumot himoyasi":
 - himoya_excel_xodim: xodimlar (to'liq ruxsatsiz rollar) AI'dan Excel/PDF fayl ola oladimi (standart — yo'q);
 - himoya_forward / himoya_rahbarga: bot yuborgan xabar va fayllarni forward qilish/saqlash taqiqi (Telegram protect_content);
-- himoya_web_ai_belgi: ERP'dagi AI chat ham TG Azo "AI bilan savol-javob" belgisini talab qiladimi;
 - himoya_kop_fayl / himoya_kop_savol: xodim bir kunda shuncha fayl / savoldan oshsa — rahbarga xabar (0 — o'chiq).
 """
 import frappe
@@ -24,10 +23,6 @@ def forward_taqiq(chat_id):
     if rol == "Rahbar":
         return bool(config.sozlama("himoya_rahbarga", 0))
     return True
-
-
-def web_ai_belgi_shart():
-    return bool(config.sozlama("himoya_web_ai_belgi", 1))
 
 
 def _cheklanganmi(user):

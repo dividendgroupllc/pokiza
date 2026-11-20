@@ -22,7 +22,6 @@
   "himoya_excel_xodim",
   "himoya_forward",
   "himoya_rahbarga",
-  "himoya_web_ai_belgi",
   "column_break_himoya",
   "himoya_kop_fayl",
   "himoya_kop_savol"
@@ -138,12 +137,6 @@
    "label": "Rahbarga ham taqiq qo'yilsin",
    "default": "0",
    "depends_on": "himoya_forward"
-  },
-  {
-   "fieldname": "himoya_web_ai_belgi",
-   "fieldtype": "Check",
-   "label": "ERP'dagi AI chat ham TG Azo'dagi \"AI bilan savol-javob\" belgisini talab qilsin",
-   "default": "1"
   },
   {
    "fieldname": "column_break_himoya",

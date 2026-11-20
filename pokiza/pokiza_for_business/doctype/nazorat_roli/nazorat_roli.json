@@ -100,7 +100,7 @@
    "fieldtype": "Table MultiSelect",
    "options": "Nazorat Roli ERP Roli",
    "label": "ERP rollari",
-   "description": "Xodimni Telegram'ga ulashda: shu ERP roli bo'lsa, bu rol avtomatik taklif qilinadi."
+   "description": "Shu ERP roli bor xodim ERP'dagi AI chatda shu rol doirasida javob oladi. Telegram'ga ulashda ham shu rol taklif qilinadi."
   },
   {
    "fieldname": "izoh",

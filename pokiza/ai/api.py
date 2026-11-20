@@ -17,21 +17,17 @@ def _check():
 
 
 def _web_kontekst():
-    """Web chat doirasi: administrator — cheklovsiz; boshqalar — TG Azo'dagi Nazorat Roli bo'yicha (Telegram bilan bir xil)."""
+    """Web chat doirasi: administrator — cheklovsiz; boshqalar — ERP rollari bo'yicha Nazorat Roli.
+    Telegram a'zoligiga (TG Azo) bog'liq emas: chatga kirish "AI Foydalanuvchi" ERP roli bilan (_check)."""
     u = frappe.session.user
     if u == "Administrator" or "System Manager" in frappe.get_roles(u):
         return None
-    from pokiza.nazorat.scope import ai_tools, azo_bolimi
+    from pokiza.nazorat.scope import ai_tools, web_bolimi
 
-    azo = frappe.db.get_value("TG Azo", u, ["faol", "rol", "bolim", "ai_ruxsat"], as_dict=True)
-    bolim = azo_bolimi(azo) if azo else None
+    bolim = web_bolimi(u)
     if not bolim:
-        frappe.throw("Sizga Nazorat roli biriktirilmagan — AI ma'lumot bera olmaydi. Administratorga murojaat qiling.",
-                     frappe.PermissionError)
-    from pokiza.nazorat.himoya import web_ai_belgi_shart
-
-    if azo.rol != "Rahbar" and not azo.ai_ruxsat and web_ai_belgi_shart():
-        frappe.throw("Sizga AI bilan savol-javob ruxsati berilmagan. Administratorga murojaat qiling.",
+        frappe.throw("Sizning ERP rolingizga Nazorat Roli biriktirilmagan — AI ma'lumot bera olmaydi. "
+                     "Administrator Nazorat Roli'dagi «ERP rollari» jadvaliga rolingizni qo'shsin.",
                      frappe.PermissionError)
     return {"kanal": "web", "bolim": bolim, "tools": ai_tools(bolim)}
 

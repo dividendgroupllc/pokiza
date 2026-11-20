@@ -85,6 +85,25 @@ def azo_bolimi(azo):
     return RAHBAR if azo.rol == "Rahbar" else azo.bolim
 
 
+def web_bolimi(user):
+    """ERP'dagi AI chat uchun rol — Telegram a'zoligiga bog'liq emas.
+
+    Nazorat rahbari -> Rahbar. Aks holda foydalanuvchining ERP rollari Nazorat Roli'ning «ERP rollari»
+    jadvali bilan solishtiriladi; bir nechtasi mos kelsa — to'liq ruxsatlisi, keyin nom bo'yicha birinchisi.
+    """
+    if not user or user == "Guest":
+        return None
+    from pokiza.nazorat.tg import config
+
+    if config.rahbar_user() == user and rol(RAHBAR):
+        return RAHBAR
+    roles = tuple(frappe.get_roles(user)) or ("-",)
+    r = frappe.db.sql("""SELECT n.name FROM `tabNazorat Roli` n
+        JOIN `tabNazorat Roli ERP Roli` e ON e.parent = n.name AND e.parenttype = 'Nazorat Roli'
+        WHERE e.role IN %s ORDER BY n.toliq_ruxsat DESC, n.name LIMIT 1""", (roles,))
+    return r[0][0] if r else None
+
+
 def bolim_kaliti(bolim):
     return (bolim or "").strip().lower().replace(" ", "_")
 

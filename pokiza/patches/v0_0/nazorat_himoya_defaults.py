@@ -3,7 +3,7 @@ Faqat hali yozilmagan maydonlar to'ldiriladi."""
 import frappe
 
 DT = "Nazorat Bot Sozlamalari"
-QIYMAT = {"himoya_excel_xodim": 0, "himoya_forward": 1, "himoya_rahbarga": 0, "himoya_web_ai_belgi": 1,
+QIYMAT = {"himoya_excel_xodim": 0, "himoya_forward": 1, "himoya_rahbarga": 0,
           "himoya_kop_fayl": 3, "himoya_kop_savol": 25}
 
 
