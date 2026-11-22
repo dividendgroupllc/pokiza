@@ -12,15 +12,17 @@ TURI = {"oylik": "oy", "haftalik": "hafta", "kunlik": "kun"}
 
 
 def _bolim():
+    """Panel doirasi — AI bilan bir xil manba (User.ai_roli). Cheklovsiz faqat Administrator."""
+    from pokiza.nazorat.scope import RAHBAR, foydalanuvchi_roli
+
     user = frappe.session.user
-    if user == "Administrator" or "System Manager" in frappe.get_roles(user):
-        return "Rahbar"
-    if frappe.db.get_single_value("Nazorat Bot Sozlamalari", "rahbar") == user:
-        return "Rahbar"
-    azo = frappe.db.get_value("TG Azo", user, ["rol", "bolim", "faol"], as_dict=True)
-    if azo and azo.faol:
-        return "Rahbar" if azo.rol == "Rahbar" else azo.bolim
-    frappe.throw(_("Sizga nazorat bo'limi biriktirilmagan (TG Azo)"), frappe.PermissionError)
+    if user == "Administrator":
+        return RAHBAR
+    bolim = foydalanuvchi_roli(user)
+    if bolim:
+        return bolim
+    frappe.throw(_("Sizga AI roli (Nazorat Roli) biriktirilmagan — administrator foydalanuvchi sahifasida "
+                   "«AI roli» maydonini to'ldirsin"), frappe.PermissionError)
 
 
 def _davr(turi, davr, sana=None):

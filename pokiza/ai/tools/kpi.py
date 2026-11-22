@@ -2,7 +2,7 @@
 
 Telegram hisobotlari va rahbar paneli ham shu funksiyani chaqiradi — AI javobi hisobot bilan bir xil bo'ladi.
 """
-from pokiza.ai.tools import ToolError, tool
+from pokiza.ai.tools import RuxsatXato, ToolError, tool
 from pokiza.nazorat.metrics import DavrXato, compute, royxat
 
 
@@ -13,9 +13,13 @@ def _bolim():
 
 
 def get_kpi(code=None, davr=None, trend=None, tafsilot=None):
+    import frappe
+
     bolim = _bolim()
     ruxsat = None
-    if bolim:  # Telegram suhbati: bo'lim doirasi (rahbar — hammasi)
+    if not bolim and (getattr(frappe.local, "pokiza_ai", None) or {}).get("tools") is not None:
+        raise RuxsatXato("Foydalanuvchiga rol biriktirilmagan")
+    if bolim:  # rol doirasi (web va Telegram; to'liq ruxsatli rol — hammasi)
         from pokiza.nazorat.scope import ruxsat_kodlar
 
         ruxsat = ruxsat_kodlar(bolim)
@@ -23,7 +27,7 @@ def get_kpi(code=None, davr=None, trend=None, tafsilot=None):
         rows = royxat()
         return {"korsatkichlar": [r for r in rows if ruxsat is None or r["code"] in ruxsat]}
     if ruxsat is not None and code.upper().strip() not in ruxsat:
-        raise ToolError(f"{code.upper()} ko'rsatkichi {bolim} bo'limi uchun yopiq")
+        raise RuxsatXato("Bu ko'rsatkich foydalanuvchining roliga kirmaydi")
     trend = int(trend or 0)
     if not 0 <= trend <= 24:
         raise ToolError("trend 0..24 oralig'ida bo'lishi kerak")

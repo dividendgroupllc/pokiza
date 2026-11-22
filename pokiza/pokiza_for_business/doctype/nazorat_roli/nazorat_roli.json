@@ -1,7 +1,7 @@
 {
  "actions": [],
  "creation": "2026-11-10 21:00:00.000000",
- "modified": "2026-11-10 21:00:00.000000",
+ "modified": "2026-11-22 10:00:00.000000",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "module": "Pokiza for business",
@@ -66,7 +66,9 @@
   "ai_ishlab_chiqarish",
   "ai_talab",
   "ai_fayl",
-  "ai_erkin"
+  "ai_erkin",
+  "section_ai_korsatma",
+  "ai_korsatma"
  ],
  "fields": [
   {
@@ -346,6 +348,17 @@
    "fieldtype": "Check",
    "label": "Butun baza bo'yicha erkin so'rov (ehtiyot bo'ling)",
    "description": "AI istalgan hujjat va jadvalni o'qiy oladi: foyda, ish haqi va boshqalar ham ko'rinadi. Faqat ishonchli rollarga."
+  },
+  {
+   "fieldname": "section_ai_korsatma",
+   "fieldtype": "Section Break",
+   "label": "AI uchun ko'rsatma"
+  },
+  {
+   "fieldname": "ai_korsatma",
+   "fieldtype": "Small Text",
+   "label": "AI uchun ko'rsatma",
+   "description": "Shu roldagi foydalanuvchi savollarini AI qanday tushunishi kerak. Masalan: «aylanma deganda savdo summasini tushun». To'liq ruxsatli rolda ishlatilmaydi."
   }
  ],
  "description": "Telegram nazorat boti va rahbar panelida kim nimani ko'rishi.",

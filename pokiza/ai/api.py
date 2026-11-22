@@ -17,19 +17,27 @@ def _check():
 
 
 def _web_kontekst():
-    """Web chat doirasi: administrator — cheklovsiz; boshqalar — ERP rollari bo'yicha Nazorat Roli.
-    Telegram a'zoligiga (TG Azo) bog'liq emas: chatga kirish "AI Foydalanuvchi" ERP roli bilan (_check)."""
+    """Web chat doirasi: faqat Administrator — cheklovsiz. Qolgan hamma (System Manager ham) — User.ai_roli
+    bo'yicha (Telegram bilan bir xil manba). Chatga kirish "AI Foydalanuvchi" ERP roli bilan (_check)."""
     u = frappe.session.user
-    if u == "Administrator" or "System Manager" in frappe.get_roles(u):
+    if u == "Administrator":
         return None
-    from pokiza.nazorat.scope import ai_tools, web_bolimi
+    from pokiza.nazorat.scope import ai_tools, foydalanuvchi_roli
 
-    bolim = web_bolimi(u)
+    bolim = foydalanuvchi_roli(u)
     if not bolim:
-        frappe.throw("Sizning ERP rolingizga Nazorat Roli biriktirilmagan — AI ma'lumot bera olmaydi. "
-                     "Administrator Nazorat Roli'dagi «ERP rollari» jadvaliga rolingizni qo'shsin.",
-                     frappe.PermissionError)
+        frappe.throw("Sizga AI roli biriktirilmagan — AI ma'lumot bera olmaydi. Administrator foydalanuvchi "
+                     "sahifasida «AI roli» maydonini to'ldirsin.", frappe.PermissionError)
     return {"kanal": "web", "bolim": bolim, "tools": ai_tools(bolim)}
+
+
+def _suhbat_roli(suhbat, kontekst):
+    """Mavjud suhbat boshqa rol bilan ochilgan bo'lsa davom ettirilmaydi: tarixida avvalgi rol ma'lumoti bor."""
+    if not suhbat or kontekst is None:
+        return
+    if (frappe.db.get_value("AI Suhbat", suhbat, "bolim") or None) != kontekst["bolim"]:
+        frappe.throw("Rolingiz o'zgargan (yoki bu suhbat rollar joriy etilishidan oldin ochilgan) — bu suhbatni "
+                     "davom ettirib bo'lmaydi. Yangi suhbat oching.", frappe.PermissionError)
 
 
 def _own(suhbat):
@@ -38,6 +46,36 @@ def _own(suhbat):
         frappe.throw("Suhbat topilmadi", frappe.DoesNotExistError)
     if owner != frappe.session.user:
         frappe.throw("Bu suhbat sizniki emas", frappe.PermissionError)
+
+
+def _adminmi(user=None):
+    """Boshqalarning suhbatini ko'ra oladi: Administrator yoki to'liq ruxsatli AI rolidagi System Manager.
+    (Cheklangan roldagi System Manager boshqa suhbatlar orqali o'z rolidan ortiq ma'lumot ko'rmasin.)"""
+    user = user or frappe.session.user
+    if user == "Administrator":
+        return True
+    from pokiza.nazorat.scope import foydalanuvchi_roli, toliqmi
+
+    return "System Manager" in frappe.get_roles(user) and toliqmi(foydalanuvchi_roli(user))
+
+
+def _ulashilganmi(suhbat, user):
+    return bool(frappe.db.exists("DocShare", {"share_doctype": "AI Suhbat", "share_name": suhbat, "user": user, "read": 1}))
+
+
+def _rejim(suhbat):
+    """Suhbatni ko'rish huquqi: egasi — to'liq; ulashilgan foydalanuvchi va administrator — faqat o'qish."""
+    owner = frappe.db.get_value("AI Suhbat", suhbat, "user")
+    if not owner:
+        frappe.throw("Suhbat topilmadi", frappe.DoesNotExistError)
+    u = frappe.session.user
+    if owner == u:
+        return "egasi"
+    if _ulashilganmi(suhbat, u):
+        return "ulashilgan"
+    if _adminmi(u):
+        return "admin"
+    frappe.throw("Bu suhbat sizniki emas", frappe.PermissionError)
 
 
 def _create_messages(text, suhbat=None, files=None):
@@ -122,6 +160,7 @@ def send_message(text=None, suhbat=None, files=None, loyiha=None):
         frappe.throw(f"Oylik AI limiti (${s.monthly_limit_usd}) tugadi. Administratorga murojaat qiling.")
 
     kontekst = _web_kontekst()
+    _suhbat_roli(suhbat, kontekst)
     if isinstance(files, str):
         files = json.loads(files or "[]")
     if loyiha and not suhbat:
@@ -132,6 +171,8 @@ def send_message(text=None, suhbat=None, files=None, loyiha=None):
     suhbat, user_xabar, xabar = _create_messages(text, suhbat, files)
     if yangi and loyiha:
         frappe.db.set_value("AI Suhbat", suhbat, "loyiha", loyiha)
+    if yangi and kontekst is not None:
+        frappe.db.set_value("AI Suhbat", suhbat, "bolim", kontekst["bolim"])
     frappe.enqueue(
         "pokiza.ai.agent.run",
         queue="long",
@@ -185,7 +226,7 @@ def _sources(tool_calls_json):
 @frappe.whitelist()
 def get_conversation(suhbat):
     _check()
-    _own(suhbat)
+    rejim = _rejim(suhbat)
     rows = frappe.get_all(
         "AI Xabar",
         filters={"suhbat": suhbat},
@@ -196,9 +237,86 @@ def get_conversation(suhbat):
         r["sources"] = _sources(r.pop("tool_calls_json"))
         r["files"] = json.loads(r.pop("files_json") or "[]")
         r["dashboards"] = json.loads(r.pop("dashboards_json") or "[]")
-    doc = frappe.db.get_value("AI Suhbat", suhbat, ["name", "title", "status", "total_cost_usd", "loyiha"], as_dict=True)
-    doc["loyiha_nomi"] = frappe.db.get_value("AI Loyiha", doc.loyiha, "nomi") if doc.loyiha else None
+    doc = frappe.db.get_value("AI Suhbat", suhbat, ["name", "title", "status", "total_cost_usd", "loyiha", "user"], as_dict=True)
+    doc["loyiha_nomi"] = frappe.db.get_value("AI Loyiha", doc.loyiha, "nomi") if doc.loyiha and rejim == "egasi" else None
+    doc["rejim"] = rejim
+    doc["egasi"] = get_fullname(doc.user)
+    if rejim != "egasi":
+        doc["loyiha"] = None
     return {"suhbat": doc, "messages": rows}
+
+
+def _ulash_qatorlari(suhbat):
+    return frappe.get_all("DocShare", filters={"share_doctype": "AI Suhbat", "share_name": suhbat, "read": 1},
+                          pluck="user")
+
+
+@frappe.whitelist()
+def share_candidates(txt=None):
+    """Ulashish uchun faol ERP foydalanuvchilari (o'zidan tashqari)."""
+    _check()
+    txt = f"%{(txt or '').strip()}%"
+    return frappe.db.sql("""SELECT name, full_name FROM `tabUser`
+        WHERE enabled = 1 AND user_type = 'System User' AND name NOT IN ('Administrator', 'Guest', %s)
+          AND (name LIKE %s OR full_name LIKE %s)
+        ORDER BY full_name LIMIT 30""", (frappe.session.user, txt, txt), as_dict=True)
+
+
+@frappe.whitelist()
+def get_shares(suhbat):
+    _check()
+    _own(suhbat)
+    return [{"user": u, "full_name": get_fullname(u)} for u in _ulash_qatorlari(suhbat)]
+
+
+@frappe.whitelist(methods=["POST"])
+def share_conversation(suhbat, users=None):
+    """Suhbatni tanlangan foydalanuvchilar bilan faqat o'qish uchun ulashish (ro'yxat to'liq almashtiriladi)."""
+    _check()
+    _own(suhbat)
+    if isinstance(users, str):
+        users = json.loads(users or "[]")
+    users = {u for u in (users or []) if u and u != frappe.session.user}
+    for u in users:
+        if not frappe.db.get_value("User", {"name": u, "enabled": 1, "user_type": "System User"}):
+            frappe.throw(f"Foydalanuvchi topilmadi yoki faol emas: {u}")
+    from frappe.share import add_docshare, remove
+
+    eski = set(_ulash_qatorlari(suhbat))
+    for u in users - eski:
+        add_docshare("AI Suhbat", suhbat, u, read=1, write=0, share=0, notify=1, flags={"ignore_share_permission": 1})
+    for u in eski - users:
+        remove("AI Suhbat", suhbat, u, flags={"ignore_share_permission": 1, "ignore_permissions": 1})
+    return get_shares(suhbat)
+
+
+@frappe.whitelist()
+def list_shared_with_me():
+    _check()
+    names = frappe.get_all("DocShare", filters={"share_doctype": "AI Suhbat", "user": frappe.session.user, "read": 1},
+                           pluck="share_name")
+    if not names:
+        return []
+    rows = frappe.get_all("AI Suhbat", filters={"name": ["in", names]},
+                          fields=["name", "title", "status", "last_message_at", "modified", "user"],
+                          order_by="modified desc", limit_page_length=200)
+    for r in rows:
+        r["egasi"] = get_fullname(r.user)
+    return rows
+
+
+@frappe.whitelist()
+def list_all_conversations():
+    """Administrator uchun: boshqa foydalanuvchilarning suhbatlari (faqat o'qish)."""
+    _check()
+    if not _adminmi():
+        frappe.throw("Faqat administrator uchun", frappe.PermissionError)
+    rows = frappe.get_all("AI Suhbat", filters={"user": ["!=", frappe.session.user]},
+                          fields=["name", "title", "status", "last_message_at", "modified", "user"],
+                          order_by="modified desc", limit_page_length=500)
+    for r in rows:
+        r["egasi"] = get_fullname(r.user)
+    return rows
 
 
 @frappe.whitelist(methods=["POST"])
@@ -214,6 +332,7 @@ def delete_conversation(suhbat):
     _check()
     _own(suhbat)
     frappe.db.delete("AI Xabar", {"suhbat": suhbat})
+    frappe.db.delete("DocShare", {"share_doctype": "AI Suhbat", "share_name": suhbat})
     for f in frappe.get_all("File", filters={"attached_to_doctype": "AI Suhbat", "attached_to_name": suhbat}, pluck="name"):
         frappe.delete_doc("File", f, ignore_permissions=True)
     frappe.delete_doc("AI Suhbat", suhbat, ignore_permissions=True)

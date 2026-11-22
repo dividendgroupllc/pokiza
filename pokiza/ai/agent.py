@@ -50,7 +50,27 @@ class Publisher:
 
 
 def _dump(content):
-    return [b.model_dump(mode="json", exclude_none=True) for b in content]
+    # by_alias: SDK fallback blokidagi `from_` API'ga `from` nomi bilan qaytishi shart
+    return _fallback_tozala([b.model_dump(mode="json", exclude_none=True, by_alias=True) for b in content])
+
+
+# Server-side fallback (betas server-side-fallback-2026-07-01): model rad etsa, javob boshqa modelga o'tadi va
+# content ichida {"type": "fallback"} bloki keladi. Qayta yuborishda (docs: refusals-and-fallback, "Continuing
+# the conversation"): fallback bloki o'z joyida qoladi; YAKUNIY fallback blokidan oldingi thinking /
+# redacted_thinking / connector_text va mijoz tool_use bloklari tashlanadi (rad etgan modelning chiqishi).
+_FALLBACKDAN_OLDIN_TASHLANADI = {"thinking", "redacted_thinking", "connector_text", "tool_use"}
+
+
+def _fallback_tozala(content):
+    if not isinstance(content, list):
+        return content
+    for b in content:
+        if isinstance(b, dict) and b.get("type") == "fallback" and "from_" in b:  # eski saqlangan yozuvlar
+            b["from"] = b.pop("from_")
+    oxirgi = max((i for i, b in enumerate(content) if isinstance(b, dict) and b.get("type") == "fallback"), default=None)
+    if oxirgi is None:
+        return content
+    return [b for i, b in enumerate(content) if i >= oxirgi or b.get("type") not in _FALLBACKDAN_OLDIN_TASHLANADI]
 
 
 def build_history(suhbat, upto_xabar):
@@ -67,6 +87,9 @@ def build_history(suhbat, upto_xabar):
             messages.append({"role": "user", "content": expand_content(json.loads(r.content_json))})
         else:
             msgs = json.loads(r.api_messages_json or "[]")
+            for m in msgs:
+                if m.get("role") == "assistant":
+                    m["content"] = _fallback_tozala(m.get("content"))
             messages.extend(msgs or [{"role": "assistant", "content": [{"type": "text", "text": "(javob berilmadi)"}]}])
     return messages
 
@@ -98,7 +121,8 @@ def _text_of(turn):
 
 
 def run(suhbat, xabar, publisher=None, kontekst=None):
-    """publisher — kanal (standart: web realtime). kontekst — {kanal, bolim, tools, on_vazifa ...} (Telegram)."""
+    """publisher — kanal (standart: web realtime). kontekst — {kanal, bolim, tools, on_vazifa ...} (web va Telegram;
+    None — Administrator, cheklovsiz)."""
     user = frappe.session.user
     pub = publisher or Publisher(user, suhbat, xabar)
     s = get_settings()
@@ -125,9 +149,13 @@ def run(suhbat, xabar, publisher=None, kontekst=None):
         from pokiza.ai.loyiha import kontekst as loyiha_kontekst
 
         loyiha_matn, loyiha_bloklar = loyiha_kontekst(suhbat)
+        from pokiza.nazorat.scope import ai_rol_matni
+
+        rol_matn = ai_rol_matni(frappe.local.pokiza_ai.get("bolim"))
         system = SYSTEM_PROMPT
-        if loyiha_matn:
-            system = [{"type": "text", "text": SYSTEM_PROMPT}, {"type": "text", "text": loyiha_matn}]
+        if loyiha_matn or rol_matn:
+            system = [{"type": "text", "text": SYSTEM_PROMPT}]
+            system += [{"type": "text", "text": t} for t in (rol_matn, loyiha_matn) if t]
         if loyiha_bloklar and history and history[0]["role"] == "user":
             history[0] = {"role": "user", "content": loyiha_bloklar + list(history[0]["content"])}
         retried_bad_json = False
@@ -285,11 +313,16 @@ def _save(suhbat, xabar, text, turn, audit, totals, status, error, stop_reason, 
 
 def run_sync(text, suhbat=None):
     """Konsoldan sinash: bench --site X execute pokiza.ai.agent.run_sync --kwargs "{'text': '...'}" """
-    from pokiza.ai.api import _create_messages
+    from pokiza.ai.api import _create_messages, _suhbat_roli, _web_kontekst
 
+    kontekst = _web_kontekst()  # joriy foydalanuvchining roli — web chat bilan bir xil doira
+    _suhbat_roli(suhbat, kontekst)
+    yangi = not suhbat
     suhbat, _user_xabar, xabar = _create_messages(text, suhbat)
+    if yangi and kontekst is not None:
+        frappe.db.set_value("AI Suhbat", suhbat, "bolim", kontekst["bolim"])
     frappe.db.commit()
-    run(suhbat, xabar)
+    run(suhbat, xabar, kontekst=kontekst)
     row = frappe.db.get_value("AI Xabar", xabar, ["status", "error", "text", "tool_calls_json", "cost_usd"], as_dict=True)
     print("STATUS:", row.status, row.error or "")
     for a in json.loads(row.tool_calls_json or "[]"):

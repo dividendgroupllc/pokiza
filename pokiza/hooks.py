@@ -168,6 +168,10 @@ override_doctype_class = {
 }
 
 doc_events = {
+	"User": {
+		# AI roli -> Telegram a'zosidagi nusxa (TG Azo rol/bolim)
+		"on_update": "pokiza.events.user.on_update",
+	},
 	"BOM": {
 		# qoralamada ichki bom_no doim default versiyaga to'g'rilanadi
 		"before_validate": "pokiza.events.bom.before_validate",

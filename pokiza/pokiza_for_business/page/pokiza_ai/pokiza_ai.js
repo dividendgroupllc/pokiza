@@ -69,6 +69,7 @@ const PAI_ICONS = {
 	edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
 	trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
 	play: '<path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/>',
+	share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
 	pause: '<rect x="7" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.5" y="5" width="3.5" height="14" rx="1" fill="currentColor" stroke="none"/>',
 };
 
@@ -129,10 +130,12 @@ class PokizaAI {
 					<header class="pai-top">
 						<button class="pai-icon-btn pai-menu" type="button" aria-label="Suhbatlar ro'yxati" title="Suhbatlar ro'yxatini yashirish / ko'rsatish (Ctrl+Shift+S)">${pai_icon("menu")}</button>
 						<div class="pai-top-title">Pokiza AI</div>
+						<button class="pai-icon-btn pai-share hidden" type="button" aria-label="Ulashish" title="Suhbatni ulashish (faqat o'qish uchun)">${pai_icon("share")}</button>
 						<button class="pai-icon-btn pai-new-mobile" type="button" aria-label="Yangi suhbat">${pai_icon("plus")}</button>
 					</header>
 					<div class="pai-scroll"><div class="pai-thread"></div></div>
 					<button class="pai-to-bottom hidden" type="button" aria-label="Pastga">${pai_icon("down", 16)}</button>
+					<div class="pai-readonly hidden" role="status"></div>
 					<div class="pai-composer">
 						<div class="pai-box">
 							<div class="pai-chips"></div>
@@ -168,6 +171,11 @@ class PokizaAI {
 		this.$chips = $r.find(".pai-chips");
 		this.$mic = $r.find(".pai-mic");
 		this.$title = $r.find(".pai-top-title");
+		this.$share = $r.find(".pai-share");
+		this.$readonly = $r.find(".pai-readonly");
+		this.$composer = $r.find(".pai-composer");
+		this.readonly = false;
+		this.$share.on("click", () => this.share_dialog());
 
 		$r.find(".pai-new, .pai-new-mobile").on("click", () => this.new_chat());
 		$r.find(".pai-menu").on("click", () => this.toggle_side());
@@ -260,10 +268,15 @@ class PokizaAI {
 
 	// ---------- suhbatlar ro'yxati ----------
 	async load_list() {
-		const [r, p] = await Promise.all([
+		const is_admin = frappe.session.user === "Administrator" || frappe.user.has_role("System Manager");
+		const [r, p, sh, al] = await Promise.all([
 			frappe.call({ method: PAI_API + "list_conversations" }),
 			frappe.call({ method: PAI_LOYIHA + "list_projects" }),
+			frappe.call({ method: PAI_API + "list_shared_with_me" }),
+			is_admin ? frappe.call({ method: PAI_API + "list_all_conversations" }) : Promise.resolve({ message: [] }),
 		]);
+		this.shared_rows = sh.message || [];
+		this.all_rows = al.message || [];
 		this.projects = p.message || [];
 		const rows = (r.message || []).filter((x) => !x.loyiha);
 		this.$list.empty();
@@ -290,7 +303,6 @@ class PokizaAI {
 
 		if (!rows.length) {
 			this.$list.append(`<div class="pai-list-group">Suhbatlar</div><div class="pai-list-empty">Savollaringiz shu yerda saqlanadi</div>`);
-			return;
 		}
 		let group = null;
 		rows.forEach((row) => {
@@ -301,6 +313,85 @@ class PokizaAI {
 			}
 			this.$list.append(this.chat_item(row));
 		});
+
+		if (this.shared_rows.length) {
+			this.$list.append(`<div class="pai-list-group">Men bilan ulashilgan</div>`);
+			this.shared_rows.forEach((row) => this.$list.append(this.view_item(row, true)));
+		}
+		if (this.all_rows.length) {
+			this.$list.append(`<div class="pai-list-group">Barcha foydalanuvchilar</div>`);
+			const by_user = {};
+			this.all_rows.forEach((row) => (by_user[row.user] = by_user[row.user] || { egasi: row.egasi, rows: [] }).rows.push(row));
+			Object.values(by_user).forEach((u) => {
+				const $d = $(`<details class="pai-user-group"><summary><span class="pai-user-name"></span><span class="pai-proj-count"></span></summary></details>`);
+				$d.find(".pai-user-name").text(u.egasi);
+				$d.find(".pai-proj-count").text(u.rows.length);
+				if (u.rows.some((x) => x.name === this.suhbat)) $d.attr("open", "");
+				u.rows.forEach((row) => $d.append(this.view_item(row, false)));
+				this.$list.append($d);
+			});
+		}
+	}
+
+	view_item(row, show_owner) {
+		const $item = $(`<div class="pai-item pai-view-item ${row.name === this.suhbat ? "active" : ""}" data-name="${row.name}" tabindex="0" role="button">
+			<span class="pai-item-title"></span><span class="pai-item-owner"></span></div>`);
+		$item.find(".pai-item-title").text(row.title || "Suhbat");
+		if (show_owner) $item.find(".pai-item-owner").text(row.egasi);
+		$item.on("click", () => this.open(row.name));
+		$item.on("keydown", (e) => e.key === "Enter" && this.open(row.name));
+		return $item;
+	}
+
+	set_readonly(ro, s) {
+		this.readonly = !!ro;
+		this.$composer.toggleClass("hidden", this.readonly);
+		this.$readonly.toggleClass("hidden", !this.readonly);
+		if (this.readonly) {
+			const kim = frappe.utils.escape_html((s && s.egasi) || "");
+			this.$readonly.html(
+				s && s.rejim === "admin"
+					? `Faqat o'qish: <b>${kim}</b> suhbati (administrator ko'rinishi)`
+					: `Faqat o'qish: <b>${kim}</b> siz bilan ulashgan suhbat`
+			);
+		}
+		this.$share.toggleClass("hidden", this.readonly || !this.suhbat);
+	}
+
+	async share_dialog() {
+		if (!this.suhbat || this.readonly) return;
+		const suhbat = this.suhbat;
+		const cur = (await frappe.call({ method: PAI_API + "get_shares", args: { suhbat } })).message || [];
+		const d = new frappe.ui.Dialog({
+			title: "Suhbatni ulashish",
+			fields: [
+				{
+					fieldname: "users",
+					fieldtype: "MultiSelectList",
+					label: "Kimlar ko'rsin",
+					default: cur.map((u) => u.user),
+					get_data: (txt) =>
+						frappe.xcall(PAI_API + "share_candidates", { txt }).then((rows) =>
+							(rows || []).map((u) => ({ value: u.name, label: u.full_name || u.name, description: u.name }))
+						),
+				},
+				{
+					fieldtype: "HTML",
+					options: `<div class="text-muted small">Tanlanganlar bu suhbatni faqat o'qiy oladi: savol yoza olmaydi va o'chira olmaydi. Ro'yxatdan olib tashlansa, ko'rinmay qoladi.</div>`,
+				},
+			],
+			primary_action_label: "Saqlash",
+			primary_action: async (v) => {
+				const r = await frappe.call({
+					method: PAI_API + "share_conversation",
+					args: { suhbat, users: JSON.stringify(v.users || []) },
+				});
+				d.hide();
+				const n = (r.message || []).length;
+				frappe.show_alert({ message: n ? `${n} kishi bilan ulashildi` : "Ulashish bekor qilindi", indicator: "green" });
+			},
+		});
+		d.show();
 	}
 
 	chat_item(row) {
@@ -410,6 +501,7 @@ class PokizaAI {
 		}
 		this.suhbat = null;
 		this.loyiha = name;
+		this.set_readonly(false);
 		this.$root.removeClass("pai-side-open");
 		this.$list.find(".pai-item").removeClass("active");
 		this.$list.find(`.pai-proj-item[data-proj="${name}"]`).addClass("active");
@@ -575,6 +667,7 @@ class PokizaAI {
 		this.suhbat = null;
 		this.loyiha = null;
 		this.project = null;
+		this.set_readonly(false);
 		this.$title.text("Pokiza AI");
 		this.$input.attr("placeholder", "Savol yozing yoki ovozli xabar yuboring…");
 		this.$list.find(".pai-item").removeClass("active");
@@ -620,6 +713,7 @@ class PokizaAI {
 		const data = r.message;
 		this.loyiha = data.suhbat.loyiha || null;
 		this.set_title(data.suhbat.title || "Suhbat", data.suhbat.loyiha_nomi);
+		this.set_readonly(data.suhbat.rejim !== "egasi", data.suhbat);
 		this.$input.attr("placeholder", "Savol yozing yoki ovozli xabar yuboring…");
 		this.$thread.empty();
 		let pending = null;
@@ -633,7 +727,8 @@ class PokizaAI {
 				else this.finish_assistant($el, m);
 			}
 		});
-		if (pending) this.start_running(pending.xabar, pending.$el);
+		if (pending && !this.readonly) this.start_running(pending.xabar, pending.$el);
+		else if (pending) this.set_step(pending.$el, "Javob tayyorlanmoqda…");
 		this.mark_last();
 		this.scroll_bottom(true);
 	}
@@ -697,9 +792,10 @@ class PokizaAI {
 		if (m.error) {
 			const $err = $(`<div class="pai-error"><span></span></div>`);
 			$err.find("span").text(m.error);
-			$(`<button type="button" class="pai-retry">${pai_icon("retry", 14)} Qayta urinish</button>`)
-				.on("click", () => this.retry())
-				.appendTo($err);
+			if (!this.readonly)
+				$(`<button type="button" class="pai-retry">${pai_icon("retry", 14)} Qayta urinish</button>`)
+					.on("click", () => this.retry())
+					.appendTo($err);
 			$c.append($err);
 		} else if (m.status === "To'xtatildi") {
 			$c.append(`<div class="pai-muted">To'xtatildi</div>`);
@@ -1222,6 +1318,7 @@ class PokizaAI {
 			const isNew = !this.suhbat;
 			this.suhbat = r.message.suhbat;
 			if (isNew) {
+				this.set_readonly(false);
 				this.set_title(
 					text.slice(0, 80) || (file_names.length && shown.every((f) => f.kind === "audio") ? "Ovozli xabar" : "Suhbat"),
 					this.proj_nomi(this.loyiha)
@@ -1232,7 +1329,12 @@ class PokizaAI {
 			this.start_running(r.message.xabar, $el);
 		} catch (e) {
 			this.set_busy(false);
-			this.finish_assistant($el, { status: "Xato", error: "Xabar yuborilmadi. Internet aloqasini tekshirib, qayta urining." });
+			this.finish_assistant($el, {
+				status: "Xato",
+				error: navigator.onLine
+					? "Xabar yuborilmadi — sababi ochilgan oynada ko'rsatildi."
+					: "Xabar yuborilmadi. Internet aloqasini tekshirib, qayta urining.",
+			});
 		}
 	}
 

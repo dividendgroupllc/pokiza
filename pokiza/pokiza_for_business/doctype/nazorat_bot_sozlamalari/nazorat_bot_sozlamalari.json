@@ -24,7 +24,8 @@
   "himoya_rahbarga",
   "column_break_himoya",
   "himoya_kop_fayl",
-  "himoya_kop_savol"
+  "himoya_kop_savol",
+  "himoya_kop_rad"
  ],
  "fields": [
   {
@@ -155,11 +156,18 @@
    "label": "Xodim bir kunda shuncha savol bersa — rahbarga xabar",
    "default": "25",
    "description": "0 — xabar yuborilmaydi. Kunlik savol limiti alohida (AI bo'limi)."
+  },
+  {
+   "fieldname": "himoya_kop_rad",
+   "fieldtype": "Int",
+   "default": "3",
+   "label": "Rolidan tashqari so'rovlar chegarasi (kuniga)",
+   "description": "Xodim AI'dan rolidan tashqari ma'lumot so'rab, AI vositasi rad etsa — shu songa yetganda rahbarga xabar. 0 — o'chiq."
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-13 14:00:00.000000",
+ "modified": "2026-11-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Pokiza for business",
  "name": "Nazorat Bot Sozlamalari",

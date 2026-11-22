@@ -78,10 +78,6 @@ def _azo(tid):
     return frappe.get_doc("TG Azo", name) if name else None
 
 
-def _sm(user):
-    return "System Manager" in frappe.get_roles(user)
-
-
 def _komanda(text):
     """'/kpi@pokiza_nazorat_bot A2 kecha' -> ('kpi', ['A2', 'kecha']) yoki boshqa botga bo'lsa None."""
     m = re.match(r"^/([A-Za-z_'ʻʼ‘’`]+)(?:@(\w+))?\s*(.*)$", (text or "").strip(), re.S)
@@ -117,7 +113,10 @@ def process_update(update):
                 pass
         chat = (update.get("message") or {}).get("chat") or {}
         if chat.get("id"):
-            send_message(chat["id"], esc(matn))
+            try:
+                send_message(chat["id"], esc(matn))
+            except TgXato:
+                pass
     except TgXato as e:
         frappe.log_error(title="Nazorat bot: Telegram xatosi", message=str(e))
     except frappe.QueryDeadlockError:
@@ -223,7 +222,7 @@ def kpi_menyu(bolim):
 
 def _buyruq(chat_id, cmd, args, bolim, azo=None, reply_to=None):
     if cmd == "men" and azo:
-        return send_message(chat_id, f"👤 {esc(azo.user)}\nRol: {esc(azo.rol)}\nBo'lim: {esc(azo.bolim or '—')}")
+        return send_message(chat_id, f"👤 {esc(azo.user)}\nRol: {esc(bolim or '—')}")
     if cmd in HISOBOT:
         if cmd not in ruxsat_turlar(bolim):
             return send_message(chat_id, "Bu hisobotda sizning bo'limingizga tegishli ko'rsatkich yo'q.", reply_to=reply_to)

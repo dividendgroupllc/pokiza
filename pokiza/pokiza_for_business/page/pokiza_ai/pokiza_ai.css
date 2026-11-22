@@ -470,3 +470,19 @@
 .pai-proj-chat:hover { background: var(--fg-hover-color); }
 .pai-proj-ctitle { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pai-proj-cdate { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
+
+/* ulashilgan va administrator ko'rinishi (faqat o'qish) */
+.pai-view-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.pai-item-owner { font-size: 11px; color: var(--text-muted); }
+.pai-item-owner:empty { display: none; }
+.pai-user-group > summary { list-style: none; display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer;
+	font-size: 13px; color: var(--text-color); border-radius: 8px; }
+.pai-user-group > summary::-webkit-details-marker { display: none; }
+.pai-user-group > summary::before { content: "▸"; font-size: 10px; color: var(--text-muted); transition: transform .15s; }
+.pai-user-group[open] > summary::before { transform: rotate(90deg); }
+.pai-user-group > summary:hover { background: var(--subtle-fg); }
+.pai-user-group .pai-user-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pai-user-group > .pai-item { padding-left: 24px; }
+.pai-readonly { margin: 0 auto 14px; width: min(var(--pai-thread), calc(100% - 32px)); padding: 10px 14px;
+	border-radius: var(--pai-radius); background: var(--pai-accent-soft); color: var(--text-color); font-size: 13px; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .pai-user-group > summary::before { transition: none; } }

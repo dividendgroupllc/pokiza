@@ -48,12 +48,14 @@ def dividend_xabar(kassa, amal="submit"):
 
 def _tarqat(kalit, matn):
     """Dividendni ko'ra oladiganlarning (C5 ruxsati) shaxsiy chatiga, har biriga bir marta."""
-    from pokiza.nazorat.jadval import qabul_qiluvchilar, yubor_bir
-    from pokiza.nazorat.scope import ruxsat_kodlar
+    from pokiza.nazorat.jadval import yubor_bir
+    from pokiza.nazorat.scope import azo_bolimi, ruxsat_kodlar
 
-    for chat_id, bolim in qabul_qiluvchilar():
-        if "C5" in ruxsat_kodlar(bolim):
-            yubor_bir(f"{kalit}:{chat_id}", "dividend", chat_id, matn)
+    # 08:00 hisobot belgisiga bog'liq emas: dividendni ko'ra oladigan har bir faol a'zoga
+    for a in frappe.get_all("TG Azo", filters={"faol": 1, "telegram_id": ["is", "set"]},
+                            fields=["name", "user", "telegram_id", "faol"]):
+        if "C5" in ruxsat_kodlar(azo_bolimi(a)):
+            yubor_bir(f"{kalit}:{a.telegram_id}", "dividend", a.telegram_id, matn)
 
 
 # ---------- Journal Entry orqali to'g'ridan-to'g'ri kiritilgan dividend (Kassa'siz) ----------

@@ -37,19 +37,25 @@ class Vazifa(Document):
     def validate(self):
         eski = self.get_doc_before_save()
         user = frappe.session.user
-        if eski and user not in (eski.berdi, "Administrator") and "System Manager" not in frappe.get_roles(user):
-            for f in ("sarlavha", "masul", "muddat", "bolim", "tavsif", "berdi", "tasdiqlandi"):
+        from pokiza.nazorat.scope import rahbarmi
+
+        boshliq = bool(eski) and (user == eski.berdi or rahbarmi(user))
+        if eski and not boshliq:
+            for f in ("sarlavha", "masul", "muddat", "bolim", "tavsif", "berdi", "tasdiqlandi", "tasdiq_vaqti",
+                      "qabul_vaqti", "bajarilgan_vaqt", "tarix", "eslatma_yuborildi"):
                 if str(eski.get(f) or "") != str(self.get(f) or ""):
                     frappe.throw(_("Mas'ul faqat holat, rad sababi va izohni o'zgartira oladi"))
         if eski and eski.holat != self.holat:
             if self.holat not in OTISH.get(eski.holat, set()):
                 frappe.throw(_("Holatni {0} dan {1} ga o'tkazib bo'lmaydi").format(eski.holat, self.holat))
+            if self.holat == "Bekor qilindi" and not boshliq:
+                frappe.throw(_("Vazifani faqat beruvchi yoki rahbar bekor qila oladi"))
             if self.holat == "Qabul qilindi":
                 self.qabul_vaqti = now_datetime()
             if self.holat == "Bajarildi":
                 self.bajarilgan_vaqt = now_datetime()
             if eski.holat == "Bajarildi" and self.holat == "Qabul qilindi":
-                if user not in (eski.berdi, "Administrator") and "System Manager" not in frappe.get_roles(user):
+                if not boshliq:
                     frappe.throw(_("Bajarilgan vazifani faqat beruvchi qaytara oladi"))
                 self.tasdiqlandi, self.tasdiq_vaqti = 0, None
                 self.tarix_qosh("qt", self.flags.get("qaytarish_sababi"))

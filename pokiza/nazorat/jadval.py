@@ -163,7 +163,7 @@ def jim_mijozlar_signal():
     matn += [f"• {esc(r.nom or r.customer)}" for r in rows[:25]]
     if len(rows) > 25:
         matn.append(f"… va yana {len(rows) - 25} ta")
-    for a in frappe.get_all("TG Azo", filters={"faol": 1}, fields=["telegram_id", "rol", "bolim", "faol"]):
+    for a in frappe.get_all("TG Azo", filters={"faol": 1}, fields=["name", "telegram_id", "rol", "bolim", "faol"]):
         if a.telegram_id and "H4" in ruxsat_kodlar(azo_bolimi(a)):
             yubor_bir(f"jim:{bugun}:{a.telegram_id}", "kunlik", a.telegram_id, "\n".join(matn))
 

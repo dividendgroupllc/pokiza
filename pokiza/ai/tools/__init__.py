@@ -24,6 +24,10 @@ class ToolError(Exception):
     """AI'ga tushunarli xabar bilan qaytariladigan xato."""
 
 
+class RuxsatXato(ToolError):
+    """Rol doirasidan tashqari so'rov — AI'ga rad javobi, kunlik hisoblagichga (Ma'lumot himoyasi) qayd."""
+
+
 # Claude API: barcha strict tool'lardagi ixtiyoriy parametrlar jami <= 24 bo'lishi kerak.
 STRICT_OPTIONAL_LIMIT = 24
 
@@ -186,14 +190,14 @@ def run_tool(name, args):
             raise ToolError(f"Noma'lum tool: {name}")
         spec, func = entry
         if not _ruxsat(name):
-            raise ToolError(f"'{name}' bu suhbat doirasida ruxsat etilmagan (bo'lim cheklovi)")
+            raise RuxsatXato("Bu ma'lumot foydalanuvchining roliga kirmaydi — vosita yopiq")
         _validate(spec, args)
         if _ctx().get("bolim"):
             from pokiza.nazorat.scope import ai_arg_xato
 
             xato = ai_arg_xato(_ctx()["bolim"], name, args)
             if xato:
-                raise ToolError(xato)
+                raise RuxsatXato(xato)
         if read_only:
             frappe.db.rollback()
             frappe.flags.read_only = True
@@ -205,6 +209,11 @@ def run_tool(name, args):
             from pokiza.nazorat.himoya import qayd
 
             qayd("fayl", izoh=args.get("title"))
+    except RuxsatXato as e:
+        content, is_error = str(e) + ". Foydalanuvchiga buni rolingizga kirmaydi deb ayt, aylanib o'tishga urinma.", True
+        from pokiza.nazorat.himoya import qayd
+
+        qayd("rad", izoh=f"{name}: {_json(args)[:150]}")
     except ToolError as e:
         content, is_error = str(e), True
     except frappe.InReadOnlyMode:

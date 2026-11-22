@@ -5,7 +5,9 @@ import re
 from pokiza.nazorat.metrics import BELGI
 
 def esc(s):
-    return html.escape(str(s if s is not None else ""), quote=False)
+    """Telegram HTML uchun xavfsiz matn. Frappe Data/Small Text maydonlarini saqlashda o'zi HTML-escape qiladi
+    ("<" -> "&lt;"), shuning uchun avval unescape — aks holda foydalanuvchi "&lt;" ni ko'radi (ikki marta escape)."""
+    return html.escape(html.unescape(str(s if s is not None else "")), quote=False)
 
 
 def son(v, kasr=0):

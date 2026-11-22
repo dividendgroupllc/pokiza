@@ -58,7 +58,8 @@ def tg_holat(user=None):
                               as_dict=True)
     from pokiza.nazorat.scope import rollar
 
-    taxmin = None if (azo and azo.bolim) else _taxminiy_rol(user)
+    # birinchi navbatda foydalanuvchining AI roli (yagona manba), u bo'lmasa ERP rollaridan taxmin
+    taxmin = None if (azo and azo.bolim) else (frappe.db.get_value("User", user, "ai_roli") or _taxminiy_rol(user))
     return {"oziniki": oziniki, "admin": _boshqaruvchi(), "bot_faol": config.faol(), "bolimlar": rollar(),
             "azo": azo, "taxminiy_bolim": taxmin}
 
@@ -116,6 +117,9 @@ def ulash(kod, tg_user):
         return False, "Bu ERP foydalanuvchi boshqa Telegram akkauntga ulangan. Qayta ulashni administrator qiladi."
 
     ism = " ".join(x for x in (tg_user.get("first_name"), tg_user.get("last_name")) if x)
+    if frappe.db.exists("TG Azo", user) and not frappe.db.get_value("TG Azo", user, "faol") \
+            and not (isinstance(v, dict) and v.get("admin")):
+        return False, "⛔ Botdan foydalanish administrator tomonidan to'xtatilgan. Administratorga murojaat qiling."
     if frappe.db.exists("TG Azo", user):
         doc = frappe.get_doc("TG Azo", user)
     else:
@@ -129,7 +133,7 @@ def ulash(kod, tg_user):
     doc.ulangan = now_datetime()
     if bolim:
         doc.bolim = bolim
-    if config.rahbar_user() == user:
-        doc.rol = "Rahbar"
+    if config.rahbar_user() == user and frappe.db.get_value("User", user, "ai_roli") in (None, "", "Rahbar"):
+        doc.rol = "Rahbar"  # admin boshqa rol bergan bo'lsa — ustidan yozilmaydi
     doc.save(ignore_permissions=True)
     return True, doc

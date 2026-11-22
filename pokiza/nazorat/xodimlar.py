@@ -29,6 +29,21 @@ def _tok(user):
     return t
 
 
+def _rtok(nom):
+    """Rol nomi uchun qisqa belgi (callback 64 bayt; nom indeks emas — ro'yxat o'zgarsa ham to'g'ri rol)."""
+    t = secrets.token_urlsafe(4)
+    frappe.cache.set_value(f"nz_xr:{t}", nom, expires_in_sec=TOK_TTL)
+    return t
+
+
+def _rol_nomi_tokdan(t):
+    """'-' — rolsiz (None); topilmasa/rol o'chirilgan — False."""
+    if t == "-":
+        return None
+    nom = frappe.cache.get_value(f"nz_xr:{t}", expires=True)
+    return nom if nom and rol(nom) else False
+
+
 def _user(tok):
     return frappe.cache.get_value(f"nz_xa:{tok}", expires=True)
 
@@ -85,12 +100,12 @@ def rol_tanlash(user):
     joriy = azo_bolimi(frappe._dict(a.as_dict(), faol=1))
     t = _tok(user)
     kb = []
-    for i, nom in enumerate(rollar()):
+    for nom in rollar():
         r = rol(nom)
         belgi = "✓ " if nom == joriy else ""
         kalit = " 🔑" if r and r.toliq_ruxsat else ""
-        kb.append([{"text": f"{belgi}{nom}{kalit}", "callback_data": f"xa:rs:{t}:{i}"}])
-    kb.append([{"text": ("✓ " if not joriy else "") + "Rolsiz (hech narsa ko'rmaydi)", "callback_data": f"xa:rs:{t}:-1"}])
+        kb.append([{"text": f"{belgi}{nom}{kalit}", "callback_data": f"xa:rs:{t}:{_rtok(nom)}"}])
+    kb.append([{"text": ("✓ " if not joriy else "") + "Rolsiz (hech narsa ko'rmaydi)", "callback_data": f"xa:rs:{t}:-"}])
     kb.append([{"text": "◀ Orqaga", "callback_data": f"xa:v:{t}"}])
     return (f"🎭 <b>{esc(_ism(user))}</b> uchun rol tanlang\n\n🔑 — to'liq ruxsat: barcha ko'rsatkichlar, foyda, "
             "dividend, vazifa berish."), {"inline_keyboard": kb}
@@ -119,13 +134,8 @@ def _xabar(doc, matn, menyu_yangila=True):
         pass
 
 
-def _rol_ber(user, admin_user, idx):
-    nomlar = rollar()
-    if idx == -1:
-        nom = None
-    elif 0 <= idx < len(nomlar):
-        nom = nomlar[idx]
-    else:
+def _rol_ber(user, admin_user, nom):
+    if nom is False:
         raise frappe.ValidationError("Rol topilmadi — ro'yxatni qayta oching")
     qiymat = {"rol": "Rahbar", "bolim": RAHBAR} if nom == RAHBAR else {"rol": "Xodim", "bolim": nom}
     doc = _qollash(user, admin_user, f"rol → {nom or 'rolsiz'}", **qiymat)
@@ -136,12 +146,11 @@ def _rol_ber(user, admin_user, idx):
         _xabar(doc, "🎭 Rolingiz olib tashlandi — ko'rsatkichlar yopiq. Vazifalar avvalgidek ishlaydi.")
 
 
-def _rol_tasdiq(user, idx):
-    nom = rollar()[idx]
+def _rol_tasdiq(user, nom):
     t = _tok(user)
     return (f"⚠️ <b>{esc(nom)}</b> — to'liq ruxsatli rol.\n\n{esc(_ism(user))} barcha ko'rsatkichlarni, foyda va "
             "dividendni ko'radi, AI'ga cheklovsiz savol bera oladi va vazifa beradi.\n\nTasdiqlaysizmi?"), {
-        "inline_keyboard": [[{"text": "✅ Ha, beraman", "callback_data": f"xa:rk:{t}:{idx}"},
+        "inline_keyboard": [[{"text": "✅ Ha, beraman", "callback_data": f"xa:rk:{t}:{_rtok(nom)}"},
                              {"text": "Bekor", "callback_data": f"xa:v:{t}"}]]}
 
 
@@ -173,11 +182,12 @@ def callback(cq, azo):
     if amal == "r":
         return ko_rsat(rol_tanlash(user))
     if amal in ("rs", "rk"):
-        idx = int(parts[3]) if len(parts) > 3 and parts[3].lstrip("-").isdigit() else -2
-        nomlar = rollar()
-        if amal == "rs" and 0 <= idx < len(nomlar) and (rol(nomlar[idx]) or {}).get("toliq_ruxsat"):
-            return ko_rsat(_rol_tasdiq(user, idx))
-        _rol_ber(user, azo.user, idx)
+        nom = _rol_nomi_tokdan(parts[3]) if len(parts) > 3 else False
+        if nom is False:
+            return answer_callback(cq["id"], "Ro'yxat eskirgan — qayta oching", alert=True)
+        if amal == "rs" and nom and (rol(nom) or {}).get("toliq_ruxsat"):
+            return ko_rsat(_rol_tasdiq(user, nom))
+        _rol_ber(user, azo.user, nom)
         answer_callback(cq["id"], "Rol saqlandi")
         return edit_message(chat_id, mid, *kartochka(user, azo.user))
     a = frappe.get_doc("TG Azo", user)

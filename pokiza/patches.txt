@@ -41,3 +41,4 @@ pokiza.patches.v0_0.nazorat_guruh_defaults
 pokiza.patches.v0_0.nazorat_rollari
 pokiza.patches.v0_0.nazorat_guruhsiz
 pokiza.patches.v0_0.nazorat_himoya_defaults
+pokiza.patches.v0_0.ai_roli_maydoni

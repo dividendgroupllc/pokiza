@@ -26,20 +26,21 @@ def forward_taqiq(chat_id):
 
 
 def _cheklanganmi(user):
-    """Rahbar va administratorlar kuzatilmaydi."""
-    from pokiza.nazorat.scope import rahbarmi
+    """To'liq ruxsatli rol (rahbar, investor) va Administrator kuzatilmaydi; qolgan hamma — System Manager ham."""
+    from pokiza.nazorat.scope import foydalanuvchi_roli, toliqmi
 
-    return not rahbarmi(user)
+    return user != "Administrator" and not toliqmi(foydalanuvchi_roli(user))
 
 
 def qayd(tur, izoh=None, user=None):
     """Xodimning kunlik fayl / savol sonini hisoblaydi; chegaraga yetganda rahbarlarga bir marta xabar.
-    tur: "fayl" | "savol". Xato bo'lsa jim (AI javobini to'xtatmasin)."""
+    tur: "fayl" | "savol" | "rad" (rolidan tashqari so'rov rad etildi). Xato bo'lsa jim (AI javobini to'xtatmasin)."""
     try:
         user = user or frappe.session.user
         if not user or user in ("Guest", "Administrator") or not _cheklanganmi(user):
             return
-        chegara = int(config.sozlama("himoya_kop_fayl" if tur == "fayl" else "himoya_kop_savol", 0) or 0)
+        maydon = {"fayl": "himoya_kop_fayl", "rad": "himoya_kop_rad"}.get(tur, "himoya_kop_savol")
+        chegara = int(config.sozlama(maydon, 0) or 0)
         if chegara <= 0:
             return
         k = frappe.cache.make_key(f"nz_himoya:{nowdate()}:{tur}:{user}")
@@ -60,7 +61,8 @@ def _rahbarga(user, tur, n, izoh):
     if not config.faol():
         return
     ism = frappe.db.get_value("User", user, "full_name") or user
-    nima = f"AI'dan {n} ta fayl oldi" if tur == "fayl" else f"AI'ga {n} ta savol berdi"
+    nima = {"fayl": f"AI'dan {n} ta fayl oldi",
+            "rad": f"AI'dan {n} marta o'z rolidan tashqari ma'lumot so'radi (rad etildi)"}.get(tur, f"AI'ga {n} ta savol berdi")
     matn = (f"⚠️ <b>Diqqat</b>: {esc(ism)} bugun {nima}."
             + (f"\nOxirgisi: <i>{esc(izoh[:200])}</i>" if izoh else "")
             + "\n\nSuhbatlar ERP'da: AI Suhbat ro'yxati. Kerak bo'lsa botda 👥 Xodimlar orqali AI ruxsatini o'chiring.")

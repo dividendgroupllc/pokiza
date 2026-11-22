@@ -174,7 +174,10 @@ def _rahbarmi(user):
 
 
 def callback(cq):
-    _, amal, name = (cq.get("data") or "").split(":", 2)
+    parts = (cq.get("data") or "").split(":", 2)
+    if len(parts) != 3:
+        return answer_callback(cq["id"])
+    _, amal, name = parts
     tid = str(cq["from"]["id"])
     user = frappe.db.get_value("TG Azo", {"telegram_id": tid, "faol": 1}, "user")
     if not frappe.db.exists("Vazifa", name):
@@ -196,7 +199,8 @@ def callback(cq):
         v.save(ignore_permissions=True)
         frappe.db.commit()
         answer_callback(cq["id"], "Tasdiqlandi")
-        return edit_message(tid, msg["message_id"], _matn(v), reply_markup={"inline_keyboard": []})
+        if msg.get("message_id"):
+            return edit_message(tid, msg["message_id"], _matn(v), reply_markup={"inline_keyboard": []})
     if not user or user != v.masul:
         return answer_callback(cq["id"], "Bu vazifa sizga berilmagan", alert=True)
     frappe.set_user(user)
@@ -326,6 +330,8 @@ def usta_callback(cq, azo):
         holat_qoy(tid, h)
         return _usta_tasdiq(tid, h)
     if amal == "ok" and h["qadam"] == "tasdiq":
+        if not _bir_bosish(f"usta:{tid}:{h.get('masul')}:{h.get('sarlavha')}", 30):
+            return
         holat_qoy(tid, None)
         v = yarat(azo.user, h["masul"], h["sarlavha"], h["muddat"], manba="Telegram")
         return send_message(tid, "✅ Vazifa berildi.\n\n" + _matn(v))
@@ -369,12 +375,17 @@ def _usta_tasdiq(tid, h):
 
 
 # ---------- AI taklifi (5-bosqich) ----------
+def _bir_bosish(kalit, sekund=60):
+    """Atomar: ikki marta bosilsa (yoki ikki ishchi parallel olsa) ikkinchisi False."""
+    return bool(frappe.cache.set(frappe.cache.make_key(f"nz_bosish:{kalit}"), 1, ex=sekund, nx=True))
+
+
 def ai_taklif_callback(cq, azo):
     """vzt:<id> — AI taklif qilgan vazifani rahbar tasdiqlaydi."""
     tid = str(cq["from"]["id"])
     key = f"nz_vz_taklif:{cq['data'].split(':', 1)[1]}"
     t = frappe.cache.get_value(key, expires=True)
-    if not t or t.get("berdi") != azo.user:
+    if not t or t.get("berdi") != azo.user or not _bir_bosish(key):
         return answer_callback(cq["id"], "Taklif topilmadi yoki muddati o'tgan", alert=True)
     frappe.cache.delete_value(key)
     answer_callback(cq["id"], "Yaratilmoqda")
@@ -390,7 +401,7 @@ def xabar_taklif_callback(cq, azo):
     """xbt:<id> — AI tayyorlagan shaxsiy xabarni rahbar tasdiqlaydi va u xodimga ketadi."""
     key = f"nz_xb_taklif:{cq['data'].split(':', 1)[1]}"
     t = frappe.cache.get_value(key, expires=True)
-    if not t or t.get("berdi") != azo.user:
+    if not t or t.get("berdi") != azo.user or not _bir_bosish(key):
         return answer_callback(cq["id"], "Xabar topilmadi yoki muddati o'tgan", alert=True)
     tg = frappe.db.get_value("TG Azo", {"user": t["kimga"], "faol": 1}, "telegram_id")
     if not tg:
@@ -428,14 +439,18 @@ def kunlik_tekshir():
     otganlar = []
     for v in frappe.get_all("Vazifa", filters={"holat": ["in", ["Yangi", "Qabul qilindi"]], "muddat": ["<", bugun]},
                             pluck="name"):
-        doc = frappe.get_doc("Vazifa", v)
-        eski = doc.holat
-        doc.holat = "Muddati o'tdi"
-        doc.flags.ignore_permissions = True
-        doc.flags.nz_jim = True  # xabar pastda, ketma-ket (navbatga yuz xabar tashlanmasin)
-        doc.save()
-        frappe.db.commit()
-        otganlar.append((doc.name, eski))
+        try:  # bitta vazifa xatosi qolganlarini (eslatma, kunlik ro'yxat) to'xtatmasin
+            doc = frappe.get_doc("Vazifa", v)
+            eski = doc.holat
+            doc.holat = "Muddati o'tdi"
+            doc.flags.ignore_permissions = True
+            doc.flags.nz_jim = True  # xabar pastda, ketma-ket (navbatga yuz xabar tashlanmasin)
+            doc.save()
+            frappe.db.commit()
+            otganlar.append((doc.name, eski))
+        except Exception:
+            frappe.db.rollback()
+            frappe.log_error(title=f"Nazorat: vazifa muddatini belgilab bo'lmadi {v}")
     if not config.faol():
         return
     for name, eski in otganlar:
