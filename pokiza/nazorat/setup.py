@@ -13,13 +13,34 @@ from pokiza.guruhlar import sotuv_guruhlari
 
 # (regex, kategoriya, ishonch) — tartib muhim: birinchi mos kelgani olinadi
 KATEGORIYA_QOIDALARI = [
-    (r"^\s*(ак\.|бонус|услуга)", "Boshqa", "yuqori"),
-    (r"тушен|консерв|welmar", "Boshqa", "o'rta"),
+    (r"^\s*(ак\.|бонус|услуга)|скидка", "Boshqa", "yuqori"),
+    (r"тушен|консерв", "Tushonka", "yuqori"),
+    (r"welmar", "Tushonka", "o'rta"),
     (r"сосиск|^\s*с-с|сардел", "Sosiska", "yuqori"),
     (r"^\s*п/к", "Kopchyonniy", "yuqori"),
     (r"коп-вар|рулет|yangilik", "Delikates", "past"),
     (r"кази|шедев", "Delikates", "o'rta"),
-    (r"доктор|завтрак|любим|любител|деликатесн|сталичн|столичн|дорожн", "Varyonniy", "o'rta"),
+    (r"доктор|завтрак|любим|любител|деликатесн|сталичн|столичн|дорожн|домашн", "Varyonniy", "o'rta"),
+    (r"сервелат|чесночн|сетка|слитка|полтав|москов|украин|таллин", "Kopchyonniy", "o'rta"),
+    (r"детск|молочн|экстра|себзор", "Varyonniy", "past"),
+]
+
+KATEGORIYA_RUXSAT = {"Sosiska", "Kopchyonniy", "Varyonniy", "Delikates", "Tushonka", "Boshqa"}
+
+# (regex, brend) — Kontrol Marj hisobotining 2-darajasi. Mos kelmasa bo'sh
+# qoladi (hisobotda «Boshqa» bo'lib ko'rinadi). «Рокiza» — kirill+lotin aralash.
+SUBKATEGORIYA_QOIDALARI = [
+    (r"burxanov|бурханов|бур[.,]|\bбур\b", "Burxanov"),
+    (r"pokiza|покиза|рок[иi]za", "Pokiza"),
+    (r"нежная", "Nejnaya"),
+    (r"milaro", "Milaro"),
+    (r"hosil|хосил", "Hosil"),
+    (r"кукча", "Kukcha"),
+    (r"welmar", "Welmar"),
+    (r"abdazoff", "Abdazoff"),
+    (r"м\.з", "M.Z"),
+    (r"ишонч", "Ishonch"),
+    (r"\bjiz\b", "JIZ"),
 ]
 
 OZGARUVCHI = r"бонус|брак|transport|газ|бензин|электро|commission|freight|реализ|упаков"
@@ -31,6 +52,13 @@ def _kategoriya(nom):
         if re.search(rx, nom or "", re.I):
             return kat, ish
     return "", "topilmadi"
+
+
+def _subkategoriya(nom):
+    for rx, sub in SUBKATEGORIYA_QOIDALARI:
+        if re.search(rx, nom or "", re.I):
+            return sub
+    return ""
 
 
 def _xarajat_turi(nom):
@@ -48,17 +76,22 @@ def taklif(fayl="/tmp/nazorat_taklif.xlsx"):
     wb = Workbook()
     ws = wb.active
     ws.title = "Kategoriya"
-    ws.append(["item_code", "nomi", "hozirgi", "taklif", "ishonch", "oxirgi 3 oy savdo (so'm)"])
+    ws.append(["item_code", "nomi", "hozirgi kat", "taklif kat", "hozirgi subkat", "taklif subkat",
+               "ishonch", "oxirgi 3 oy savdo (so'm)"])
     savdo = dict(frappe.db.sql(
         """SELECT sii.item_code, SUM(sii.base_net_amount) FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         WHERE si.docstatus = 1 AND si.posting_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH) GROUP BY sii.item_code"""))
+    subkat_bor = frappe.db.has_column("Item", "custom_subkategoriya")
     items = frappe.get_all("Item", filters={"item_group": ["in", sotuv_guruhlari()], "disabled": 0},
-                           fields=["name", "item_name", "custom_kategoriya"])
+                           fields=["name", "item_name", "custom_kategoriya"]
+                                  + (["custom_subkategoriya"] if subkat_bor else []))
     items.sort(key=lambda r: -(savdo.get(r.name) or 0))
     for it in items:
         kat, ish = _kategoriya(it.item_name)
-        ws.append([it.name, it.item_name, it.custom_kategoriya or "", kat, ish, round(savdo.get(it.name) or 0)])
+        ws.append([it.name, it.item_name, it.custom_kategoriya or "", kat,
+                   it.get("custom_subkategoriya") or "", _subkategoriya(it.item_name),
+                   ish, round(savdo.get(it.name) or 0)])
 
     ws2 = wb.create_sheet("Xarajat turi")
     ws2.append(["account", "nomi", "ota hisob", "hozirgi", "taklif", "oxirgi 3 oy (so'm)"])
@@ -75,7 +108,7 @@ def taklif(fayl="/tmp/nazorat_taklif.xlsx"):
     for w in (ws, ws2):
         for c in w[1]:
             c.font = Font(bold=True)
-        for col, width in zip("ABCDEF", (16, 45, 14, 14, 12, 20)):
+        for col, width in zip("ABCDEFGH", (16, 45, 14, 14, 14, 14, 12, 20)):
             w.column_dimensions[col].width = width
     wb.save(fayl)
     print(f"Saqlandi: {fayl} — {len(items)} mahsulot, {ws2.max_row - 1} xarajat hisobi")
@@ -87,19 +120,32 @@ def qollash(fayl="/tmp/nazorat_taklif.xlsx", ustiga_yoz=False):
     from openpyxl import load_workbook
 
     wb = load_workbook(fayl, read_only=True)
-    n = {"Item": 0, "Account": 0}
-    for sheet, dt, field, ruxsat in (
-        ("Kategoriya", "Item", "custom_kategoriya", {"Sosiska", "Kopchyonniy", "Varyonniy", "Delikates", "Boshqa"}),
-        ("Xarajat turi", "Account", "custom_xarajat_turi", {"Doimiy", "O'zgaruvchi"}),
-    ):
-        for row in list(wb[sheet].iter_rows(values_only=True))[1:]:
-            name, taklif_v = row[0], (row[3] if dt == "Item" else row[4])
-            if not name or taklif_v not in ruxsat or not frappe.db.exists(dt, name):
-                continue
-            if not ustiga_yoz and frappe.db.get_value(dt, name, field):
-                continue
-            frappe.db.set_value(dt, name, field, taklif_v, update_modified=False)
-            n[dt] += 1
+    n = {"Item": 0, "Item_sub": 0, "Account": 0}
+
+    def _yoz(dt, name, field, qiymat):
+        if not qiymat or not frappe.db.exists(dt, name):
+            return False
+        if not ustiga_yoz and frappe.db.get_value(dt, name, field):
+            return False
+        frappe.db.set_value(dt, name, field, qiymat, update_modified=False)
+        return True
+
+    subkat_bor = frappe.db.has_column("Item", "custom_subkategoriya")
+    for row in list(wb["Kategoriya"].iter_rows(values_only=True))[1:]:
+        name = row[0]
+        if not name:
+            continue
+        kat = row[3] if row[3] in KATEGORIYA_RUXSAT else None
+        n["Item"] += _yoz("Item", name, "custom_kategoriya", kat)
+        if subkat_bor and len(row) > 5:
+            sub = (str(row[5]).strip() if row[5] else "")[:60]
+            n["Item_sub"] += _yoz("Item", name, "custom_subkategoriya", sub)
+
+    for row in list(wb["Xarajat turi"].iter_rows(values_only=True))[1:]:
+        name, taklif_v = row[0], row[4]
+        if name and taklif_v in {"Doimiy", "O'zgaruvchi"}:
+            n["Account"] += _yoz("Account", name, "custom_xarajat_turi", taklif_v)
     frappe.db.commit()
-    print(f"Yozildi: {n['Item']} mahsulot kategoriyasi, {n['Account']} xarajat turi")
+    print(f"Yozildi: {n['Item']} mahsulot kategoriyasi, {n['Item_sub']} sub-kategoriyasi, "
+          f"{n['Account']} xarajat turi")
     return n
