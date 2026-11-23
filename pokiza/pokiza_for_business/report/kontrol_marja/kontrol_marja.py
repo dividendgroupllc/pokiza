@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """Kontrol Marja — marja nazorati uchun daraxt hisoboti:
-Kategoriya -> Sub-kategoriya (brend) -> Tavar, ustunlar esa davrlar
+Item Group -> Sub-kategoriya (brend) -> Tavar, ustunlar esa davrlar
 (oyma-oy yoki kunma-kun), har katakda yalpi marja %.
 
 Marja ERPNext'ning Gross Profit hisobotidagi gross_profit_percent bilan
@@ -22,9 +22,10 @@ SLE yozuvi yo'q qatorlar (Услуга,
 Бонус kabi omborga tegmaydiganlar) tannarxsiz, ya'ni marja 100% bo'lib
 ko'rinadi — bu xato emas, ularning tannarxi haqiqatan yo'q.
 
-Daraja manbasi: Item.custom_kategoriya / Item.custom_subkategoriya
-(pokiza.nazorat.setup.taklif/qollash bilan to'ldiriladi). Bo'sh qiymat
-«Belgilanmagan» (kategoriya) / «Boshqa» (sub-kategoriya) bo'lib chiqadi.
+Daraja manbalari: 1-daraja Item.item_group, 2-daraja
+Item.custom_subkategoriya (pokiza.nazorat.setup.taklif/qollash bilan
+to'ldiriladi; bo'sh qiymat «Boshqa» bo'lib chiqadi). Item.custom_kategoriya
+daraxtda ishlatilmaydi, lekin filtr sifatida qoladi.
 """
 
 from datetime import timedelta
@@ -75,7 +76,7 @@ def _davr_fieldname(key):
 
 def _columns(davrlar):
     columns = [{
-        "fieldname": "tavar", "label": _("Kategoriya / Brend / Tavar"),
+        "fieldname": "tavar", "label": _("Guruh / Brend / Tavar"),
         "fieldtype": "Data", "width": 300,
     }]
     for key, label in davrlar:
@@ -119,6 +120,10 @@ def _sotuv_qatorlari(filters):
         qiymat["customer_groups"] = _ichki_guruhlar("Customer Group", filters.customer_group)
         shart.append(
             "si.customer IN (SELECT name FROM `tabCustomer` WHERE customer_group IN %(customer_groups)s)")
+    mijozlar = _royxat(filters.get("mijozlar"))
+    if mijozlar:
+        qiymat["mijozlar"] = mijozlar
+        shart.append("si.customer IN %(mijozlar)s")
     if filters.get("item_group"):
         qiymat["item_groups"] = _ichki_guruhlar("Item Group", filters.item_group)
         shart.append("i.item_group IN %(item_groups)s")
@@ -141,7 +146,7 @@ def _sotuv_qatorlari(filters):
 
     return frappe.db.sql(f"""
         SELECT
-            COALESCE(NULLIF(i.custom_kategoriya, ''), 'Belgilanmagan') AS kat,
+            i.item_group AS kat,
             COALESCE(NULLIF(i.custom_subkategoriya, ''), 'Boshqa') AS subkat,
             sii.item_code,
             {davr_sql} AS davr,
@@ -184,7 +189,9 @@ def _data(filters, davrlar):
         return sum(v[0] for v in tugunlar.get(kalit, {}).values())
 
     def qator(kalit, label, ota, indent):
-        out = {"tavar": label, "ota": ota, "indent": indent}
+        out = {"tavar": label, "ota": ota, "indent": indent,
+               # tavar qatorini bosganda Item kartochkasiga o'tish uchun (JS formatter)
+               "item_code": kalit[2] if len(kalit) == 3 else None}
         davr_map = tugunlar.get(kalit, {})
         t_savdo = t_tannarx = 0.0
         for key, _label in davrlar:

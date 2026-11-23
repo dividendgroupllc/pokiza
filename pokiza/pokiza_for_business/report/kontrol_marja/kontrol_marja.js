@@ -35,6 +35,14 @@ frappe.query_reports["Kontrol Marja"] = {
 			options: "Customer Group",
 		},
 		{
+			fieldname: "mijozlar",
+			label: __("Mijozlar"),
+			fieldtype: "MultiSelectList",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Customer", txt);
+			},
+		},
+		{
 			fieldname: "item_group",
 			label: __("Tavar guruhi"),
 			fieldtype: "Link",
@@ -72,6 +80,9 @@ frappe.query_reports["Kontrol Marja"] = {
 	initial_depth: 1,
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
+		if (column.fieldname === "tavar" && data && data.item_code) {
+			value = `<a href="/app/item/${encodeURIComponent(data.item_code)}">${value}</a>`;
+		}
 		if (data && data.indent === 0) {
 			value = `<span style="font-weight:600">${value}</span>`;
 		}
