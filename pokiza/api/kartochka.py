@@ -204,17 +204,21 @@ def _upakovka_narxi(sku):
 def bundle_normasi(sku):
     """SKU bundle'idagi norma (ГП) — default norma sifatida.
 
-    Bitta bo'lsa (143 tadan 137 tasi shunday) o'shani qaytaradi,
-    aksiya-to'plamlarda (2-3 norma) None: normani odam tanlaydi.
+    Bitta bo'lsa (143 tadan 137 tasi shunday) o'shani qaytaradi.
+    Aksiya-to'plamlarda (2-3 norma) ENG KATTA ulushli (kg bo'yicha)
+    norma default olinadi (egasi talabi 2026-11-23) — kartochkada
+    keyin qo'lda o'zgartirsa bo'ladi.
     """
     kesh = _kesh("pokiza_bundle_norma_keshi")
     if sku in kesh:
         return kesh[sku]
 
-    normalar = {q.item_code for q in _bundle_qatorlari(sku)
-                if q.item_group in NORMA_GURUHLAR}
-    if len(normalar) == 1:
-        kesh[sku] = normalar.pop()
+    ulush = {}
+    for q in _bundle_qatorlari(sku):
+        if q.item_group in NORMA_GURUHLAR:
+            ulush[q.item_code] = ulush.get(q.item_code, 0) + flt(q.qty)
+    if ulush:
+        kesh[sku] = max(ulush, key=ulush.get)
     else:
         # bundle'siz (yangi) mahsulot: SKU BOM'idagi yagona ГП qatori
         from pokiza.api.partiya import bom_yagona_gp
