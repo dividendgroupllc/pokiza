@@ -85,10 +85,10 @@ def _columns(davrlar):
             "fieldtype": "Percent", "precision": 1, "width": 90,
         })
     columns += [
-        {"fieldname": "jami_savdo", "label": _("Jami savdo"), "fieldtype": "Currency", "width": 140},
-        {"fieldname": "jami_foyda", "label": _("Jami yalpi foyda"), "fieldtype": "Currency", "width": 140},
         {"fieldname": "jami_marja", "label": _("Jami marja %"), "fieldtype": "Percent",
          "precision": 1, "width": 100},
+        {"fieldname": "jami_savdo", "label": _("Jami savdo"), "fieldtype": "Currency", "width": 140},
+        {"fieldname": "jami_foyda", "label": _("Jami yalpi foyda"), "fieldtype": "Currency", "width": 140},
     ]
     return columns
 
@@ -111,7 +111,9 @@ def _royxat(qiymat):
     return [v for v in qiymat if v]
 
 
-def _sotuv_qatorlari(filters):
+def _shartlar(filters):
+    """Hisobot filtrlaridan SQL shartlari — asosiy so'rov va detal (drill-down)
+    ikkalasi ham shundan foydalanadi, shartlar hech qachon ajralib ketmasin."""
     shart = ["si.docstatus = 1"]
     qiymat = {"from_date": filters.from_date, "to_date": filters.to_date}
     shart.append("si.posting_date BETWEEN %(from_date)s AND %(to_date)s")
@@ -139,6 +141,11 @@ def _sotuv_qatorlari(filters):
     if tavarlar:
         qiymat["tavarlar"] = tavarlar
         shart.append("sii.item_code IN %(tavarlar)s")
+    return shart, qiymat
+
+
+def _sotuv_qatorlari(filters):
+    shart, qiymat = _shartlar(filters)
 
     davr_sql = ("DATE_FORMAT(si.posting_date, '%%Y-%%m-%%d')"
                 if filters.get("davr") == "Kunlik"
@@ -191,7 +198,10 @@ def _data(filters, davrlar):
     def qator(kalit, label, ota, indent):
         out = {"tavar": label, "ota": ota, "indent": indent,
                # tavar qatorini bosganda Item kartochkasiga o'tish uchun (JS formatter)
-               "item_code": kalit[2] if len(kalit) == 3 else None}
+               "item_code": kalit[2] if len(kalit) == 3 else None,
+               # son ustiga bosilganda drill-down (detal) shu tugunni tanishi uchun
+               "r_guruh": kalit[0],
+               "r_subkat": kalit[1] if len(kalit) >= 2 else None}
         davr_map = tugunlar.get(kalit, {})
         t_savdo = t_tannarx = 0.0
         for key, _label in davrlar:
@@ -232,6 +242,90 @@ def _data(filters, davrlar):
         jami["jami_marja"] = _marja(t_savdo, t_tannarx)
         data.append(jami)
     return data
+
+
+DETAL_LIMIT = 500
+
+
+@frappe.whitelist()
+def detal(args):
+    """Drill-down: hisobotdagi son ustiga bosilganda o'sha katak qayerdan
+    kelganini ko'rsatadi — tanlangan davr va tugun (guruh/brend/tavar)
+    bo'yicha schyot qatorlari. Hisobotning barcha filtrlari ham qo'llanadi.
+
+    args: hisobot filtrlari + davr ("jami" yoki p_YYYY_MM / p_YYYY_MM_DD
+    fieldname'i) + r_guruh / r_subkat / item_code (bosilgan qator tuguni).
+    """
+    args = frappe._dict(frappe.parse_json(args))
+
+    # bosilgan ustun davri -> sanalar oralig'i (hisobot oralig'iga qirqiladi)
+    boshi, oxiri = getdate(args.from_date), getdate(args.to_date)
+    davr = args.get("davr") or "jami"
+    if davr.startswith("p_"):
+        qism = davr[2:].split("_")
+        if len(qism) == 3:  # kunlik ustun
+            boshi = oxiri = getdate("-".join(qism))
+        else:  # oylik ustun
+            oy_boshi = getdate(f"{qism[0]}-{qism[1]}-01")
+            boshi = max(boshi, oy_boshi)
+            oxiri = min(oxiri, get_last_day(oy_boshi))
+    args.from_date, args.to_date = boshi, oxiri
+
+    shart, qiymat = _shartlar(args)
+    if args.get("r_guruh"):
+        qiymat["r_guruh"] = args.r_guruh
+        shart.append("i.item_group = %(r_guruh)s")
+    if args.get("r_subkat"):
+        qiymat["r_subkat"] = args.r_subkat
+        shart.append("COALESCE(NULLIF(i.custom_subkategoriya, ''), 'Boshqa') = %(r_subkat)s")
+    if args.get("item_code"):
+        qiymat["r_item"] = args.item_code
+        shart.append("sii.item_code = %(r_item)s")
+
+    rows = frappe.db.sql(f"""
+        SELECT
+            si.name AS schyot,
+            si.posting_date AS sana,
+            si.customer AS mijoz,
+            si.is_return AS vozvrat,
+            sii.item_code AS tavar,
+            sii.stock_qty AS kg,
+            sii.base_amount AS savdo,
+            -COALESCE(sle.v, 0) AS tannarx
+        FROM `tabSales Invoice Item` sii
+        JOIN `tabSales Invoice` si ON si.name = sii.parent
+        JOIN `tabItem` i ON i.name = sii.item_code
+        LEFT JOIN (
+            SELECT voucher_detail_no, SUM(stock_value_difference) AS v
+            FROM `tabStock Ledger Entry`
+            WHERE is_cancelled = 0 AND voucher_type = 'Sales Invoice'
+              AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+            GROUP BY voucher_detail_no
+        ) sle ON sle.voucher_detail_no = sii.name
+        WHERE {" AND ".join(shart)}
+        ORDER BY ABS(sii.base_amount) DESC
+        LIMIT {DETAL_LIMIT + 1}
+    """, qiymat, as_dict=True)
+
+    qirqildi = len(rows) > DETAL_LIMIT
+    rows = rows[:DETAL_LIMIT]
+    for r in rows:
+        r.foyda = flt(r.savdo) - flt(r.tannarx)
+        r.marja = _marja(flt(r.savdo), flt(r.tannarx))
+    t_savdo = sum(flt(r.savdo) for r in rows)
+    t_tannarx = sum(flt(r.tannarx) for r in rows)
+    return {
+        "rows": rows,
+        "qirqildi": qirqildi,
+        "boshi": str(boshi), "oxiri": str(oxiri),
+        "jami": {
+            "kg": sum(flt(r.kg) for r in rows),
+            "savdo": t_savdo,
+            "tannarx": t_tannarx,
+            "foyda": t_savdo - t_tannarx,
+            "marja": _marja(t_savdo, t_tannarx),
+        },
+    }
 
 
 @frappe.whitelist()
