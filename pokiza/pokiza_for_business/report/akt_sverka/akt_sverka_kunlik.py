@@ -65,7 +65,7 @@ def generate_akt_sverka_excel(filters):
         check_report_permission,
     )
 
-    check_report_permission()
+    check_report_permission(filters)
 
     if not filters or not filters.get("party"):
         frappe.throw("Контрагентни танланг")

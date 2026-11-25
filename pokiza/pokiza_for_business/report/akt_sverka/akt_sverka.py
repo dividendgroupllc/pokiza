@@ -10,7 +10,31 @@ VIEW_DAILY = "Ежедневный"
 REPORT_NAME = "Akt Sverka"
 
 
-def check_report_permission():
+# Shu rollardan biri bo'lsa — hisobot to'liq (mijoz, postavshik, xodim). Qolganlar (masalan Ombor) — faqat postavshik.
+TOLIQ_ROLLAR = {"System Manager", "Accounts Manager", "Accounts User", "kassa", "investor"}
+
+
+def faqat_postavshik(user=None):
+    user = user or frappe.session.user
+    return user != "Administrator" and not (TOLIQ_ROLLAR & set(frappe.get_roles(user)))
+
+
+@frappe.whitelist()
+def akt_doirasi():
+    """JS uchun: foydalanuvchi faqat postavshik aktini ko'radimi."""
+    return {"faqat_postavshik": faqat_postavshik()}
+
+
+def tekshir_doira(filters):
+    """Server tomonda majburiy: cheklangan foydalanuvchi faqat Supplier akti."""
+    filters = filters or {}
+    if not filters.get("party"):  # kontragent tanlanmagan — ma'lumot yo'q (sahifa ochilgandagi birinchi ishga tushish)
+        return
+    if faqat_postavshik() and filters.get("party_type") != "Supplier":
+        frappe.throw(frappe._("Сизга фақат поставщиклар акт сверкаси очиқ"), frappe.PermissionError)
+
+
+def check_report_permission(filters=None):
     """PDF/Excel endpointlari ham hisobotning o'z ruxsatiga bo'ysunsin.
 
     @frappe.whitelist() usullari sukut bo'yicha tizimga kirgan HAR QANDAY
@@ -24,6 +48,7 @@ def check_report_permission():
         )
 
     frappe.has_permission("GL Entry", "report", throw=True)
+    tekshir_doira(filters)
 
 
 def execute(filters=None):
@@ -36,6 +61,8 @@ def execute(filters=None):
     """
     if not filters:
         return [], []
+
+    tekshir_doira(filters)
 
     if filters.get("view") == VIEW_DAILY:
         return execute_daily(filters)
@@ -718,7 +745,7 @@ def generate_akt_sverka_pdf(filters):
     if isinstance(filters, str):
         filters = json.loads(filters)
 
-    check_report_permission()
+    check_report_permission(filters)
 
     data = get_data(filters)
 

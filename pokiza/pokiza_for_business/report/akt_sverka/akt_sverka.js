@@ -128,6 +128,20 @@ frappe.query_reports["Akt Sverka"] = {
     },
 
     "onload": function(report) {
+        // Cheklangan foydalanuvchi (masalan omborchi) — faqat postavshik akti (server ham tekshiradi)
+        frappe.call("pokiza.pokiza_for_business.report.akt_sverka.akt_sverka.akt_doirasi").then(function(r) {
+            if (!(r.message && r.message.faqat_postavshik)) {
+                return;
+            }
+            var f = report.get_filter("party_type");
+            if (f) {
+                f.df.options = "Supplier";
+                f.df.read_only = 1;
+                f.refresh();
+                report.set_filter_value("party_type", "Supplier");
+            }
+        });
+
         var original_show_footer_message = report.show_footer_message;
         report.show_footer_message = function() {
             original_show_footer_message.apply(report, arguments);
