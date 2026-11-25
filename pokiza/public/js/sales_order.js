@@ -236,7 +236,7 @@ function setSalesItemQuery(frm) {
             filters: {
                 disabled: 0,
                 is_sales_item: 1,
-                item_group: ["descendants of (inclusive)", "Сотув махсулотлари"],
+                item_group: ["in", (frappe.boot.pokiza_sotuv_guruhlari || ["Сотув махсулотлари"])],
             },
         };
     });

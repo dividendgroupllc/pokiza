@@ -35,3 +35,10 @@ def sotuv_guruhlari():
 def bom_item_guruhlari():
     """BOM item dropdowni uchun ruxsat etilgan guruhlar (public/js/bom.js)."""
     return list(NORMA_GURUHLAR) + list(sotuv_guruhlari())
+
+
+def boot(bootinfo):
+    """boot_session: sotuv guruhlari JS'ga (item dropdown filtri). ERPNext item_query
+    "descendants of (inclusive)" filtrini tushunmaydi — 0 natija qaytaradi; shuning uchun
+    formalarda ["in", frappe.boot.pokiza_sotuv_guruhlari] ishlatiladi."""
+    bootinfo.pokiza_sotuv_guruhlari = list(sotuv_guruhlari())

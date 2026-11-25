@@ -17,7 +17,7 @@ function zapasItemFiltr(frm) {
             query: "erpnext.controllers.queries.item_query",
             filters: {
                 disabled: 0,
-                item_group: ["descendants of (inclusive)", "Сотув махсулотлари"],
+                item_group: ["in", (frappe.boot.pokiza_sotuv_guruhlari || ["Сотув махсулотлари"])],
             },
         };
     });

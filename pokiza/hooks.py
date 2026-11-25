@@ -167,6 +167,8 @@ override_doctype_class = {
 	"Exchange Rate Revaluation": "pokiza.overrides.exchange_rate_revaluation.PokizaExchangeRateRevaluation",
 }
 
+boot_session = "pokiza.guruhlar.boot"
+
 doc_events = {
 	"User": {
 		# AI roli -> Telegram a'zosidagi nusxa (TG Azo rol/bolim)
@@ -215,8 +217,10 @@ doc_events = {
 		"on_submit": [
 			"pokiza.api.navbat.si_on_submit",
 			"pokiza.events.sales_invoice.on_submit",
+			"pokiza.events.qadoqlash.qoralama_yarat",  # sotilgan mahsulotga qadoqlash qoralamasi (BOM)
 		],
 		"before_cancel": "pokiza.events.sales_invoice.before_cancel",
+		"on_cancel": "pokiza.events.qadoqlash.qoralamalarni_ochir",
 	},
 	# Zapas (omborga) ishlab chiqarish — MIJOZSIZ standart hujjat
 	# (Material Request, turi Manufacture); faqat shu turga ishlaydi
