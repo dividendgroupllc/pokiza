@@ -83,18 +83,16 @@ frappe.query_reports["Kontrol Marja"] = {
 		if (column.fieldname === "tavar" && data && data.item_code) {
 			value = `<a href="/app/item/${encodeURIComponent(data.item_code)}">${value}</a>`;
 		}
-		// son ustiga bosilganda — drill-down (qayerdan kelgani)
+		// son ustiga bosilganda — Kontrol Marja Detal sahifasi (filtrlar avto-to'ldirilgan)
 		const sonli =
 			column.fieldname.startsWith("p_") ||
 			["jami_marja", "jami_savdo", "jami_foyda"].includes(column.fieldname);
 		if (sonli && data && data[column.fieldname] != null) {
 			const args = {
 				davr: column.fieldname.startsWith("p_") ? column.fieldname : "jami",
-				davr_label: column.label,
 				r_guruh: data.r_guruh || null,
 				r_subkat: data.r_subkat || null,
 				item_code: data.item_code || null,
-				tavar_label: data.tavar,
 			};
 			const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(args))));
 			value = `<a href="#" onclick="event.preventDefault(); frappe.query_reports['Kontrol Marja'].detal('${b64}')">${value}</a>`;
@@ -107,63 +105,34 @@ frappe.query_reports["Kontrol Marja"] = {
 	detal: function (b64) {
 		const args = JSON.parse(decodeURIComponent(escape(atob(b64))));
 		const f = frappe.query_report.get_filter_values();
-		frappe.call({
-			method: "pokiza.pokiza_for_business.report.kontrol_marja.kontrol_marja.detal",
-			args: { args: Object.assign({}, f, args) },
-			freeze: true,
-			callback: function (r) {
-				const m = r.message;
-				if (!m || !m.rows.length) {
-					frappe.msgprint(__("Bu katak bo'yicha qator topilmadi"));
-					return;
-				}
-				const pul = (v) => format_currency(v, frappe.defaults.get_default("currency"), 0);
-				const pc = (v) => (v == null ? "-" : flt(v).toFixed(1) + "%");
-				let satrlar = m.rows
-					.map(
-						(d) => `<tr${d.vozvrat ? ' style="color:var(--red-500)"' : ""}>
-							<td><a href="/app/sales-invoice/${encodeURIComponent(d.schyot)}">${d.schyot}</a>${d.vozvrat ? " (vozvrat)" : ""}</td>
-							<td>${frappe.datetime.str_to_user(d.sana)}</td>
-							<td>${frappe.utils.escape_html(d.mijoz || "")}</td>
-							<td><a href="/app/item/${encodeURIComponent(d.tavar)}">${frappe.utils.escape_html(d.tavar)}</a></td>
-							<td class="text-right">${flt(d.kg, 1)}</td>
-							<td class="text-right">${pul(d.savdo)}</td>
-							<td class="text-right">${pul(d.tannarx)}</td>
-							<td class="text-right">${pul(d.foyda)}</td>
-							<td class="text-right">${pc(d.marja)}</td>
-						</tr>`
-					)
-					.join("");
-				const j = m.jami;
-				satrlar += `<tr style="font-weight:600;border-top:2px solid var(--border-color)">
-					<td colspan="4">${__("Jami")} (${m.rows.length} ${__("qator")})</td>
-					<td class="text-right">${flt(j.kg, 1)}</td>
-					<td class="text-right">${pul(j.savdo)}</td>
-					<td class="text-right">${pul(j.tannarx)}</td>
-					<td class="text-right">${pul(j.foyda)}</td>
-					<td class="text-right">${pc(j.marja)}</td>
-				</tr>`;
-				const ogoh = m.qirqildi
-					? `<p class="text-muted">${__("Faqat eng katta {0} qator ko'rsatildi — jami qatori ham faqat shular bo'yicha.", [500])}</p>`
-					: "";
-				const sarlavha = [args.tavar_label, args.davr_label].filter(Boolean).join(" · ");
-				const d = new frappe.ui.Dialog({
-					title: __("Manba: {0}", [sarlavha]),
-					size: "extra-large",
-				});
-				d.$body.html(`${ogoh}
-					<div style="max-height:65vh;overflow:auto">
-					<table class="table table-bordered" style="font-size:12px">
-						<thead><tr>
-							<th>${__("Schyot")}</th><th>${__("Sana")}</th><th>${__("Mijoz")}</th><th>${__("Tavar")}</th>
-							<th class="text-right">${__("Kg")}</th><th class="text-right">${__("Savdo")}</th>
-							<th class="text-right">${__("Tannarx")}</th><th class="text-right">${__("Foyda")}</th>
-							<th class="text-right">${__("Marja %")}</th>
-						</tr></thead>
-						<tbody>${satrlar}</tbody>
-					</table></div>`);
-				d.show();
-			},
-		});
+
+		// bosilgan ustun davri -> sana oralig'i (hisobot oralig'iga qirqiladi)
+		let from = f.from_date,
+			to = f.to_date;
+		if (args.davr !== "jami") {
+			const q = args.davr.slice(2).split("_"); // p_YYYY_MM yoki p_YYYY_MM_DD
+			if (q.length === 3) {
+				from = to = `${q[0]}-${q[1]}-${q[2]}`;
+			} else {
+				const oy_boshi = `${q[0]}-${q[1]}-01`;
+				const oy_oxiri = moment(oy_boshi).endOf("month").format("YYYY-MM-DD");
+				from = from > oy_boshi ? from : oy_boshi;
+				to = to < oy_oxiri ? to : oy_oxiri;
+			}
+		}
+
+		frappe.route_options = {
+			from_date: from,
+			to_date: to,
+			customer_group: f.customer_group || "",
+			mijozlar: f.mijozlar || [],
+			kategoriya: f.kategoriya || "",
+			// bosilgan tugun hisobot filtridan ustun turadi
+			item_group: args.r_guruh || f.item_group || "",
+			subkategoriya: args.r_subkat ? [args.r_subkat] : f.subkategoriya || [],
+			tavarlar: args.item_code ? [args.item_code] : f.tavarlar || [],
+			vozvrat: "",
+		};
+		frappe.set_route("query-report", "Kontrol Marja Detal");
 	},
 };
