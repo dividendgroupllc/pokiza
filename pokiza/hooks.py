@@ -49,7 +49,8 @@ app_include_css = [
 doctype_js = {
 	"BOM": "public/js/bom.js",
 	"User": "public/js/user_nazorat.js",
-	"Customer": "public/js/mijoz_hisobot.js",
+	"Customer": ["public/js/mijoz_hisobot.js", "public/js/kontragent_balans.js"],
+	"Supplier": "public/js/kontragent_balans.js",
 	"Mijoz Kartochkasi": "public/js/mijoz_hisobot.js",
 	"Payment Entry": "public/js/payment_entry.js",
 	"Purchase Invoice": "public/js/purchase_invoice.js",
