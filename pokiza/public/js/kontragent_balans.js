@@ -1,5 +1,8 @@
-// Kontragent kartochkasi tepasida joriy balans (qarzdor/haqdor) indikatori.
+// Kontragent kartochkasida joriy balans: tepada indikator-pill + Details
+// ichidagi «Balans» HTML maydoni (custom_balans_korinish).
 // Server tomoni: pokiza/api/kontragent.py (GL Entry bo'yicha debit − credit).
+// Ishora ikkala turda ham bir xil o'qiladi:
+//   balans > 0 -> kontragent BIZGA QARZDOR; balans < 0 -> HAQDOR (biz qarzdormiz).
 
 function pokiza_balans_korsat(frm, party_type) {
 	if (frm.is_new()) return;
@@ -9,32 +12,35 @@ function pokiza_balans_korsat(frm, party_type) {
 	}).then((r) => {
 		const bal = flt(r.message);
 		const pul = format_currency(Math.abs(bal), "UZS", 0);
-		let label, rang;
-		if (party_type === "Customer") {
-			if (bal > 0.5) {
-				label = __("Bizga qarzdor: {0}", [pul]);
-				rang = "red";
-			} else if (bal < -0.5) {
-				label = __("Haqdor (avans olingan): {0}", [pul]);
-				rang = "blue";
-			} else {
-				label = __("Qarzi yo'q");
-				rang = "green";
-			}
+		let label, rang, css;
+		if (bal > 0.5) {
+			label = __("Bizga qarzdor: {0}", [pul]);
+			rang = "red";
+			css = "var(--red-600)";
+		} else if (bal < -0.5) {
+			label = __("Haqdor (biz qarzdormiz): {0}", [pul]);
+			rang = "blue";
+			css = "var(--blue-600)";
 		} else {
-			// Supplier: credit > debit (bal < 0) -> biz qarzdormiz
-			if (bal < -0.5) {
-				label = __("Biz qarzdormiz: {0}", [pul]);
-				rang = "red";
-			} else if (bal > 0.5) {
-				label = __("Haqdormiz (avans berilgan): {0}", [pul]);
-				rang = "blue";
-			} else {
-				label = __("Qarz yo'q");
-				rang = "green";
-			}
+			label = __("Qarzi yo'q");
+			rang = "green";
+			css = "var(--green-600)";
 		}
+
+		// 1) tepadagi indikator-pill
 		frm.dashboard.add_indicator(label, rang);
+
+		// 2) Details ichidagi «Balans» maydoni
+		const field = frm.get_field("custom_balans_korinish");
+		if (field && field.$wrapper) {
+			field.$wrapper.html(`
+				<div class="frappe-control">
+					<div class="control-label">${__("Balans")}</div>
+					<div class="like-disabled-input" style="font-size:15px;font-weight:600;color:${css}">
+						${label}
+					</div>
+				</div>`);
+		}
 	});
 }
 
