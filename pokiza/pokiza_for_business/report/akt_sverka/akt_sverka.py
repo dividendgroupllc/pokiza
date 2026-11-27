@@ -10,28 +10,48 @@ VIEW_DAILY = "Ежедневный"
 REPORT_NAME = "Akt Sverka"
 
 
-# Shu rollardan biri bo'lsa — hisobot to'liq (mijoz, postavshik, xodim). Qolganlar (masalan Ombor) — faqat postavshik.
+# Shu rollardan biri bo'lsa — hisobot to'liq (mijoz, postavshik, xodim, boshqa).
 TOLIQ_ROLLAR = {"System Manager", "Accounts Manager", "Accounts User", "kassa", "investor"}
+# Qolgan rollar — faqat shu kontragent turlari (bir nechta rol bo'lsa — birlashmasi).
+# Yangi rolga Akt Sverka berilsa, shu yerga qo'shiladi; ro'yxatda yo'q rol hech narsa ko'rmaydi.
+ROL_TURLARI = {
+    "Ombor": {"Supplier"},
+    "salesadmin": {"Customer"},
+}
+
+
+def ruxsat_turlari(user=None):
+    """None — hamma tur; set — faqat shu kontragent turlari."""
+    user = user or frappe.session.user
+    rollar = set(frappe.get_roles(user))
+    if user == "Administrator" or TOLIQ_ROLLAR & rollar:
+        return None
+    out = set()
+    for r in rollar:
+        out |= ROL_TURLARI.get(r, set())
+    return out
 
 
 def faqat_postavshik(user=None):
-    user = user or frappe.session.user
-    return user != "Administrator" and not (TOLIQ_ROLLAR & set(frappe.get_roles(user)))
+    """Eski nom (orqaga moslik): faqat postavshik ko'radimi."""
+    return ruxsat_turlari(user) == {"Supplier"}
 
 
 @frappe.whitelist()
 def akt_doirasi():
-    """JS uchun: foydalanuvchi faqat postavshik aktini ko'radimi."""
-    return {"faqat_postavshik": faqat_postavshik()}
+    """JS uchun: cheklangan foydalanuvchiga ochiq kontragent turlari (None — hammasi)."""
+    t = ruxsat_turlari()
+    return {"turlar": None if t is None else sorted(t)}
 
 
 def tekshir_doira(filters):
-    """Server tomonda majburiy: cheklangan foydalanuvchi faqat Supplier akti."""
+    """Server tomonda majburiy: cheklangan foydalanuvchi faqat o'z rolidagi kontragent turi akti."""
     filters = filters or {}
     if not filters.get("party"):  # kontragent tanlanmagan — ma'lumot yo'q (sahifa ochilgandagi birinchi ishga tushish)
         return
-    if faqat_postavshik() and filters.get("party_type") != "Supplier":
-        frappe.throw(frappe._("Сизга фақат поставщиклар акт сверкаси очиқ"), frappe.PermissionError)
+    t = ruxsat_turlari()
+    if t is not None and filters.get("party_type") not in t:
+        frappe.throw(frappe._("Сизга бу контрагент тури акт сверкаси очиқ эмас"), frappe.PermissionError)
 
 
 def check_report_permission(filters=None):
