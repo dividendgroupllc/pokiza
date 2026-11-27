@@ -12,33 +12,26 @@ function pokiza_balans_korsat(frm, party_type) {
 	}).then((r) => {
 		const bal = flt(r.message);
 		const pul = format_currency(Math.abs(bal), "UZS", 0);
-		let label, rang, css;
+		let label, css;
 		if (bal > 0.5) {
 			label = __("Bizga qarzdor: {0}", [pul]);
-			rang = "red";
 			css = "var(--red-600)";
 		} else if (bal < -0.5) {
 			label = __("Haqdor (biz qarzdormiz): {0}", [pul]);
-			rang = "blue";
 			css = "var(--blue-600)";
 		} else {
 			label = __("Qarzi yo'q");
-			rang = "green";
-			css = "var(--green-600)";
+			css = "var(--text-color)";
 		}
 
-		// 1) tepadagi indikator-pill
-		frm.dashboard.add_indicator(label, rang);
-
-		// 2) Details ichidagi «Balans» maydoni
+		// Details ichidagi «Balans» maydoni (dashborddagi pill ataylab YO'Q —
+		// u yerda ERPNext'ning o'z Total Unpaid'i bor, takror bo'lib qolardi)
 		const field = frm.get_field("custom_balans_korinish");
 		if (field && field.$wrapper) {
 			field.$wrapper.html(`
 				<div class="frappe-control">
 					<div class="control-label">${__("Balans")}</div>
-					<div class="like-disabled-input" style="font-size:15px;font-weight:600;color:${css}">
-						${label}
-					</div>
+					<div class="like-disabled-input" style="color:${css}">${label}</div>
 				</div>`);
 		}
 	});
