@@ -13,8 +13,12 @@ ni to'g'ridan-to'g'ri qo'yadi). Shuning uchun harakat miqdori shunday hisoblanad
 har (tavar, sklad) oqimi bo'yicha yurib, movement = qty_after_transaction - oldingi balans.
 Shunda Boshlang'ich + Kirim - Chiqim = So'ngi qoldiq doim bajariladi.
 
-Tannarx = stock_value_difference (SLE dagi haqiqiy baholash o'zgarishi) — kirimda musbat,
-chiqimda manfiy bo'ladi, mos ustunga absolyut qiymati yoziladi.
+Tannarx ustunlarida 1 BIRLIK NARXI (so'm/dona yoki so'm/kg): SLE dagi haqiqiy
+baholash o'zgarishi (stock_value_difference) harakat miqdoriga bo'linadi.
+Jami summalar qator ostida emas, tepadagi summary kartochkalarida — aks holda
+total-qator birlik narxlarini qo'shib ma'nosiz son chiqarar edi (shu sababli
+add_total_row ham o'chirilgan). Harakatsiz qayta baholash qatorida (dona 0,
+qiymat o'zgargan) narx chiqmaydi, lekin summasi jami kartochkaga qo'shiladi.
 
 Diqqat: tavar filtrisiz (guruh/sklad bo'yicha) dona yig'indilari ARALASH birlikda
 chiqishi mumkin (кг + шт) — summary shuni hisobga olib o'qilsin.
@@ -27,20 +31,10 @@ from frappe.utils.nestedset import get_descendants_of
 
 EPS = 0.0005
 
-HUJJAT_TURI_UZ = {
-    "Purchase Invoice": "Zakup (kirim schyoti)",
-    "Sales Invoice": "Sotuv (schyot)",
-    "Stock Reconciliation": "Inventarizatsiya",
-}
-
-STOCK_ENTRY_TURI_UZ = {
-    "Material Receipt": "Kirim (qabul)",
-    "Material Issue": "Spisaniye",
-    "Material Transfer": "Ko'chirish",
-    "Material Transfer for Manufacture": "Ishlab chiqarishga uzatish",
-    "Manufacture": "Ishlab chiqarish",
-    "Repack": "Qayta qadoqlash",
-}
+# Hujjat turi TARJIMA QILINMAYDI — tizimda qanday bo'lsa shundayligicha
+# chiqadi (foydalanuvchi talabi, 2026-11-28): Stock Entry'da hujjatdagi
+# stock_entry_type (Material Receipt, Manufacture, Repack...), qolganlarida
+# voucher_type (Purchase Invoice, Sales Invoice, Stock Reconciliation).
 
 
 def execute(filters=None):
@@ -110,6 +104,7 @@ def execute(filters=None):
 
     data = []
     jami_kirim = jami_chiqim = 0.0
+    jami_kirim_summa = jami_chiqim_summa = 0.0
     for r in rows:
         kalit = (r.item_code, r.warehouse)
         oldingi = balans.get(kalit, 0.0)
@@ -124,24 +119,30 @@ def execute(filters=None):
 
         kirim_dona = movement if movement > EPS else None
         chiqim_dona = -movement if movement < -EPS else None
-        # tannarx harakat yo'nalishiga emas, qiymat o'zgarishi belgisiga qarab yotqiziladi
-        # (qayta baholashda dona 0 bo'lsa ham qiymat o'zgaradi)
-        kirim_tannarx = svd if svd > 0 else None
-        chiqim_tannarx = -svd if svd < 0 else None
+        # 1 birlik narxi: qiymat o'zgarishi / harakat miqdori. Harakatsiz
+        # qayta baholashda (dona 0, qiymat bor) narx chiqarilmaydi.
+        narx = abs(svd) / abs(movement) if abs(movement) >= EPS else None
+        kirim_narx = narx if kirim_dona else None
+        chiqim_narx = narx if chiqim_dona else None
 
         if kirim_dona:
             jami_kirim += kirim_dona
         if chiqim_dona:
             jami_chiqim += chiqim_dona
+        # jami summalar (summary kartochkalari uchun) — belgisi bo'yicha
+        if svd > 0:
+            jami_kirim_summa += svd
+        elif svd < 0:
+            jami_chiqim_summa += -svd
 
         data.append({
             "sana": r.posting_date,
             "tavar": r.item_name,
             "item_code": r.item_code,
             "kirim_dona": kirim_dona,
-            "kirim_tannarx": kirim_tannarx,
+            "kirim_tannarx": kirim_narx,
             "chiqim_dona": chiqim_dona,
-            "chiqim_tannarx": chiqim_tannarx,
+            "chiqim_tannarx": chiqim_narx,
             "birlik": r.stock_uom,
             "hujjat_turi": _hujjat_turi(r, izohlar),
             "voucher_type": r.voucher_type,
@@ -160,9 +161,9 @@ def execute(filters=None):
         {"fieldname": "sana", "label": _("Sana"), "fieldtype": "Date", "width": 95},
         {"fieldname": "tavar", "label": _("Tavar"), "fieldtype": "Data", "width": 220},
         {"fieldname": "kirim_dona", "label": _("Kirim (dona)"), "fieldtype": "Float", "width": 110},
-        {"fieldname": "kirim_tannarx", "label": _("Kirim tannarxi"), "fieldtype": "Currency", "width": 130},
+        {"fieldname": "kirim_tannarx", "label": _("Kirim narxi (1 birlik)"), "fieldtype": "Currency", "width": 130},
         {"fieldname": "chiqim_dona", "label": _("Chiqim (dona)"), "fieldtype": "Float", "width": 110},
-        {"fieldname": "chiqim_tannarx", "label": _("Chiqim tannarxi"), "fieldtype": "Currency", "width": 130},
+        {"fieldname": "chiqim_tannarx", "label": _("Chiqim narxi (1 birlik)"), "fieldtype": "Currency", "width": 130},
         {"fieldname": "birlik", "label": _("Birlik"), "fieldtype": "Data", "width": 70},
         {"fieldname": "hujjat_turi", "label": _("Hujjat turi"), "fieldtype": "Data", "width": 170},
         {"fieldname": "hujjat", "label": _("Hujjat"), "fieldtype": "Dynamic Link", "options": "voucher_type", "width": 170},
@@ -174,7 +175,11 @@ def execute(filters=None):
     report_summary = [
         {"value": flt(boshlangich, 3), "label": _("Boshlang'ich qoldiq"), "datatype": "Float", "indicator": "Blue"},
         {"value": flt(jami_kirim, 3), "label": _("Jami kirim (dona)"), "datatype": "Float", "indicator": "Green"},
+        {"value": flt(jami_kirim_summa), "label": _("Jami kirim tannarxi (summa)"), "datatype": "Currency",
+         "currency": "UZS", "indicator": "Green"},
         {"value": flt(jami_chiqim, 3), "label": _("Jami chiqim (dona)"), "datatype": "Float", "indicator": "Red"},
+        {"value": flt(jami_chiqim_summa), "label": _("Jami chiqim tannarxi (summa)"), "datatype": "Currency",
+         "currency": "UZS", "indicator": "Red"},
         {"value": flt(songgi, 3), "label": _("So'nggi qoldiq"), "datatype": "Float", "indicator": "Blue"},
     ]
 
@@ -182,11 +187,11 @@ def execute(filters=None):
 
 
 def _hujjat_turi(r, izohlar):
-    """Hujjat turining tushunarli nomi; Stock Entry uchun aniq maqsadi ko'rsatiladi."""
+    """Hujjat turi tizimdagidek: Stock Entry'da hujjatning o'z turi
+    (stock_entry_type), qolganlarida voucher_type."""
     if r.voucher_type == "Stock Entry":
-        purpose = izohlar.get((r.voucher_type, r.voucher_no), {}).get("purpose") or ""
-        return STOCK_ENTRY_TURI_UZ.get(purpose, purpose or "Stock Entry")
-    return HUJJAT_TURI_UZ.get(r.voucher_type, r.voucher_type)
+        return izohlar.get((r.voucher_type, r.voucher_no), {}).get("turi") or "Stock Entry"
+    return r.voucher_type
 
 
 def _izohlarni_olish(rows):
@@ -208,11 +213,11 @@ def _izohlarni_olish(rows):
         for d in frappe.get_all(
             "Stock Entry",
             filters={"name": ("in", list(nomlar["Stock Entry"]))},
-            fields=["name", "purpose", "remarks"],
+            fields=["name", "stock_entry_type", "purpose", "remarks"],
         ):
             izohlar[("Stock Entry", d.name)] = {
                 "izoh": _tozala(d.remarks),
-                "purpose": d.purpose,
+                "turi": d.stock_entry_type or d.purpose,
             }
 
     for dt, kontragent_maydon in (
