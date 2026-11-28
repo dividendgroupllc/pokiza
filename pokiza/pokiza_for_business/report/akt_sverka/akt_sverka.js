@@ -139,7 +139,11 @@ frappe.query_reports["Akt Sverka"] = {
                 f.df.options = turlar.join("\n");
                 f.df.read_only = turlar.length === 1 ? 1 : 0;
                 f.refresh();
-                report.set_filter_value("party_type", turlar[0]);
+                // Kontragent kartochkasidan kelgan (route) qiymat ruxsat doirasida
+                // bo'lsa, uni saqlaymiz — aks holda birinchi ruxsat etilgan tur
+                if (turlar.indexOf(report.get_filter_value("party_type")) === -1) {
+                    report.set_filter_value("party_type", turlar[0]);
+                }
             }
         });
 
@@ -358,6 +362,13 @@ frappe.query_reports["Akt Sverka"] = {
             ],
             "default": "Подробный",
             "reqd": 1
+        },
+        {
+            "fieldname": "faqat_operatsiya",
+            "label": __("Фақат операция кунлари"),
+            "fieldtype": "Check",
+            "default": 1,
+            "depends_on": "eval:doc.view=='Ежедневный'"
         }
     ],
 

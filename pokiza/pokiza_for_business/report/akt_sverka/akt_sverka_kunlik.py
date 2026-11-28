@@ -30,7 +30,7 @@ import json
 from collections import defaultdict
 
 import frappe
-from frappe.utils import add_days, flt, get_last_day, getdate
+from frappe.utils import add_days, cint, flt, get_last_day, getdate
 
 # Bank / o'tkazma hisoblarini aniqlash uchun nomlardagi kalit so'zlar.
 # (Pokiza'da «Р/С» hisobining account_type xato — «Cash», shuning uchun
@@ -152,6 +152,12 @@ def build_report(filters):
         rows.append(row)
         day = getdate(add_days(day, 1))
 
+    # «Фақат операция кунлари» (sukutda yoqiq): harakatsiz kalendar kunlari
+    # olib tashlanadi. Сальдо yuqorida kun-kun kumulyativ hisoblab bo'lingan,
+    # shuning uchun qator tushishi qolganlarining сальдосига ta'sir qilmaydi.
+    if cint(filters.get("faqat_operatsiya", 1)):
+        rows = [r for r in rows if any(r[f] for f in AMOUNT_FIELDS)]
+
     return {
         "rows": rows,
         "totals": {k: flt(v, 2) for k, v in totals.items()},
@@ -163,6 +169,9 @@ def build_report(filters):
         "from_date": from_date,
         "to_date": to_date,
         "show_boshqa": bool(flt(totals["boshqa"], 2)),
+        # Davr bo'yicha umuman harakat bo'lmagan ixtiyoriy ustunlar yashirinadi
+        "show_vozvrat": bool(flt(totals["vozvrat"], 2)),
+        "show_bonus": bool(flt(totals["bonus"], 2)),
         "company": get_company(),
     }
 
@@ -371,13 +380,24 @@ def get_columns(report):
          "options": "currency", "width": 130},
         {"label": "Оплачено", "fieldname": "oplachano", "fieldtype": "Currency",
          "options": "currency", "width": 130},
-        {"label": "Возврат", "fieldname": "vozvrat", "fieldtype": "Currency",
-         "options": "currency", "width": 120},
-        {"label": "Перечисления", "fieldname": "perechisleniya", "fieldtype": "Currency",
-         "options": "currency", "width": 140},
-        {"label": "Бонус", "fieldname": "bonus", "fieldtype": "Currency",
-         "options": "currency", "width": 130},
     ]
+
+    if report.get("show_vozvrat"):
+        columns.append(
+            {"label": "Возврат", "fieldname": "vozvrat", "fieldtype": "Currency",
+             "options": "currency", "width": 120}
+        )
+
+    columns.append(
+        {"label": "Перечисления", "fieldname": "perechisleniya", "fieldtype": "Currency",
+         "options": "currency", "width": 140}
+    )
+
+    if report.get("show_bonus"):
+        columns.append(
+            {"label": "Бонус", "fieldname": "bonus", "fieldtype": "Currency",
+             "options": "currency", "width": 130}
+        )
 
     if report.get("show_boshqa"):
         columns.append(
@@ -422,10 +442,12 @@ def get_summary_html(report):
     cells = [
         ("Отгрузка", totals["otgruzka"], "#1565c0"),
         ("Оплачено", totals["oplachano"], "#2e7d32"),
-        ("Возврат", totals["vozvrat"], "#c62828"),
-        ("Перечисления", totals["perechisleniya"], "#2e7d32"),
-        ("Бонус", totals["bonus"], "#ef6c00"),
     ]
+    if report.get("show_vozvrat"):
+        cells.append(("Возврат", totals["vozvrat"], "#c62828"))
+    cells.append(("Перечисления", totals["perechisleniya"], "#2e7d32"))
+    if report.get("show_bonus"):
+        cells.append(("Бонус", totals["bonus"], "#ef6c00"))
     if report.get("show_boshqa"):
         cells.append(("Прочее", totals["boshqa"], "#6a1b9a"))
 
@@ -471,8 +493,16 @@ def build_excel(report):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
-    fields = ["otgruzka", "oplachano", "vozvrat", "perechisleniya", "bonus"]
-    labels = ["Отгрузка", "Оплачено", "Возврат", "Перечисления", "Бонус"]
+    fields = ["otgruzka", "oplachano"]
+    labels = ["Отгрузка", "Оплачено"]
+    if report.get("show_vozvrat"):
+        fields.append("vozvrat")
+        labels.append("Возврат")
+    fields.append("perechisleniya")
+    labels.append("Перечисления")
+    if report.get("show_bonus"):
+        fields.append("bonus")
+        labels.append("Бонус")
     if report["show_boshqa"]:
         fields.append("boshqa")
         labels.append("Прочее")

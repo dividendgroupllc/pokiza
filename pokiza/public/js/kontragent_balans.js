@@ -37,14 +37,28 @@ function pokiza_balans_korsat(frm, party_type) {
 	});
 }
 
+// «Акт сверки» tugmasi — hisobotga shu kontragent filtrlari bilan o'tadi
+// (sanalar hisobotning o'z sukutida qoladi: oxirgi 1 oy).
+function pokiza_akt_sverka_tugma(frm, party_type) {
+	if (frm.is_new()) return;
+	frm.add_custom_button(__("Акт сверки"), () => {
+		frappe.set_route("query-report", "Akt Sverka", {
+			party_type: party_type,
+			party: frm.doc.name,
+		});
+	});
+}
+
 frappe.ui.form.on("Customer", {
 	refresh(frm) {
 		pokiza_balans_korsat(frm, "Customer");
+		pokiza_akt_sverka_tugma(frm, "Customer");
 	},
 });
 
 frappe.ui.form.on("Supplier", {
 	refresh(frm) {
 		pokiza_balans_korsat(frm, "Supplier");
+		pokiza_akt_sverka_tugma(frm, "Supplier");
 	},
 });
